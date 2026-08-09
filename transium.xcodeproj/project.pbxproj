@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		B685FCB33028DD8A005B7C1E /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = B685FCB23028DD88005B7C1E /* .gitignore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		B685FCA43028DCB5005B7C1E /* transium.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = transium.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B685FCB23028DD88005B7C1E /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -32,6 +37,7 @@
 		B685FC9B3028DCB5005B7C1E = {
 			isa = PBXGroup;
 			children = (
+				B685FCB23028DD88005B7C1E /* .gitignore */,
 				B685FCA63028DCB5005B7C1E /* transium */,
 				B685FCA53028DCB5005B7C1E /* Products */,
 			);
@@ -109,6 +115,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B685FCB33028DD8A005B7C1E /* .gitignore in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
