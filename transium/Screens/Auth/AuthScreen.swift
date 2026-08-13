@@ -16,9 +16,9 @@ struct AuthScreen: View {
     @State private var signInErrorMessage: String?
     @State private var backendIDToast: BackendIDToast?
 
-    let onBackToOnboarding: (() -> Void)?
+    let onBackToOnboarding: () -> Void
 
-    init(onBackToOnboarding: (() -> Void)? = nil) {
+    init(onBackToOnboarding: @escaping () -> Void = {}) {
         self.onBackToOnboarding = onBackToOnboarding
     }
 
@@ -40,26 +40,14 @@ struct AuthScreen: View {
                     onCompletion: handleAppleSignIn,
                     onCopyBackendID: copyBackendID
                 )
-
-                if let onBackToOnboarding {
-                    VStack {
-                        HStack {
-                            TransiumIconButton(
-                                systemName: "arrow.left",
-                                accessibilityLabel: "Back to onboarding",
-                                action: onBackToOnboarding
-                            )
-
-                            Spacer()
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 10)
-
-                        Spacer()
-                    }
-                }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
+            .overlay(alignment: .topLeading) {
+                backButton
+                    .padding(.leading, 20)
+                    .padding(.top, 12)
+                    .zIndex(10)
+            }
         }
         .task {
             await refreshStoredCredentialState(showErrors: false)
@@ -73,6 +61,21 @@ struct AuthScreen: View {
     }
 
     // MARK: Important Flow - Hero Placement
+
+    private var backButton: some View {
+        Button(action: onBackToOnboarding) {
+            Image(systemName: "arrow.left")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.black)
+                .frame(width: 40, height: 40)
+                .background(.white)
+                .clipShape(.circle)
+                .shadow(color: .authInk.opacity(0.08), radius: 12, y: 4)
+                .contentShape(.circle)
+        }
+        .buttonStyle(.transiumNoOpacity)
+        .accessibilityLabel("Back to onboarding")
+    }
 
     private func heroArt(_ metrics: AuthScreenMetrics) -> some View {
         Image(TransiumAsset.Illustration.authHero)

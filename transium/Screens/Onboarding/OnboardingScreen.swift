@@ -11,6 +11,7 @@ struct OnboardingScreen: View {
     let onComplete: () -> Void
 
     @State private var currentPage = 0
+    @GestureState private var dragOffset: CGFloat = 0
     private let pages = OnboardingPage.defaultPages
 
     init(initialPage: Int = 0, onComplete: @escaping () -> Void) {
@@ -33,12 +34,18 @@ struct OnboardingScreen: View {
 
                 Spacer(minLength: 26)
 
-                OnboardingPageContent(page: page, animation: pageAnimation)
-                    .padding(.horizontal, 25)
+                OnboardingCopyPager(
+                    pages: pages,
+                    currentPage: currentPage,
+                    dragOffset: dragOffset,
+                    animation: pageAnimation
+                )
+                .frame(height: 120)
 
                 OnboardingVisualPager(
                     pages: pages,
                     currentPage: currentPage,
+                    dragOffset: dragOffset,
                     animation: pageAnimation
                 )
                     .frame(height: 350)
@@ -63,8 +70,11 @@ struct OnboardingScreen: View {
 
     private var swipeGesture: some Gesture {
         DragGesture(minimumDistance: 36)
+            .updating($dragOffset) { value, state, _ in
+                state = rubberBandedDragOffset(value.translation.width)
+            }
             .onEnded { value in
-                handleSwipe(value.translation.width)
+                handleSwipe(value.predictedEndTranslation.width)
             }
     }
 
@@ -72,7 +82,7 @@ struct OnboardingScreen: View {
         let threshold: CGFloat = 54
 
         if horizontalTranslation <= -threshold {
-            advance()
+            goToNextPage()
         } else if horizontalTranslation >= threshold {
             goBack()
         }
@@ -81,6 +91,14 @@ struct OnboardingScreen: View {
     private func advance() {
         guard currentPage < pages.count - 1 else {
             onComplete()
+            return
+        }
+
+        goToNextPage()
+    }
+
+    private func goToNextPage() {
+        guard currentPage < pages.count - 1 else {
             return
         }
 
@@ -103,6 +121,15 @@ struct OnboardingScreen: View {
         reduceMotion ? .linear(duration: 0.12) : .smooth(duration: 0.34, extraBounce: 0)
     }
 
+    private func rubberBandedDragOffset(_ horizontalTranslation: CGFloat) -> CGFloat {
+        let isDraggingBeforeFirstPage = currentPage == 0 && horizontalTranslation > 0
+        let isDraggingAfterLastPage = currentPage == pages.count - 1 && horizontalTranslation < 0
+
+        return isDraggingBeforeFirstPage || isDraggingAfterLastPage
+            ? horizontalTranslation * 0.22
+            : horizontalTranslation
+    }
+
     private var navigationBar: some View {
         HStack {
             if currentPage > 0 {
@@ -120,11 +147,34 @@ struct OnboardingScreen: View {
     }
 }
 
-private struct OnboardingPageContent: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    let page: OnboardingPage
+private struct OnboardingCopyPager: View {
+    let pages: [OnboardingPage]
+    let currentPage: Int
+    let dragOffset: CGFloat
     let animation: Animation
+
+    var body: some View {
+        GeometryReader { proxy in
+            HStack(spacing: 0) {
+                ForEach(pages.indices, id: \.self) { pageIndex in
+                    OnboardingPageContent(page: pages[pageIndex])
+                        .padding(.horizontal, 25)
+                        .frame(width: proxy.size.width)
+                }
+            }
+            .offset(x: pageTrackOffset(width: proxy.size.width))
+            .animation(animation, value: currentPage)
+        }
+        .clipped()
+    }
+
+    private func pageTrackOffset(width: CGFloat) -> CGFloat {
+        (-CGFloat(currentPage) * width) + dragOffset
+    }
+}
+
+private struct OnboardingPageContent: View {
+    let page: OnboardingPage
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -133,30 +183,14 @@ private struct OnboardingPageContent: View {
                 .foregroundStyle(.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.86)
-                .contentTransition(textTransition)
-                .animation(titleAnimation, value: page.title)
 
             Text(page.description)
                 .font(TransiumFont.body(17))
                 .foregroundStyle(.white)
                 .fixedSize(horizontal: false, vertical: true)
-                .contentTransition(textTransition)
-                .animation(descriptionAnimation, value: page.description)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-    }
-
-    private var textTransition: ContentTransition {
-        reduceMotion ? .identity : .interpolate
-    }
-
-    private var titleAnimation: Animation? {
-        reduceMotion ? nil : animation
-    }
-
-    private var descriptionAnimation: Animation? {
-        reduceMotion ? nil : animation.delay(0.06)
     }
 }
 
@@ -165,6 +199,7 @@ private struct OnboardingVisualPager: View {
 
     let pages: [OnboardingPage]
     let currentPage: Int
+    let dragOffset: CGFloat
     let animation: Animation
 
     var body: some View {
@@ -173,14 +208,14 @@ private struct OnboardingVisualPager: View {
                 visualPage(for: pages[currentPage])
             } else {
                 GeometryReader { proxy in
-                    ZStack {
+                    HStack(spacing: 0) {
                         ForEach(pages.indices, id: \.self) { pageIndex in
                             visualPage(for: pages[pageIndex])
                                 .frame(width: proxy.size.width)
-                                .offset(x: pageOffset(for: pageIndex, width: proxy.size.width))
-                                .animation(pageAnimation(for: pageIndex), value: currentPage)
                         }
                     }
+                    .offset(x: pageTrackOffset(width: proxy.size.width))
+                    .animation(animation.delay(0.035), value: currentPage)
                 }
             }
         }
@@ -199,14 +234,8 @@ private struct OnboardingVisualPager: View {
         }
     }
 
-    private func pageOffset(for pageIndex: Int, width: CGFloat) -> CGFloat {
-        CGFloat(pageIndex - currentPage) * width
-    }
-
-    private func pageAnimation(for pageIndex: Int) -> Animation {
-        let delay = pageIndex == currentPage ? 0.045 : 0
-
-        return animation.delay(delay)
+    private func pageTrackOffset(width: CGFloat) -> CGFloat {
+        (-CGFloat(currentPage) * width) + dragOffset
     }
 }
 
@@ -219,13 +248,13 @@ private struct OnboardingPage {
     static let defaultPages = [
         OnboardingPage(
             title: "Explore Bali",
-            description: "No matter if you've been here 20 years or 20 minutes.",
+            description: "Find places, routes, and local moments without the guesswork.",
             imageName: TransiumAsset.Illustration.onboardingExplore,
             buttonTitle: "Next"
         ),
         OnboardingPage(
             title: "Worry-free Adventure!",
-            description: "No matter if you've been here 20 years or 20 minutes.",
+            description: "Keep every move simple, safe, and ready before you head out.",
             imageName: TransiumAsset.Illustration.onboardingAdventure,
             buttonTitle: "Next"
         ),
