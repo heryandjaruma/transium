@@ -2,6 +2,8 @@
 //  AuthScreen.swift
 //  transium
 //
+//  Created by Salman Alfarisi on 12/08/26.
+//
 
 import AuthenticationServices
 import SwiftData
@@ -53,6 +55,7 @@ struct AuthScreen: View {
             .resizable()
             .scaledToFit()
             .frame(width: metrics.heroWidth)
+            .scaleEffect(metrics.heroScale, anchor: .bottom)
             .offset(y: metrics.heroBottomOverlap)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .padding(.bottom, metrics.panelHeight)
@@ -147,6 +150,9 @@ private struct AuthBottomPanel: View {
             header
                 .padding(.bottom, metrics.headerBottomSpacing)
 
+            AuthAssuranceLine()
+                .padding(.bottom, metrics.trustPillBottomSpacing)
+
             SignInWithAppleButton(.continue, onRequest: onRequest, onCompletion: onCompletion)
                 .signInWithAppleButtonStyle(.black)
                 .frame(maxWidth: metrics.buttonMaxWidth)
@@ -175,27 +181,14 @@ private struct AuthBottomPanel: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: metrics.termsMaxWidth)
                 .accessibilityLabel("Signing up to a Transium account means you agree to the Privacy Policy and Terms of Service.")
+                .padding(.bottom, metrics.panelBottomPadding)
         }
-        .frame(maxWidth: metrics.contentMaxWidth)
+        .frame(width: metrics.panelWidth)
         .padding(.top, metrics.panelTopPadding)
         .padding(.horizontal, metrics.panelHorizontalPadding)
         .frame(width: metrics.panelWidth, height: metrics.panelHeight, alignment: .top)
-        .background {
-            VStack(spacing: 0) {
-                UnevenRoundedRectangle(
-                    topLeadingRadius: metrics.panelCornerRadius,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: metrics.panelCornerRadius,
-                    style: .continuous
-                )
-                .fill(Color(.systemBackground))
-                .frame(width: metrics.panelWidth, height: metrics.panelHeight)
-
-                Color(.systemBackground)
-                    .frame(width: metrics.panelWidth, height: metrics.bottomSafeAreaFillHeight)
-                    .ignoresSafeArea(edges: .bottom)
-            }
+        .background(alignment: .top) {
+            AuthPanelBackground(metrics: metrics)
         }
         .overlay(alignment: .top) {
             if let backendIDToast {
@@ -208,18 +201,18 @@ private struct AuthBottomPanel: View {
     }
 
     private var header: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: metrics.headerInnerSpacing) {
             Text("Welcome!")
                 .font(TransiumFont.display(metrics.titleFontSize))
                 .foregroundStyle(.primary)
-                .minimumScaleFactor(0.82)
+                .minimumScaleFactor(0.72)
                 .lineLimit(1)
 
             Text("Sign in to Start Your Adventure!")
                 .font(TransiumFont.body(metrics.subtitleFontSize))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .minimumScaleFactor(0.82)
+                .minimumScaleFactor(0.72)
                 .lineLimit(1)
         }
         .accessibilityElement(children: .combine)
@@ -241,6 +234,120 @@ private struct AuthBottomPanel: View {
         }
 
         return text
+    }
+}
+
+private struct AuthAssuranceLine: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            softRule
+
+            HStack(spacing: 6) {
+                Image(systemName: "lock.shield")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.authInk.opacity(0.42))
+
+                Text("Private, password-free sign in")
+                    .font(TransiumFont.body(10, weight: .medium))
+                    .foregroundStyle(Color.authInk.opacity(0.52))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Private, password-free sign in")
+
+            softRule
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var softRule: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        .clear,
+                        Color.authInk.opacity(0.11),
+                        .clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .frame(width: 54)
+            .frame(height: 1)
+    }
+}
+
+private struct AuthPanelBackground: View {
+    let metrics: AuthScreenMetrics
+
+    var body: some View {
+        VStack(spacing: 0) {
+            panelShape
+                .fill(panelFill)
+                .overlay(alignment: .top) {
+                    panelTopGlow
+                        .clipShape(panelShape)
+                }
+                .overlay(alignment: .top) {
+                    Capsule()
+                        .fill(Color.authInk.opacity(0.08))
+                        .frame(width: 42, height: 4)
+                        .padding(.top, 12)
+                }
+                .overlay {
+                    panelShape
+                        .stroke(.white.opacity(0.9), lineWidth: 1)
+                }
+                .frame(width: metrics.panelWidth, height: metrics.panelHeight)
+                .shadow(color: .authInk.opacity(0.08), radius: 24, y: -8)
+
+            Color.authPanelBase
+                .frame(width: metrics.panelWidth, height: metrics.bottomSafeAreaFillHeight)
+                .ignoresSafeArea(edges: .bottom)
+        }
+    }
+
+    private var panelShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            topLeadingRadius: metrics.panelCornerRadius,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: 0,
+            topTrailingRadius: metrics.panelCornerRadius,
+            style: .continuous
+        )
+    }
+
+    private var panelFill: LinearGradient {
+        LinearGradient(
+            colors: [
+                .white,
+                .authPanelBase,
+                .white
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    private var panelTopGlow: some View {
+        HStack(spacing: 0) {
+            Circle()
+                .fill(Color.authGold.opacity(0.18))
+                .frame(width: 170, height: 170)
+                .blur(radius: 36)
+                .offset(x: -58, y: -94)
+
+            Spacer()
+
+            Circle()
+                .fill(Color.authBlue.opacity(0.08))
+                .frame(width: 150, height: 150)
+                .blur(radius: 34)
+                .offset(x: 48, y: -82)
+        }
+        .frame(width: metrics.panelWidth, height: 110)
     }
 }
 
@@ -284,11 +391,11 @@ private struct AuthScreenMetrics {
     let size: CGSize
 
     var panelHeight: CGFloat {
-        max(282, min(308, size.height * 0.325))
+        max(334, min(362, size.height * 0.388))
     }
 
     var bottomSafeAreaFillHeight: CGFloat {
-        80
+        max(72, size.height * 0.08)
     }
 
     var panelWidth: CGFloat {
@@ -304,15 +411,27 @@ private struct AuthScreenMetrics {
     }
 
     var panelTopPadding: CGFloat {
-        max(14, panelHeight * 0.052)
+        max(26, panelHeight * 0.12)
+    }
+
+    var panelBottomPadding: CGFloat {
+        max(8, panelHeight * 0.026)
+    }
+
+    var headerInnerSpacing: CGFloat {
+        max(4, panelHeight * 0.012)
     }
 
     var headerBottomSpacing: CGFloat {
-        max(18, panelHeight * 0.062)
+        max(18, panelHeight * 0.052)
+    }
+
+    var trustPillBottomSpacing: CGFloat {
+        max(24, panelHeight * 0.07)
     }
 
     var buttonBottomSpacing: CGFloat {
-        max(20, panelHeight * 0.07)
+        max(30, panelHeight * 0.088)
     }
 
     var errorBottomSpacing: CGFloat {
@@ -324,7 +443,7 @@ private struct AuthScreenMetrics {
     }
 
     var buttonHeight: CGFloat {
-        max(54, min(60, panelHeight * 0.18))
+        max(58, min(62, panelHeight * 0.18))
     }
 
     var contentMaxWidth: CGFloat {
@@ -332,7 +451,7 @@ private struct AuthScreenMetrics {
     }
 
     var termsMaxWidth: CGFloat {
-        max(320, panelWidth - 44)
+        max(340, panelWidth - 64)
     }
 
     var buttonMaxWidth: CGFloat {
@@ -343,8 +462,12 @@ private struct AuthScreenMetrics {
         max(size.width * 2.22, min(1_475, size.height * 1.2))
     }
 
+    var heroScale: CGFloat {
+        1.2
+    }
+
     var heroBottomOverlap: CGFloat {
-        panelHeight * 0.28
+        panelHeight * 0.42
     }
 
     var titleFontSize: CGFloat {
@@ -352,17 +475,20 @@ private struct AuthScreenMetrics {
     }
 
     var subtitleFontSize: CGFloat {
-        max(20, min(24, size.width * 0.054))
+        max(17, min(20, size.width * 0.048))
     }
 
     var termsFontSize: CGFloat {
-        max(13, min(15, size.width * 0.035))
+        max(12, min(13, size.width * 0.031))
     }
 }
 
 private extension Color {
     static let authBlue = TransiumColor.authBlue
     static let authLinkBlue = TransiumColor.linkBlue
+    static let authGold = Color(red: 1.0, green: 0.66, blue: 0.16)
+    static let authInk = Color(red: 0.07, green: 0.07, blue: 0.1)
+    static let authPanelBase = Color(red: 1.0, green: 0.995, blue: 0.975)
 }
 
 #Preview {

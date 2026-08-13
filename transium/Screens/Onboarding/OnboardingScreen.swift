@@ -6,9 +6,12 @@
 import SwiftUI
 
 struct OnboardingScreen: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let onComplete: () -> Void
 
     @State private var currentPage = 0
+    @State private var pageDirection = 1
 
     private let pages = OnboardingPage.defaultPages
 
@@ -27,12 +30,13 @@ struct OnboardingScreen: View {
                 OnboardingPageContent(page: page)
                     .padding(.horizontal, 25)
 
-                Image(page.imageName)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 350)
+                OnboardingVisualPager(
+                    pages: pages,
+                    currentPage: currentPage,
+                    animation: pageAnimation
+                )
+                    .frame(height: 350)
                     .padding(.top, 10)
-                    .accessibilityHidden(true)
 
                 Spacer(minLength: 28)
 
@@ -55,7 +59,9 @@ struct OnboardingScreen: View {
             return
         }
 
-        withAnimation(.snappy(duration: 0.28)) {
+        pageDirection = 1
+
+        withAnimation(pageAnimation) {
             currentPage += 1
         }
     }
@@ -65,9 +71,15 @@ struct OnboardingScreen: View {
             return
         }
 
-        withAnimation(.snappy(duration: 0.28)) {
+        pageDirection = -1
+
+        withAnimation(pageAnimation) {
             currentPage -= 1
         }
+    }
+
+    private var pageAnimation: Animation {
+        reduceMotion ? .linear(duration: 0.12) : .smooth(duration: 0.34, extraBounce: 0)
     }
 
     private var navigationBar: some View {
@@ -88,6 +100,8 @@ struct OnboardingScreen: View {
 }
 
 private struct OnboardingPageContent: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let page: OnboardingPage
 
     var body: some View {
@@ -102,7 +116,60 @@ private struct OnboardingPageContent: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .id(page.title)
+        .transition(pageTransition)
         .accessibilityElement(children: .combine)
+    }
+
+    private var pageTransition: AnyTransition {
+        guard !reduceMotion else {
+            return .opacity
+        }
+
+        return AnyTransition.asymmetric(
+            insertion: AnyTransition.opacity.combined(with: .offset(y: 10)),
+            removal: AnyTransition.opacity.combined(with: .offset(y: -8))
+        )
+    }
+}
+
+private struct OnboardingVisualPager: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let pages: [OnboardingPage]
+    let currentPage: Int
+    let animation: Animation
+
+    var body: some View {
+        Group {
+            if reduceMotion {
+                visualPage(for: pages[currentPage])
+            } else {
+                GeometryReader { proxy in
+                    HStack(spacing: 0) {
+                        ForEach(pages.indices, id: \.self) { pageIndex in
+                            visualPage(for: pages[pageIndex])
+                                .frame(width: proxy.size.width)
+                        }
+                    }
+                    .offset(x: -CGFloat(currentPage) * proxy.size.width)
+                    .animation(animation, value: currentPage)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .clipped()
+    }
+
+    private func visualPage(for page: OnboardingPage) -> some View {
+        VStack(spacing: 20) {
+            Image(page.imageName)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .frame(height: 350)
+                .accessibilityHidden(true)
+        }
     }
 }
 
