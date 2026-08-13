@@ -3,8 +3,9 @@
 ## Status On August 13, 2026
 
 `transium` is now a native SwiftUI app with a first-run onboarding flow,
-Apple-only authentication, and local SwiftData auth/profile models. Backend and
-database choices are still intentionally undecided.
+Apple-only authentication, a post-auth MapLibre home map, and local SwiftData
+auth/profile models. Backend and database choices are still intentionally
+undecided.
 
 ## Repository Shape
 
@@ -13,11 +14,14 @@ database choices are still intentionally undecided.
 - `transium/ContentView.swift` gates onboarding before authentication
 - `transium/Screens/Onboarding` contains the first-run onboarding flow
 - `transium/Screens/Auth` contains the Apple sign-in screen
+- `transium/Screens/Home` contains the initial post-auth map experience
 - `transium/UI/System` contains shared colors, fonts, asset names, and
   app environment flags in `DesignTokens.swift`
-- `transium/UI/Components` contains reusable buttons and page indicators
+- `transium/UI/Components` contains reusable buttons, page indicators, and
+  global app toast UI
 - `transium/Features/Auth` contains Apple sign-in service/store/local identity
   models
+- `transium/Features/Map` contains local MapLibre style generation
 - `transium/Features/Profile` contains the local private profile model
 - `transium/Backend` contains backend auth contracts only
 - `transium/Assets.xcassets` holds app icon, color assets, and illustrations
@@ -35,6 +39,8 @@ database choices are still intentionally undecided.
 3. If `AppEnvironment.DEV_MODE == true`, reset onboarding completion once from
    `transiumApp.init()` so onboarding replays on fresh launch.
 4. Show `AuthScreen` after onboarding completes.
+5. Show `HomeScreen` after Apple sign-in succeeds and the local profile is
+   persisted.
 
 Onboarding must stay before authentication until product direction changes.
 
@@ -64,6 +70,11 @@ available layers:
 - Basemap layers include land, district boundaries, water, vegetation, and
   roads.
 - Transit layers include bus stops and bus routes.
+- `HomeScreen` wraps MapLibre Native's `MLNMapView` in SwiftUI.
+- `TransiumMapStyleFactory` writes a temporary MapLibre style JSON that points
+  to the bundled PMTiles through `pmtiles://file://...` URLs.
+- The initial map style intentionally avoids symbol/text layers because no
+  local glyph or sprite assets are bundled yet.
 
 ## Build And Target Notes
 
@@ -71,7 +82,7 @@ available layers:
 - iPhone deployment target is currently `26.5`.
 - Sign in with Apple capability is enabled via `transium/transium.entitlements`.
 - `transium/Info.plist` registers bundled app fonts.
-- No Swift Package dependencies are configured yet.
+- MapLibre Native `6.28.0` is configured through Swift Package Manager.
 - No test target exists yet.
 
 ## What Future Agents Should Assume
@@ -85,8 +96,8 @@ available layers:
 
 ## Good Next Milestones
 
-- Add the post-auth app shell/profile destination
-- Add a map rendering spike using the bundled PMTiles assets
+- Add the post-auth profile destination
+- Add local glyph/sprite support if map labels become necessary
 - Define app navigation and first feature boundaries
 - Add an accessibility baseline early
 - Add tests as soon as domain logic appears

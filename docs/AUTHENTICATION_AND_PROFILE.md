@@ -16,8 +16,12 @@ at model contracts and security requirements.
   condition after onboarding completes.
 - Authentication must remain inaccessible until onboarding completes, except
   when onboarding is skipped/completed through the onboarding controls.
+- After successful Sign in with Apple handling and local profile persistence,
+  `ContentView` routes to `HomeScreen`.
 - The auth screen is light-mode only for now and uses shared `UI/System`
   typography/color tokens.
+- Auth success, warning, and error feedback uses the global top-screen toast
+  component from `UI/Components/AppToast.swift`.
 
 ## Local Device Models
 
@@ -66,12 +70,10 @@ Required middleware behavior:
 - Check local Apple credential state for existing sessions.
 - If Apple reports revoked, not found, or transferred credentials, clear the
   local session and ask the user to sign in again.
-- The current auth screen surfaces Apple's stable user identifier after a
-  successful sign-in as a temporary development callback/toast. A backend must
-  still verify the identity token and authorization code server-side before
-  trusting that identifier.
-- The temporary identifier toast is for development visibility only; it is not
-  a substitute for backend session creation.
+- Do not show Apple's stable user identifier, identity token, authorization
+  code, nonce, or backend-only data in user-facing toast copy.
+- A backend must still verify the identity token and authorization code
+  server-side before trusting the Apple account.
 
 ## Future Backend Decision Points
 

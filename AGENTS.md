@@ -19,9 +19,9 @@ file as the default operating agreement for any agent working here.
 ## Current Reality
 
 - The app has an onboarding flow, an Apple-only authentication screen, and
-  SwiftData local auth/profile models.
+  a post-auth MapLibre home map backed by bundled PMTiles.
 - There are no tests yet.
-- There are no external packages yet.
+- MapLibre Native is installed through Swift Package Manager.
 - The project uses Xcode's file-system-synchronized layout, so source files are
   discovered from the `transium/` folder instead of being manually listed one
   by one in the project file.
@@ -38,6 +38,8 @@ file as the default operating agreement for any agent working here.
   is chosen.
 - `transium/Resources/Fonts` stores font files registered through
   `transium/Info.plist`.
+- `transium/Resources/Maps` stores bundled PMTiles used by the initial
+  MapLibre home screen.
 
 ## App Flow Rules
 
@@ -49,6 +51,9 @@ file as the default operating agreement for any agent working here.
   the final onboarding button will never reach authentication.
 - Keep Sign in with Apple as the only authentication method unless the user
   explicitly changes product direction.
+- Do not show Apple identifiers, identity tokens, authorization codes, or nonce
+  values in user-facing toast copy.
+- After successful local Apple sign-in persistence, route to `HomeScreen`.
 - Do not trust client-provided user IDs on a future backend; verify Apple
   identity tokens and enforce owner-only profile access server-side.
 
@@ -64,6 +69,9 @@ file as the default operating agreement for any agent working here.
   current phone layout.
 - Keep auth hero artwork large and slightly clipped by the white auth panel,
   matching the supplied reference direction.
+- Use `AppToastCenter.shared` for global success, warning, and error feedback.
+- Keep toast messages human-readable and action-oriented; do not surface raw
+  error payloads, IDs, tokens, or implementation details.
 
 ## Non-Negotiable Git Rules
 

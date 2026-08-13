@@ -11,6 +11,7 @@ import SwiftData
 private enum RootScreen {
     case onboarding(initialPage: Int)
     case auth
+    case home
 }
 
 struct ContentView: View {
@@ -19,6 +20,7 @@ struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var rootScreen: RootScreen
     @State private var onboardingInitialPage = 0
+    @StateObject private var toastCenter = AppToastCenter.shared
 
     init() {
         let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Self.onboardingCompletionKey)
@@ -27,13 +29,21 @@ struct ContentView: View {
     }
 
     var body: some View {
-        switch rootScreen {
-        case .auth:
-            AuthScreen(onBackToOnboarding: showFinalOnboardingPage)
-        case .onboarding(let initialPage):
-            OnboardingScreen(initialPage: initialPage, onComplete: completeOnboarding)
-                .id(initialPage)
+        Group {
+            switch rootScreen {
+            case .auth:
+                AuthScreen(
+                    onAuthenticated: showHome,
+                    onBackToOnboarding: showFinalOnboardingPage
+                )
+            case .onboarding(let initialPage):
+                OnboardingScreen(initialPage: initialPage, onComplete: completeOnboarding)
+                    .id(initialPage)
+            case .home:
+                HomeScreen()
+            }
         }
+        .appToastOverlay(toastCenter)
     }
 
     // MARK: Important Flow - Onboarding Before Auth
@@ -53,6 +63,12 @@ struct ContentView: View {
 
         withAnimation(.smooth(duration: 0.28, extraBounce: 0)) {
             rootScreen = .onboarding(initialPage: onboardingInitialPage)
+        }
+    }
+
+    private func showHome() {
+        withAnimation(.smooth(duration: 0.28, extraBounce: 0)) {
+            rootScreen = .home
         }
     }
 }

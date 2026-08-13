@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9E61306EF41C5976FE50838A /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = 970EFECCF3C669B9A389005D /* MapLibre */; };
 		B685FCB33028DD8A005B7C1E /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = B685FCB23028DD88005B7C1E /* .gitignore */; };
 /* End PBXBuildFile section */
 
@@ -41,6 +42,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9E61306EF41C5976FE50838A /* MapLibre in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,6 +86,7 @@
 			);
 			name = transium;
 			packageProductDependencies = (
+				970EFECCF3C669B9A389005D /* MapLibre */,
 			);
 			productName = transium;
 			productReference = B685FCA43028DCB5005B7C1E /* transium.app */;
@@ -118,6 +121,9 @@
 			);
 			mainGroup = B685FC9B3028DCB5005B7C1E;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5BB5D5BEEA16FB862CB2FFA1 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = B685FCA53028DCB5005B7C1E /* Products */;
 			projectDirPath = "";
@@ -363,6 +369,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5BB5D5BEEA16FB862CB2FFA1 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/maplibre/maplibre-gl-native-distribution";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.28.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		970EFECCF3C669B9A389005D /* MapLibre */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5BB5D5BEEA16FB862CB2FFA1 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */;
+			productName = MapLibre;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B685FC9C3028DCB5005B7C1E /* Project object */;
 }

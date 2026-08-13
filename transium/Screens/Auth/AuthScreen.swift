@@ -8,17 +8,19 @@
 import AuthenticationServices
 import SwiftData
 import SwiftUI
-import UIKit
 
 struct AuthScreen: View {
     @Environment(\.modelContext) private var modelContext
     @State private var appleSignInService = AppleSignInService()
-    @State private var signInErrorMessage: String?
-    @State private var backendIDToast: BackendIDToast?
 
+    let onAuthenticated: () -> Void
     let onBackToOnboarding: () -> Void
 
-    init(onBackToOnboarding: @escaping () -> Void = {}) {
+    init(
+        onAuthenticated: @escaping () -> Void = {},
+        onBackToOnboarding: @escaping () -> Void = {}
+    ) {
+        self.onAuthenticated = onAuthenticated
         self.onBackToOnboarding = onBackToOnboarding
     }
 
@@ -37,11 +39,10 @@ struct AuthScreen: View {
 
                     AuthBottomPanel(
                         metrics: metrics,
-                        signInErrorMessage: signInErrorMessage,
-                        backendIDToast: backendIDToast,
+                        isDeveloperAuthEnabled: AppEnvironment.DEV_MODE,
                         onRequest: configureAppleSignIn,
                         onCompletion: handleAppleSignIn,
-                        onCopyBackendID: copyBackendID
+                        onDeveloperSignIn: handleDeveloperSignIn
                     )
                 }
                 .frame(width: proxy.size.width, height: proxy.size.height)
@@ -98,14 +99,31 @@ struct AuthScreen: View {
 
     private func configureAppleSignIn(_ request: ASAuthorizationAppleIDRequest) {
         do {
-            signInErrorMessage = nil
             try appleSignInService.configure(request)
         } catch {
-            signInErrorMessage = error.localizedDescription
+            AppToastCenter.shared.showError(
+                title: "Sign in could not start",
+                message: "Please try again in a moment."
+            )
         }
     }
 
     // MARK: Important Flow - Store Verified Local Profile Seed
+
+    // MARK: Important Flow - Developer Auth Shortcut
+
+    private func handleDeveloperSignIn() {
+        // TODO: Remove this DEV_MODE shortcut before production auth/backend work.
+        guard AppEnvironment.DEV_MODE else {
+            return
+        }
+
+        AppToastCenter.shared.showWarning(
+            title: "Developer sign in",
+            message: "Preview mode skipped Apple sign in."
+        )
+        onAuthenticated()
+    }
 
     private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
         defer { appleSignInService.reset() }
@@ -114,39 +132,23 @@ struct AuthScreen: View {
             let authorization = try result.get()
             let credential = try appleSignInService.credential(from: authorization)
             _ = try AuthStore(modelContext: modelContext).upsertLocalProfile(from: credential)
-            showBackendIDToast(credential.appleUserIdentifier)
-            signInErrorMessage = nil
+
+            AppToastCenter.shared.showSuccess(
+                title: "You're signed in",
+                message: "Welcome to Transium. Your profile is ready."
+            )
+            onAuthenticated()
+        } catch let authError as AuthError {
+            AppToastCenter.shared.showError(
+                title: "Apple sign in failed",
+                message: authError.userFacingMessage
+            )
         } catch {
-            signInErrorMessage = error.localizedDescription
+            AppToastCenter.shared.showError(
+                title: "Apple sign in failed",
+                message: "Please try again. No account details were saved."
+            )
         }
-    }
-
-    // MARK: Important Flow - Surface Backend User Identifier
-
-    private func showBackendIDToast(_ appleUserIdentifier: String) {
-        withAnimation(.snappy(duration: 0.28)) {
-            backendIDToast = BackendIDToast(appleUserIdentifier: appleUserIdentifier)
-        }
-
-        Task {
-            try? await Task.sleep(for: .seconds(8))
-
-            await MainActor.run {
-                if backendIDToast?.appleUserIdentifier == appleUserIdentifier {
-                    withAnimation(.snappy(duration: 0.28)) {
-                        backendIDToast = nil
-                    }
-                }
-            }
-        }
-    }
-
-    private func copyBackendID() {
-        guard let backendIDToast else {
-            return
-        }
-
-        UIPasteboard.general.string = backendIDToast.appleUserIdentifier
     }
 
     // MARK: Important Flow - Guard Stored Apple Sessions
@@ -156,14 +158,17 @@ struct AuthScreen: View {
             try await AuthStore(modelContext: modelContext)
                 .refreshStoredAppleCredentialState(using: appleSignInService)
 
-            if signInErrorMessage != nil {
-                signInErrorMessage = nil
-            }
         } catch AuthError.credentialRevoked, AuthError.credentialNotFound, AuthError.credentialTransferred {
-            signInErrorMessage = nil
+            AppToastCenter.shared.showWarning(
+                title: "Session needs refresh",
+                message: "Please sign in again with Apple."
+            )
         } catch {
             if showErrors {
-                signInErrorMessage = error.localizedDescription
+                AppToastCenter.shared.showError(
+                    title: "Session check failed",
+                    message: "Please check your connection and try again."
+                )
             }
         }
     }
@@ -171,11 +176,10 @@ struct AuthScreen: View {
 
 private struct AuthBottomPanel: View {
     let metrics: AuthScreenMetrics
-    let signInErrorMessage: String?
-    let backendIDToast: BackendIDToast?
+    let isDeveloperAuthEnabled: Bool
     let onRequest: (ASAuthorizationAppleIDRequest) -> Void
     let onCompletion: (Result<ASAuthorization, Error>) -> Void
-    let onCopyBackendID: () -> Void
+    let onDeveloperSignIn: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -185,25 +189,8 @@ private struct AuthBottomPanel: View {
             AuthAssuranceLine()
                 .padding(.bottom, metrics.trustPillBottomSpacing)
 
-            SignInWithAppleButton(.continue, onRequest: onRequest, onCompletion: onCompletion)
-                .signInWithAppleButtonStyle(.black)
-                .frame(maxWidth: metrics.buttonMaxWidth)
-                .frame(height: metrics.buttonHeight)
-                .clipShape(.capsule)
-                .accessibilityLabel("Continue with Apple")
-                .accessibilityHint("Signs in to Transium using your Apple Account.")
+            authButton
                 .padding(.bottom, metrics.buttonBottomSpacing)
-
-            if let signInErrorMessage {
-                Text(signInErrorMessage)
-                    .font(TransiumFont.body(13))
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                    .accessibilityLabel("Sign in error: \(signInErrorMessage)")
-                    .padding(.bottom, metrics.errorBottomSpacing)
-            }
 
             Text(termsText)
                 .font(TransiumFont.body(metrics.termsFontSize))
@@ -222,13 +209,37 @@ private struct AuthBottomPanel: View {
         .background(alignment: .top) {
             AuthPanelBackground(metrics: metrics)
         }
-        .overlay(alignment: .top) {
-            if let backendIDToast {
-                BackendIDToastView(toast: backendIDToast, onCopy: onCopyBackendID)
-                    .padding(.horizontal, metrics.panelHorizontalPadding)
-                    .padding(.top, metrics.toastTopPadding)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    @ViewBuilder
+    private var authButton: some View {
+        if isDeveloperAuthEnabled {
+            Button(action: onDeveloperSignIn) {
+                HStack(spacing: 10) {
+                    Image(systemName: "apple.logo")
+                        .font(.system(size: 21, weight: .semibold))
+
+                    Text("Continue with Apple")
+                        .font(TransiumFont.body(19, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: metrics.buttonMaxWidth)
+                .frame(height: metrics.buttonHeight)
+                .background(.black)
+                .clipShape(.capsule)
+                .contentShape(.capsule)
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Developer continue with Apple")
+            .accessibilityHint("Skips Apple sign in only while development mode is enabled.")
+        } else {
+            SignInWithAppleButton(.continue, onRequest: onRequest, onCompletion: onCompletion)
+                .signInWithAppleButtonStyle(.black)
+                .frame(maxWidth: metrics.buttonMaxWidth)
+                .frame(height: metrics.buttonHeight)
+                .clipShape(.capsule)
+                .accessibilityLabel("Continue with Apple")
+                .accessibilityHint("Signs in to Transium using your Apple Account.")
         }
     }
 
@@ -383,42 +394,6 @@ private struct AuthPanelBackground: View {
     }
 }
 
-private struct BackendIDToast: Identifiable, Equatable {
-    let id = UUID()
-    let appleUserIdentifier: String
-}
-
-private struct BackendIDToastView: View {
-    let toast: BackendIDToast
-    let onCopy: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Apple backend ID")
-                    .font(TransiumFont.body(12, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                Text(toast.appleUserIdentifier)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-
-            Button("Copy", action: onCopy)
-                .font(TransiumFont.body(12, weight: .semibold))
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.regularMaterial, in: .rect(cornerRadius: 18, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Apple backend ID \(toast.appleUserIdentifier). Copy button.")
-    }
-}
-
 private struct AuthScreenMetrics {
     let size: CGSize
 
@@ -464,14 +439,6 @@ private struct AuthScreenMetrics {
 
     var buttonBottomSpacing: CGFloat {
         max(30, panelHeight * 0.088)
-    }
-
-    var errorBottomSpacing: CGFloat {
-        max(10, panelHeight * 0.034)
-    }
-
-    var toastTopPadding: CGFloat {
-        max(14, panelTopPadding * 0.3)
     }
 
     var buttonHeight: CGFloat {
@@ -521,6 +488,22 @@ private extension Color {
     static let authGold = Color(red: 1.0, green: 0.66, blue: 0.16)
     static let authInk = Color(red: 0.07, green: 0.07, blue: 0.1)
     static let authPanelBase = Color(red: 1.0, green: 0.995, blue: 0.975)
+}
+
+private extension AuthError {
+    var userFacingMessage: String {
+        switch self {
+        case .invalidAuthorization, .invalidAppleState:
+            "Apple could not verify this sign in. Please try again."
+        case .missingAppleIdentityToken, .missingAppleAuthorizationCode,
+             .invalidAppleIdentityTokenEncoding, .invalidAppleAuthorizationCodeEncoding:
+            "Apple did not return the details needed to sign you in."
+        case .credentialRevoked, .credentialNotFound, .credentialTransferred:
+            "This Apple session is no longer active. Please sign in again."
+        case .unknownCredentialState:
+            "We could not confirm your Apple session. Please try again."
+        }
+    }
 }
 
 #Preview {
