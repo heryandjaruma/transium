@@ -6,12 +6,21 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct transiumApp: App {
     var body: some Scene {
         WindowGroup {
-            OnboardingView()
+            ContentView()
         }
+        .modelContainer(for: transiumSchema.models)
     }
+}
+
+enum transiumSchema {
+    static let models: [any PersistentModel.Type] = [
+        LocalAuthIdentity.self,
+        LocalProfile.self
+    ]
 }

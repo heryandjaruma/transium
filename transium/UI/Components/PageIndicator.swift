@@ -2,8 +2,6 @@
 //  PageIndicator.swift
 //  transium
 //
-//  Created by Awfar on 13/08/26.
-//
 
 import SwiftUI
 
@@ -16,23 +14,19 @@ struct PageIndicator: View {
             ForEach(0..<totalPages, id: \.self) { page in
                 Capsule()
                     .fill(page == currentPage ? Color.white : Color.white.opacity(0.25))
-                    .frame(
-                        width: page == currentPage ? 16 : 8,
-                        height: 8
-                    )
+                    .frame(width: page == currentPage ? 16 : 8, height: 8)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Page \(currentPage + 1) of \(totalPages)")
     }
 }
 
 #Preview {
     ZStack {
-        Color("PrimaryBlue")
+        TransiumColor.primaryBlue
             .ignoresSafeArea()
 
-        PageIndicator(
-            currentPage: 0,
-            totalPages: 3
-        )
+        PageIndicator(currentPage: 0, totalPages: 3)
     }
 }
