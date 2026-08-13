@@ -11,7 +11,7 @@ import SwiftUI
 struct transiumApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            OnboardingView()
         }
     }
 }
