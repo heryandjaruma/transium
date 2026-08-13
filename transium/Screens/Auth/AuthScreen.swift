@@ -26,28 +26,33 @@ struct AuthScreen: View {
         GeometryReader { proxy in
             let metrics = AuthScreenMetrics(size: proxy.size)
 
-            ZStack(alignment: .bottom) {
+            ZStack {
                 Color.authBlue
                     .ignoresSafeArea()
 
                 heroArt(metrics)
 
-                AuthBottomPanel(
-                    metrics: metrics,
-                    signInErrorMessage: signInErrorMessage,
-                    backendIDToast: backendIDToast,
-                    onRequest: configureAppleSignIn,
-                    onCompletion: handleAppleSignIn,
-                    onCopyBackendID: copyBackendID
-                )
-            }
-            .frame(width: proxy.size.width, height: proxy.size.height)
-            .overlay(alignment: .topLeading) {
+                VStack {
+                    Spacer()
+
+                    AuthBottomPanel(
+                        metrics: metrics,
+                        signInErrorMessage: signInErrorMessage,
+                        backendIDToast: backendIDToast,
+                        onRequest: configureAppleSignIn,
+                        onCompletion: handleAppleSignIn,
+                        onCopyBackendID: copyBackendID
+                    )
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+
                 backButton
                     .padding(.leading, 20)
-                    .padding(.top, 12)
-                    .zIndex(10)
+                    .padding(.top, proxy.safeAreaInsets.top + 10)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .zIndex(20)
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .task {
             await refreshStoredCredentialState(showErrors: false)
@@ -67,13 +72,13 @@ struct AuthScreen: View {
             Image(systemName: "arrow.left")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(.black)
-                .frame(width: 40, height: 40)
+                .frame(width: 48, height: 48)
                 .background(.white)
                 .clipShape(.circle)
                 .shadow(color: .authInk.opacity(0.08), radius: 12, y: 4)
-                .contentShape(.circle)
+                .contentShape(.rect)
         }
-        .buttonStyle(.transiumNoOpacity)
+        .buttonStyle(.plain)
         .accessibilityLabel("Back to onboarding")
     }
 
