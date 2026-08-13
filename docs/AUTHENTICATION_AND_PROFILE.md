@@ -11,7 +11,9 @@ at model contracts and security requirements.
 - `ContentView` shows onboarding before authentication.
 - Onboarding completion is stored in `@AppStorage("hasCompletedOnboarding")`.
 - `AppEnvironment.DEV_MODE` can be set to `true` during development to replay
-  onboarding every launch.
+  onboarding on each fresh launch by resetting `hasCompletedOnboarding` once
+  from `transiumApp.init()`. It must not be used as part of the live routing
+  condition after onboarding completes.
 - Authentication must remain inaccessible until onboarding completes, except
   when onboarding is skipped/completed through the onboarding controls.
 - The auth screen is light-mode only for now and uses shared `UI/System`

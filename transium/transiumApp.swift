@@ -10,6 +10,12 @@ import SwiftData
 
 @main
 struct transiumApp: App {
+    init() {
+        if AppEnvironment.DEV_MODE {
+            UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

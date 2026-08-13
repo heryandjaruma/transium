@@ -18,11 +18,16 @@ struct PageIndicator: View {
                     .fill(isCurrentPage ? Color.white : Color.white.opacity(0.25))
                     .frame(width: page == currentPage ? 16 : 8, height: 8)
                     .scaleEffect(isCurrentPage ? 1 : 0.92)
-                    .animation(.smooth(duration: 0.26, extraBounce: 0), value: currentPage)
+                    .animation(pageAnimation(for: page), value: currentPage)
             }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Page \(currentPage + 1) of \(totalPages)")
+    }
+
+    private func pageAnimation(for page: Int) -> Animation {
+        .smooth(duration: 0.26, extraBounce: 0)
+            .delay(Double(page) * 0.025)
     }
 }
 

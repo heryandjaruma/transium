@@ -32,7 +32,8 @@ database choices are still intentionally undecided.
 
 1. Show `OnboardingScreen` when onboarding has not completed.
 2. Persist completion with `@AppStorage("hasCompletedOnboarding")`.
-3. If `AppEnvironment.DEV_MODE == true`, replay onboarding every launch.
+3. If `AppEnvironment.DEV_MODE == true`, reset onboarding completion once from
+   `transiumApp.init()` so onboarding replays on fresh launch.
 4. Show `AuthScreen` after onboarding completes.
 
 Onboarding must stay before authentication until product direction changes.

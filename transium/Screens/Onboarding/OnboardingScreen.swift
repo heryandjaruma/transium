@@ -11,9 +11,15 @@ struct OnboardingScreen: View {
     let onComplete: () -> Void
 
     @State private var currentPage = 0
-    @State private var pageDirection = 1
-
     private let pages = OnboardingPage.defaultPages
+
+    init(initialPage: Int = 0, onComplete: @escaping () -> Void) {
+        let pageBounds = OnboardingPage.defaultPages.indices
+        let safeInitialPage = pageBounds.contains(initialPage) ? initialPage : 0
+
+        self.onComplete = onComplete
+        _currentPage = State(initialValue: safeInitialPage)
+    }
 
     var body: some View {
         let page = pages[currentPage]
@@ -27,7 +33,7 @@ struct OnboardingScreen: View {
 
                 Spacer(minLength: 26)
 
-                OnboardingPageContent(page: page)
+                OnboardingPageContent(page: page, animation: pageAnimation)
                     .padding(.horizontal, 25)
 
                 OnboardingVisualPager(
@@ -49,17 +55,34 @@ struct OnboardingScreen: View {
             .padding(.top, 10)
             .padding(.bottom, 24)
         }
+        .contentShape(.rect)
+        .gesture(swipeGesture)
     }
 
     // MARK: Important Flow - Onboarding Navigation
+
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 36)
+            .onEnded { value in
+                handleSwipe(value.translation.width)
+            }
+    }
+
+    private func handleSwipe(_ horizontalTranslation: CGFloat) {
+        let threshold: CGFloat = 54
+
+        if horizontalTranslation <= -threshold {
+            advance()
+        } else if horizontalTranslation >= threshold {
+            goBack()
+        }
+    }
 
     private func advance() {
         guard currentPage < pages.count - 1 else {
             onComplete()
             return
         }
-
-        pageDirection = 1
 
         withAnimation(pageAnimation) {
             currentPage += 1
@@ -70,8 +93,6 @@ struct OnboardingScreen: View {
         guard currentPage > 0 else {
             return
         }
-
-        pageDirection = -1
 
         withAnimation(pageAnimation) {
             currentPage -= 1
@@ -103,33 +124,39 @@ private struct OnboardingPageContent: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let page: OnboardingPage
+    let animation: Animation
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(page.title)
                 .font(TransiumFont.display(45))
                 .foregroundStyle(.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.86)
+                .contentTransition(textTransition)
+                .animation(titleAnimation, value: page.title)
 
             Text(page.description)
                 .font(TransiumFont.body(17))
                 .foregroundStyle(.white)
                 .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(textTransition)
+                .animation(descriptionAnimation, value: page.description)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .id(page.title)
-        .transition(pageTransition)
         .accessibilityElement(children: .combine)
     }
 
-    private var pageTransition: AnyTransition {
-        guard !reduceMotion else {
-            return .opacity
-        }
+    private var textTransition: ContentTransition {
+        reduceMotion ? .identity : .interpolate
+    }
 
-        return AnyTransition.asymmetric(
-            insertion: AnyTransition.opacity.combined(with: .offset(y: 10)),
-            removal: AnyTransition.opacity.combined(with: .offset(y: -8))
-        )
+    private var titleAnimation: Animation? {
+        reduceMotion ? nil : animation
+    }
+
+    private var descriptionAnimation: Animation? {
+        reduceMotion ? nil : animation.delay(0.06)
     }
 }
 
@@ -146,14 +173,14 @@ private struct OnboardingVisualPager: View {
                 visualPage(for: pages[currentPage])
             } else {
                 GeometryReader { proxy in
-                    HStack(spacing: 0) {
+                    ZStack {
                         ForEach(pages.indices, id: \.self) { pageIndex in
                             visualPage(for: pages[pageIndex])
                                 .frame(width: proxy.size.width)
+                                .offset(x: pageOffset(for: pageIndex, width: proxy.size.width))
+                                .animation(pageAnimation(for: pageIndex), value: currentPage)
                         }
                     }
-                    .offset(x: -CGFloat(currentPage) * proxy.size.width)
-                    .animation(animation, value: currentPage)
                 }
             }
         }
@@ -170,6 +197,16 @@ private struct OnboardingVisualPager: View {
                 .frame(height: 350)
                 .accessibilityHidden(true)
         }
+    }
+
+    private func pageOffset(for pageIndex: Int, width: CGFloat) -> CGFloat {
+        CGFloat(pageIndex - currentPage) * width
+    }
+
+    private func pageAnimation(for pageIndex: Int) -> Animation {
+        let delay = pageIndex == currentPage ? 0.045 : 0
+
+        return animation.delay(delay)
     }
 }
 

@@ -16,6 +16,12 @@ struct AuthScreen: View {
     @State private var signInErrorMessage: String?
     @State private var backendIDToast: BackendIDToast?
 
+    let onBackToOnboarding: (() -> Void)?
+
+    init(onBackToOnboarding: (() -> Void)? = nil) {
+        self.onBackToOnboarding = onBackToOnboarding
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let metrics = AuthScreenMetrics(size: proxy.size)
@@ -34,6 +40,24 @@ struct AuthScreen: View {
                     onCompletion: handleAppleSignIn,
                     onCopyBackendID: copyBackendID
                 )
+
+                if let onBackToOnboarding {
+                    VStack {
+                        HStack {
+                            TransiumIconButton(
+                                systemName: "arrow.left",
+                                accessibilityLabel: "Back to onboarding",
+                                action: onBackToOnboarding
+                            )
+
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+
+                        Spacer()
+                    }
+                }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }

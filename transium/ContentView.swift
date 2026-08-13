@@ -10,21 +10,26 @@ import SwiftData
 
 struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var onboardingInitialPage = 0
 
     var body: some View {
-        if shouldShowOnboarding {
-            OnboardingScreen {
-                hasCompletedOnboarding = true
-            }
+        if hasCompletedOnboarding {
+            AuthScreen(onBackToOnboarding: showFinalOnboardingPage)
         } else {
-            AuthScreen()
+            OnboardingScreen(initialPage: onboardingInitialPage, onComplete: completeOnboarding)
         }
     }
 
     // MARK: Important Flow - Onboarding Before Auth
 
-    private var shouldShowOnboarding: Bool {
-        AppEnvironment.DEV_MODE || !hasCompletedOnboarding
+    private func completeOnboarding() {
+        onboardingInitialPage = 0
+        hasCompletedOnboarding = true
+    }
+
+    private func showFinalOnboardingPage() {
+        onboardingInitialPage = 2
+        hasCompletedOnboarding = false
     }
 }
 

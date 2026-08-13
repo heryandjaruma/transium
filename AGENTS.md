@@ -44,7 +44,9 @@ file as the default operating agreement for any agent working here.
 - Onboarding must run before authentication.
 - `ContentView` owns the one-time onboarding gate with `@AppStorage`.
 - `AppEnvironment.DEV_MODE` in `UI/System/DesignTokens.swift`
-  intentionally replays onboarding on every launch when set to `true`.
+  resets `hasCompletedOnboarding` to `false` once from `transiumApp.init()`.
+  Do not use `DEV_MODE` directly in the onboarding/auth routing condition, or
+  the final onboarding button will never reach authentication.
 - Keep Sign in with Apple as the only authentication method unless the user
   explicitly changes product direction.
 - Do not trust client-provided user IDs on a future backend; verify Apple
