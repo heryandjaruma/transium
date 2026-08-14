@@ -9,10 +9,24 @@ import AuthenticationServices
 import SwiftUI
 import SwiftData
 
+private enum RootScreen {
+    case onboarding(initialPage: Int)
+    case auth
+    case home
+}
+
 struct ContentView: View {
     @Environment(SessionController.self) private var session
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var rootScreen: RootScreen
     @State private var onboardingInitialPage = 0
+    @StateObject private var toastCenter = AppToastCenter.shared
+
+    init() {
+        let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Self.onboardingCompletionKey)
+
+        _rootScreen = State(initialValue: hasCompletedOnboarding ? .auth : .onboarding(initialPage: 0))
+    }
 
     var body: some View {
         content
@@ -51,25 +65,15 @@ struct ContentView: View {
     private func completeOnboarding() {
         onboardingInitialPage = 0
         hasCompletedOnboarding = true
+
+        withAnimation(.smooth(duration: 0.28, extraBounce: 0)) {
+            rootScreen = .auth
+        }
     }
 
     private func showFinalOnboardingPage() {
         onboardingInitialPage = 2
         hasCompletedOnboarding = false
-    }
-}
-
-// Shown while restoring an existing session.
-private struct LaunchPlaceholder: View {
-    var body: some View {
-        ZStack {
-            TransiumColor.primaryBlue
-                .ignoresSafeArea()
-
-            ProgressView()
-                .tint(.white)
-        }
-        .accessibilityLabel("Restoring your session")
     }
 }
 

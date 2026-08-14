@@ -17,7 +17,11 @@ struct AuthScreen: View {
 
     let onBackToOnboarding: (() -> Void)?
 
-    init(onBackToOnboarding: (() -> Void)? = nil) {
+    init(
+        onAuthenticated: @escaping () -> Void = {},
+        onBackToOnboarding: @escaping () -> Void = {}
+    ) {
+        self.onAuthenticated = onAuthenticated
         self.onBackToOnboarding = onBackToOnboarding
     }
 
@@ -25,7 +29,7 @@ struct AuthScreen: View {
         GeometryReader { proxy in
             let metrics = AuthScreenMetrics(size: proxy.size)
 
-            ZStack(alignment: .bottom) {
+            ZStack {
                 Color.authBlue
                     .ignoresSafeArea()
 
@@ -33,10 +37,11 @@ struct AuthScreen: View {
 
                 AuthBottomPanel(
                     metrics: metrics,
-                    signInErrorMessage: signInErrorMessage ?? session.errorMessage,
-                    isVerifying: session.isBusy,
+                    signInErrorMessage: signInErrorMessage,
+                    backendIDToast: backendIDToast,
                     onRequest: configureAppleSignIn,
-                    onCompletion: handleAppleSignIn
+                    onCompletion: handleAppleSignIn,
+                    onCopyBackendID: copyBackendID
                 )
 
                 if let onBackToOnboarding {
@@ -72,6 +77,21 @@ struct AuthScreen: View {
 
     // MARK: Important Flow - Hero Placement
 
+    private var backButton: some View {
+        Button(action: onBackToOnboarding) {
+            Image(systemName: "arrow.left")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.black)
+                .frame(width: 48, height: 48)
+                .background(.white)
+                .clipShape(.circle)
+                .shadow(color: .authInk.opacity(0.08), radius: 12, y: 4)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Back to onboarding")
+    }
+
     private func heroArt(_ metrics: AuthScreenMetrics) -> some View {
         Image(TransiumAsset.Illustration.authHero)
             .resizable()
@@ -87,10 +107,12 @@ struct AuthScreen: View {
     // Prepare the Apple sign-in request.
     private func configureAppleSignIn(_ request: ASAuthorizationAppleIDRequest) {
         do {
-            signInErrorMessage = nil
             try appleSignInService.configure(request)
         } catch {
-            signInErrorMessage = error.localizedDescription
+            AppToastCenter.shared.showError(
+                title: "Sign in could not start",
+                message: "Please try again in a moment."
+            )
         }
     }
 
@@ -125,14 +147,17 @@ struct AuthScreen: View {
             try await AuthStore(modelContext: modelContext)
                 .refreshStoredAppleCredentialState(using: appleSignInService)
 
-            if signInErrorMessage != nil {
-                signInErrorMessage = nil
-            }
         } catch AuthError.credentialRevoked, AuthError.credentialNotFound, AuthError.credentialTransferred {
-            signInErrorMessage = nil
+            AppToastCenter.shared.showWarning(
+                title: "Session needs refresh",
+                message: "Please sign in again with Apple."
+            )
         } catch {
             if showErrors {
-                signInErrorMessage = error.localizedDescription
+                AppToastCenter.shared.showError(
+                    title: "Session check failed",
+                    message: "Please check your connection and try again."
+                )
             }
         }
     }
@@ -171,17 +196,6 @@ private struct AuthBottomPanel: View {
                     }
                 }
                 .padding(.bottom, metrics.buttonBottomSpacing)
-
-            if let signInErrorMessage {
-                Text(signInErrorMessage)
-                    .font(TransiumFont.body(13))
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
-                    .accessibilityLabel("Sign in error: \(signInErrorMessage)")
-                    .padding(.bottom, metrics.errorBottomSpacing)
-            }
 
             Text(termsText)
                 .font(TransiumFont.body(metrics.termsFontSize))
@@ -409,6 +423,22 @@ private extension Color {
     static let authGold = Color(red: 1.0, green: 0.66, blue: 0.16)
     static let authInk = Color(red: 0.07, green: 0.07, blue: 0.1)
     static let authPanelBase = Color(red: 1.0, green: 0.995, blue: 0.975)
+}
+
+private extension AuthError {
+    var userFacingMessage: String {
+        switch self {
+        case .invalidAuthorization, .invalidAppleState:
+            "Apple could not verify this sign in. Please try again."
+        case .missingAppleIdentityToken, .missingAppleAuthorizationCode,
+             .invalidAppleIdentityTokenEncoding, .invalidAppleAuthorizationCodeEncoding:
+            "Apple did not return the details needed to sign you in."
+        case .credentialRevoked, .credentialNotFound, .credentialTransferred:
+            "This Apple session is no longer active. Please sign in again."
+        case .unknownCredentialState:
+            "We could not confirm your Apple session. Please try again."
+        }
+    }
 }
 
 #Preview {

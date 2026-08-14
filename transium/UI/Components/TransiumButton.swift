@@ -96,14 +96,14 @@ struct TransiumCapsuleTextButton: View {
     }
 }
 
-private struct TransiumNoOpacityButtonStyle: ButtonStyle {
+struct TransiumNoOpacityButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(1)
     }
 }
 
-private extension ButtonStyle where Self == TransiumNoOpacityButtonStyle {
+extension ButtonStyle where Self == TransiumNoOpacityButtonStyle {
     static var transiumNoOpacity: TransiumNoOpacityButtonStyle {
         TransiumNoOpacityButtonStyle()
     }
