@@ -16,9 +16,7 @@ enum AuthMethod: String, Codable, CaseIterable, Sendable {
 enum AuthError: Error, LocalizedError, Sendable {
     case invalidAuthorization
     case missingAppleIdentityToken
-    case missingAppleAuthorizationCode
     case invalidAppleIdentityTokenEncoding
-    case invalidAppleAuthorizationCodeEncoding
     case invalidAppleState
     case credentialRevoked
     case credentialNotFound
@@ -31,12 +29,8 @@ enum AuthError: Error, LocalizedError, Sendable {
             "The Apple authorization response was not valid."
         case .missingAppleIdentityToken:
             "Apple did not return an identity token."
-        case .missingAppleAuthorizationCode:
-            "Apple did not return an authorization code."
         case .invalidAppleIdentityTokenEncoding:
             "The Apple identity token could not be decoded."
-        case .invalidAppleAuthorizationCodeEncoding:
-            "The Apple authorization code could not be decoded."
         case .invalidAppleState:
             "The Apple authorization state did not match this sign-in request."
         case .credentialRevoked:
@@ -114,7 +108,6 @@ enum AppleCredentialState: String, Codable, Sendable {
 struct AppleSignInCredential: Codable, Sendable {
     let appleUserIdentifier: String
     let identityToken: String
-    let authorizationCode: String
     let rawNonce: String
     let state: String?
     let email: String?
@@ -145,21 +138,12 @@ struct AppleSignInCredential: Codable, Sendable {
             throw AuthError.missingAppleIdentityToken
         }
 
-        guard let authorizationCodeData = credential.authorizationCode else {
-            throw AuthError.missingAppleAuthorizationCode
-        }
-
         guard let identityToken = String(data: identityTokenData, encoding: .utf8) else {
             throw AuthError.invalidAppleIdentityTokenEncoding
         }
 
-        guard let authorizationCode = String(data: authorizationCodeData, encoding: .utf8) else {
-            throw AuthError.invalidAppleAuthorizationCodeEncoding
-        }
-
         self.appleUserIdentifier = credential.user
         self.identityToken = identityToken
-        self.authorizationCode = authorizationCode
         self.rawNonce = requestContext.rawNonce
         self.state = credential.state
         self.email = credential.email?.nilIfBlank

@@ -70,7 +70,6 @@ nonisolated enum BackendError: Error, LocalizedError, Sendable {
 
 nonisolated enum AuthBackendRequirement: String, Codable, CaseIterable, Sendable {
     case verifyAppleNonce
-    case exchangeSingleUseAuthorizationCode
     case keepRefreshTokenServerSideOnly
     case requireAuthenticatedUserForProfileRoutes
     case enforceProfileOwnerAccess
