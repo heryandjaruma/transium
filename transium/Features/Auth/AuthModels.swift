@@ -92,8 +92,7 @@ enum AppleCredentialState: String, Codable, Sendable {
         }
     }
 
-    // MARK: Important Flow - Gate Existing Sessions
-
+    // Make sure an existing Apple credential can still be used.
     func validateForActiveSession() throws {
         switch self {
         case .authorized:
@@ -133,8 +132,7 @@ struct AppleSignInCredential: Codable, Sendable {
         )
     }
 
-    // MARK: Important Flow - Extract And Validate Apple's One-Time Response
-
+    // Extract the values returned by Sign in with Apple.
     init(
         credential: ASAuthorizationAppleIDCredential,
         requestContext: AppleSignInRequestContext
@@ -178,6 +176,8 @@ struct AppleSignInCredential: Codable, Sendable {
 final class LocalAuthIdentity {
     @Attribute(.unique) var appleUserIdentifier: String
     var profileID: UUID
+    // Better Auth user ID after the first successful server sign-in.
+    var remoteUserID: String?
     var method: String
     var email: String?
     var realUserStatus: String
@@ -189,6 +189,7 @@ final class LocalAuthIdentity {
     init(
         appleUserIdentifier: String,
         profileID: UUID,
+        remoteUserID: String? = nil,
         method: String = AuthMethod.apple.rawValue,
         email: String? = nil,
         realUserStatus: String = AppleRealUserStatus.unknown.rawValue,
@@ -199,6 +200,7 @@ final class LocalAuthIdentity {
     ) {
         self.appleUserIdentifier = appleUserIdentifier
         self.profileID = profileID
+        self.remoteUserID = remoteUserID
         self.method = method
         self.email = email
         self.realUserStatus = realUserStatus
@@ -208,10 +210,10 @@ final class LocalAuthIdentity {
         self.lastCredentialStateCheckedAt = lastCredentialStateCheckedAt
     }
 
-    // MARK: Important Flow - Refresh Local Auth Metadata
-
-    func markAuthenticated(with credential: AppleSignInCredential) {
+    // Update locally stored auth information after a successful sign-in.
+    func markAuthenticated(with credential: AppleSignInCredential, remoteUserID: String? = nil) {
         email = credential.email ?? email
+        self.remoteUserID = remoteUserID ?? self.remoteUserID
         realUserStatus = credential.realUserStatus.rawValue
         credentialState = AppleCredentialState.authorized.rawValue
         lastAuthenticatedAt = .now

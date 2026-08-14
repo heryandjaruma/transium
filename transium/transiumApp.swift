@@ -10,6 +10,8 @@ import SwiftData
 
 @main
 struct transiumApp: App {
+    @State private var session = SessionController()
+
     init() {
         if AppEnvironment.DEV_MODE {
             UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
@@ -19,6 +21,7 @@ struct transiumApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(session)
         }
         .modelContainer(for: transiumSchema.models)
     }

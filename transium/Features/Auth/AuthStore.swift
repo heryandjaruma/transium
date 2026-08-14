@@ -12,9 +12,13 @@ struct AuthStore {
 
     // MARK: Important Flow - Persist Successful Apple Sign-In
 
-    func upsertLocalProfile(from credential: AppleSignInCredential) throws -> LocalProfile {
+    @discardableResult
+    func upsertLocalProfile(
+        from credential: AppleSignInCredential,
+        remoteUserID: String? = nil
+    ) throws -> LocalProfile {
         if let identity = try localIdentity(forAppleUserIdentifier: credential.appleUserIdentifier) {
-            identity.markAuthenticated(with: credential)
+            identity.markAuthenticated(with: credential, remoteUserID: remoteUserID)
 
             if let profile = try localProfile(id: identity.profileID) {
                 if profile.firstName.isEmpty || credential.firstName != nil || credential.lastName != nil {
@@ -35,6 +39,7 @@ struct AuthStore {
         let identity = LocalAuthIdentity(
             appleUserIdentifier: credential.appleUserIdentifier,
             profileID: profile.id,
+            remoteUserID: remoteUserID,
             email: credential.email,
             realUserStatus: credential.realUserStatus.rawValue
         )

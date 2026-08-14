@@ -5,22 +5,48 @@
 //  Created by Heryan Djaruma on 10/08/26.
 //
 
+import AuthenticationServices
 import SwiftUI
 import SwiftData
 
 struct ContentView: View {
+    @Environment(SessionController.self) private var session
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var onboardingInitialPage = 0
 
     var body: some View {
-        if hasCompletedOnboarding {
-            AuthScreen(onBackToOnboarding: showFinalOnboardingPage)
-        } else {
-            OnboardingScreen(initialPage: onboardingInitialPage, onComplete: completeOnboarding)
-        }
+        content
+            .task {
+                await session.restore()
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: ASAuthorizationAppleIDProvider.credentialRevokedNotification
+                )
+            ) { _ in
+                Task { await session.handleAppleCredentialRevoked() }
+            }
+            .animation(.snappy(duration: 0.28), value: session.phase)
     }
 
-    // MARK: Important Flow - Onboarding Before Auth
+    // Decide which screen to show based on onboarding and sign-in state.
+    @ViewBuilder
+    private var content: some View {
+        switch session.phase {
+        case .restoring:
+            LaunchPlaceholder()
+
+        case .signedIn:
+            HomeScreen()
+
+        case .signedOut:
+            if hasCompletedOnboarding {
+                AuthScreen(onBackToOnboarding: showFinalOnboardingPage)
+            } else {
+                OnboardingScreen(initialPage: onboardingInitialPage, onComplete: completeOnboarding)
+            }
+        }
+    }
 
     private func completeOnboarding() {
         onboardingInitialPage = 0
@@ -33,7 +59,22 @@ struct ContentView: View {
     }
 }
 
+// Shown while restoring an existing session.
+private struct LaunchPlaceholder: View {
+    var body: some View {
+        ZStack {
+            TransiumColor.primaryBlue
+                .ignoresSafeArea()
+
+            ProgressView()
+                .tint(.white)
+        }
+        .accessibilityLabel("Restoring your session")
+    }
+}
+
 #Preview {
     ContentView()
+        .environment(SessionController())
         .modelContainer(for: transiumSchema.models, inMemory: true)
 }

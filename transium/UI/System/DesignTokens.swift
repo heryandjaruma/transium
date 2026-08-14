@@ -63,10 +63,9 @@ enum TransiumFont {
     }
 }
 
-enum AppEnvironment {
+nonisolated enum AppEnvironment {
     // MARK: Important Flow - Dev Onboarding Replay
 
-    /// Keep `false` for normal app behavior. Set `true` locally when the
-    /// onboarding flow should replay on every launch while polishing it.
+    // Replay onboarding on every launch.
     static let DEV_MODE = true
 }
