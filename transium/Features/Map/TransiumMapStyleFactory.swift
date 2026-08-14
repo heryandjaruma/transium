@@ -83,14 +83,14 @@ enum TransiumMapStyleFactory {
             {
               "id": "background",
               "type": "background",
-              "paint": { "background-color": "#2F6FEA" }
+              "paint": { "background-color": "#99D1F4" }
             },
             {
               "id": "land",
               "type": "fill",
               "source": "bali-basemap",
               "source-layer": "land",
-              "paint": { "fill-color": "#F7E7B0" }
+              "paint": { "fill-color": "#EDEDED" }
             },
             {
               "id": "vegetation",
@@ -98,8 +98,8 @@ enum TransiumMapStyleFactory {
               "source": "bali-basemap",
               "source-layer": "vegetation",
               "paint": {
-                "fill-color": "#7CCB7B",
-                "fill-opacity": 0.72
+                "fill-color": "#94C77E",
+                "fill-opacity": 0.62
               }
             },
             {
@@ -107,7 +107,7 @@ enum TransiumMapStyleFactory {
               "type": "fill",
               "source": "bali-basemap",
               "source-layer": "water",
-              "paint": { "fill-color": "#6BBCEB" }
+              "paint": { "fill-color": "#86C8F1" }
             },
             {
               "id": "streams",
@@ -115,9 +115,9 @@ enum TransiumMapStyleFactory {
               "source": "bali-basemap",
               "source-layer": "streams",
               "paint": {
-                "line-color": "#58A9DA",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.55, 13, 1.45],
-                "line-opacity": 0.84
+                "line-color": "#A7D4EE",
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.28, 13, 1.0],
+                "line-opacity": 0.7
               }
             },
             {
@@ -127,7 +127,7 @@ enum TransiumMapStyleFactory {
               "source-layer": "kelurahan",
               "paint": {
                 "line-color": "#FFFFFF",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.2, 13, 0.9],
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.16, 13, 0.62],
                 "line-opacity": 0.38
               }
             },
@@ -137,9 +137,9 @@ enum TransiumMapStyleFactory {
               "source": "bali-basemap",
               "source-layer": "kecamatan",
               "paint": {
-                "line-color": "#D59B35",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.55, 13, 1.4],
-                "line-opacity": 0.68
+                "line-color": "#D4D4D4",
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.32, 13, 0.92],
+                "line-opacity": 0.42
               }
             },
             {
@@ -148,9 +148,9 @@ enum TransiumMapStyleFactory {
               "source": "bali-basemap",
               "source-layer": "roads",
               "paint": {
-                "line-color": "#C98F3A",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.0, 13, 4.0],
-                "line-opacity": 0.55
+                "line-color": "#D6D6D6",
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.95, 13, 4.2],
+                "line-opacity": 0.72
               }
             },
             {
@@ -159,9 +159,9 @@ enum TransiumMapStyleFactory {
               "source": "bali-basemap",
               "source-layer": "roads",
               "paint": {
-                "line-color": "#FFF7E8",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.55, 13, 2.7],
-                "line-opacity": 0.92
+                "line-color": "#FFFFFF",
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 13, 2.85],
+                "line-opacity": 1.0
               }
             },
             {
@@ -170,9 +170,9 @@ enum TransiumMapStyleFactory {
               "source": "bali-transit",
               "source-layer": "bus_routes",
               "paint": {
-                "line-color": "#093A96",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.6, 13, 5.6],
-                "line-opacity": 0.46
+                "line-color": "#FFFFFF",
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.2, 13, 4.8],
+                "line-opacity": 0.82
               }
             },
             {
@@ -181,9 +181,9 @@ enum TransiumMapStyleFactory {
               "source": "bali-transit",
               "source-layer": "bus_routes",
               "paint": {
-                "line-color": "#1E66F5",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 1.4, 13, 3.4],
-                "line-opacity": 0.94
+                "line-color": "#5E9FE8",
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.95, 13, 2.55],
+                "line-opacity": 0.78
               }
             },
             {
@@ -192,9 +192,9 @@ enum TransiumMapStyleFactory {
               "source": "bali-transit",
               "source-layer": "bus_stops",
               "paint": {
-                "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 2.0, 13, 6.8],
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 1.5, 13, 5.3],
                 "circle-color": "#FFFFFF",
-                "circle-opacity": 0.88
+                "circle-opacity": 0.82
               }
             },
             {
@@ -203,10 +203,10 @@ enum TransiumMapStyleFactory {
               "source": "bali-transit",
               "source-layer": "bus_stops",
               "paint": {
-                "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 1.1, 13, 4.2],
-                "circle-color": "#FFB327",
-                "circle-stroke-color": "#7A4B00",
-                "circle-stroke-width": 0.7
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 13, 3.2],
+                "circle-color": "#5E9FE8",
+                "circle-stroke-color": "#FFFFFF",
+                "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 13, 1.2]
               }
             }
           ]
