@@ -13,15 +13,10 @@ struct AuthScreen: View {
     @Environment(SessionController.self) private var session
     @Environment(\.modelContext) private var modelContext
     @State private var appleSignInService = AppleSignInService()
-    @State private var signInErrorMessage: String?
 
     let onBackToOnboarding: (() -> Void)?
 
-    init(
-        onAuthenticated: @escaping () -> Void = {},
-        onBackToOnboarding: @escaping () -> Void = {}
-    ) {
-        self.onAuthenticated = onAuthenticated
+    init(onBackToOnboarding: (() -> Void)? = nil) {
         self.onBackToOnboarding = onBackToOnboarding
     }
 
@@ -37,11 +32,9 @@ struct AuthScreen: View {
 
                 AuthBottomPanel(
                     metrics: metrics,
-                    signInErrorMessage: signInErrorMessage,
-                    backendIDToast: backendIDToast,
+                    isVerifying: session.isBusy,
                     onRequest: configureAppleSignIn,
-                    onCompletion: handleAppleSignIn,
-                    onCopyBackendID: copyBackendID
+                    onCompletion: handleAppleSignIn
                 )
 
                 if let onBackToOnboarding {
@@ -77,21 +70,6 @@ struct AuthScreen: View {
 
     // MARK: Important Flow - Hero Placement
 
-    private var backButton: some View {
-        Button(action: onBackToOnboarding) {
-            Image(systemName: "arrow.left")
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(.black)
-                .frame(width: 48, height: 48)
-                .background(.white)
-                .clipShape(.circle)
-                .shadow(color: .authInk.opacity(0.08), radius: 12, y: 4)
-                .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Back to onboarding")
-    }
-
     private func heroArt(_ metrics: AuthScreenMetrics) -> some View {
         Image(TransiumAsset.Illustration.authHero)
             .resizable()
@@ -124,19 +102,22 @@ struct AuthScreen: View {
             let authorization = try result.get()
             let credential = try appleSignInService.credential(from: authorization)
 
-            signInErrorMessage = nil
-
             Task {
                 await session.signIn(
                     with: credential,
                     localStore: AuthStore(modelContext: modelContext)
                 )
+
+                if let errorMessage = session.errorMessage {
+                    AppToastCenter.shared.showError(title: "Sign in failed", message: errorMessage)
+                }
             }
         } catch let error as ASAuthorizationError where error.code == .canceled {
             // Closing the Apple sign-in sheet is not an error.
-            signInErrorMessage = nil
+        } catch let error as AuthError {
+            AppToastCenter.shared.showError(title: "Sign in failed", message: error.userFacingMessage)
         } catch {
-            signInErrorMessage = error.localizedDescription
+            AppToastCenter.shared.showError(title: "Sign in failed", message: error.localizedDescription)
         }
     }
 
@@ -165,7 +146,6 @@ struct AuthScreen: View {
 
 private struct AuthBottomPanel: View {
     let metrics: AuthScreenMetrics
-    let signInErrorMessage: String?
     let isVerifying: Bool
     let onRequest: (ASAuthorizationAppleIDRequest) -> Void
     let onCompletion: (Result<ASAuthorization, Error>) -> Void
@@ -430,8 +410,7 @@ private extension AuthError {
         switch self {
         case .invalidAuthorization, .invalidAppleState:
             "Apple could not verify this sign in. Please try again."
-        case .missingAppleIdentityToken, .missingAppleAuthorizationCode,
-             .invalidAppleIdentityTokenEncoding, .invalidAppleAuthorizationCodeEncoding:
+        case .missingAppleIdentityToken, .invalidAppleIdentityTokenEncoding:
             "Apple did not return the details needed to sign you in."
         case .credentialRevoked, .credentialNotFound, .credentialTransferred:
             "This Apple session is no longer active. Please sign in again."
