@@ -44,9 +44,9 @@ import Observation
 struct StatCardData: Identifiable {
     let id = UUID()
     let title: String
-    let value: String        // "17", "4.4K", "2500", "3600"
-    let unit: String?        // "km", "Rp", nil, nil
-    let icon: String         // SF Symbol or custom asset name
+    let value: String        // angka2 dinamis momz (calories, km etc)
+    let unit: String?
+    let icon: String
 }
 
 // MARK: - Reusable card view
