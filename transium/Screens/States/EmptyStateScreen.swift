@@ -8,10 +8,35 @@
 import SwiftUI
 
 struct EmptyStateScreen: View {
+    
+    @Environment(\.dismiss) private var dismiss
+    
     var body: some View {
         ZStack {
-            TransiumColor.primaryBlue
-                .ignoresSafeArea()
+            ZStack {
+                GeometryReader { geo in
+                           ZStack {
+                               Path { path in
+                                   path.move(to: CGPoint(x: geo.size.width, y: geo.size.height))
+                                   path.addLine(to: CGPoint(x: geo.size.width, y: 0))
+                                   path.addLine(to: CGPoint(x: 0, y: geo.size.height))
+                                   path.closeSubpath()
+                               }
+                               .fill(TransiumColor.primaryBlue)
+                               
+                               Path { path in
+                                   path.move(to: CGPoint(x: 0, y: 0))
+                                   path.addLine(to: CGPoint(x: geo.size.width, y: 0))
+                                   path.addLine(to: CGPoint(x: 0, y: geo.size.height))
+                                   path.closeSubpath()
+                               }
+                               .fill(TransiumColor.primaryBlue.opacity(0.95))
+                           }
+                       }
+                       .background(Color.white) // required: opacity above blends against this
+                       .ignoresSafeArea()
+            }
+            
             VStack {
                 
                 Image("Hammer")
@@ -30,13 +55,13 @@ struct EmptyStateScreen: View {
                 .foregroundStyle(.white)
                 
                 TransiumPrimaryButton(
-                    title: "Go back to Home 􀄫") {}
+                    title: "Go back to Home 􀄫") {
+                        dismiss()
+                    }
                     .padding()
+                    .accessibilityLabel("Go back to Home")
             }
         }
-        
-//        TransiumCapsuleTextButton(title: "Go back to Home", action: HomeScreen())
-//            .accessibilityLabel("Go back to Home")
     }
 }
 
