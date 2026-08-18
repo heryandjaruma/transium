@@ -11,12 +11,20 @@ enum TransiumAsset {
         static let onboardingExplore = "onboard-1"
         static let onboardingAdventure = "onboard-2"
         static let onboardingShare = "onboard-3"
+        static let permissionOnboarding = "Permission_onboarding"
+        static let payment = "Payment"
+    
+    }
+    
+    enum Logo {
+        static let tmd = "logo_tmd"
     }
 }
 
 enum TransiumColor {
     static let primaryBlue = Color("PrimaryBlue")
     static let primaryYellow = Color("PrimaryYellow")
+    static let darkBlue = Color("DarkBlue")
     static let authBlue = Color(red: 0.19, green: 0.43, blue: 0.91)
     static let linkBlue = Color(red: 0.0, green: 0.18, blue: 0.62)
 }

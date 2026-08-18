@@ -128,7 +128,7 @@ extension ButtonStyle where Self == TransiumNoOpacityButtonStyle {
     }
 }
 
-private extension Color {
+extension Color {
     var transiumDarkerShadow: Color {
         if self == .white {
             return Color(red: 0.82, green: 0.82, blue: 0.78)

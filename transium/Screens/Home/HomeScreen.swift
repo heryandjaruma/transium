@@ -10,23 +10,139 @@ import SwiftUI
 struct HomeScreen: View {
     @StateObject private var locationStore = LocationStore()
 
+    // MARK: - Search sheet state
+    @State private var isSearchPresented = false
+    @State private var sheetState: SearchSheetState = .searching
+    @State private var sheetDetent: PresentationDetent = .large
+    @State private var searchText = ""
+    
+    
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            LocalBaliMapView(currentLocation: locationStore.currentLocation)
-                .ignoresSafeArea()
+            ZStack(alignment: .topLeading) {
+                LocalBaliMapView(currentLocation: locationStore.currentLocation)
+                    .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 10) {
-                mapBadge
-                locationCard
+                VStack(alignment: .leading, spacing: 10) {
+                    mapBadge
+                    locationCard
+                    searchBarTrigger
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+
+                // Kontrol back + locate, hanya muncul saat mode "drag point"
+                if isSearchPresented && sheetState == .pinning {
+                    pinningOverlayControls
+                    centerPinIndicator
+                }
+            }
+            .task {
+                locationStore.requestCurrentLocation()
+            }
+            .preferredColorScheme(.light)
+            .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
+                SearchSheetView(
+                    state: $sheetState,
+                    searchText: $searchText,
+                    onCancel: { isSearchPresented = false }
+                )
+                .presentationDetents([.medium, .large], selection: $sheetDetent)
+                .presentationDragIndicator(.hidden)
+                .interactiveDismissDisabled(false)
+                .onChange(of: sheetDetent) { _, newDetent in
+                    sheetState = (newDetent == .large) ? .searching : .pinning
+                }
+            }
+        }
+
+        // MARK: - Search bar trigger
+
+        private var searchBarTrigger: some View {
+            Button(action: { presentSearchSheet(in: .searching) }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text("Cari tujuan atau alamat")
+                        .font(TransiumFont.body(13))
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial)
+                .background(.white.opacity(0.9))
+                .clipShape(.rect(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.08), radius: 12, y: 5)
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+
+        // MARK: - Overlay saat mode drag point (image 2)
+
+        private var pinningOverlayControls: some View {
+            HStack {
+                Button(action: { isSearchPresented = false }) {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 40, height: 40)
+                        .background(.white)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                }
+
+                Spacer()
+
+                Button(action: locationStore.requestCurrentLocation) {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(TransiumColor.primaryBlue)
+                        .frame(width: 40, height: 40)
+                        .background(.white)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
+            .transition(.opacity)
         }
-        .task {
-            locationStore.requestCurrentLocation()
+
+        /// Pin tetap di tengah area map yang kelihatan (di atas sheet .medium).
+        /// Posisi vertikal ini masih perkiraan — nanti disesuaikan lagi
+        /// begitu tinggi sheet & card final-nya sudah fix.
+        private var centerPinIndicator: some View {
+            GeometryReader { proxy in
+                Image(systemName: "mappin")
+                    .font(.system(size: 34))
+                    .foregroundStyle(.red)
+                    .shadow(radius: 4)
+                    .position(
+                        x: proxy.size.width / 2,
+                        y: proxy.size.height * 0.42
+                    )
+            }
+            .allowsHitTesting(false)
+            .transition(.opacity)
         }
-        .preferredColorScheme(.light)
-    }
+
+        // MARK: - Helpers
+
+        private func presentSearchSheet(in state: SearchSheetState) {
+            sheetState = state
+            sheetDetent = (state == .searching) ? .large : .medium
+            isSearchPresented = true
+        }
+
+        private func resetSheetState() {
+            sheetState = .searching
+            sheetDetent = .large
+            searchText = ""
+        }
 
     private var mapBadge: some View {
         VStack(alignment: .leading, spacing: 4) {
