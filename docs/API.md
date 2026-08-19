@@ -19,6 +19,19 @@ Configuration in the codebase is managed via [`transium/Backend/APIConfiguration
 
 ## 1. Journey Planning
 
+### `GET /journey/real`
+
+Plan a real door-to-door transit journey directly to a Quest using its `questId` and the user's starting origin coordinates. This eliminates the need for the client to manually specify a destination coordinate, deriving it automatically from the quest's first actionable badge step.
+
+#### Query Parameters
+- `questId` (string, required): UUID identifier of the target quest. Example: `c8e567dc-e321-438f-9a30-33eb8ae06546`
+- `origin` (string, required): Starting coordinate as `lat,lng`. Example: `-8.702105,115.176189`
+
+#### Response Schema (200 OK)
+Returns the standard `JourneyResponse` containing `best` (and optional `lessWalking`/`lessTransit` alternatives).
+
+---
+
 ### `GET /journey/overview`
 
 Plan a door-to-door journey between two coordinates in Bali, optimizing for different travel preferences (walking vs public transport).

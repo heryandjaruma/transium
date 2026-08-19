@@ -47,6 +47,10 @@ struct HomeScreen: View {
     @State private var sheetDetent: PresentationDetent = .large
     @State private var searchText = ""
     
+    // MARK: - Kelurahan Quests State
+    @State private var kelurahanGroups: [KelurahanQuestsGroup] = []
+    @State private var selectedKelurahanGroup: KelurahanQuestsGroup? = nil
+    
     init(previewLocation: CLLocation? = nil) {
         self.previewLocation = previewLocation
     }
@@ -210,6 +214,9 @@ struct HomeScreen: View {
         .task {
             guard previewLocation == nil else { return }
             locationStore.requestCurrentLocation()
+            if let groups = try? await QuestService.shared.listKelurahanQuests(), !groups.isEmpty {
+                kelurahanGroups = groups
+            }
         }
         .preferredColorScheme(.light)
         .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
@@ -229,7 +236,14 @@ struct HomeScreen: View {
             ProfileScreen()
         }
         .sheet(isPresented: $isDetailPresented) {
-            DetailPlaceScreen()
+            DetailPlaceScreen(
+                kelurahan: selectedKelurahanGroup?.kelurahan ?? Kelurahan(id: "20447277", kelurahanName: "Sanur", kecamatanName: "Denpasar Selatan"),
+                initialQuests: [],
+                onStartQuest: { questId in
+                    isDetailPresented = false
+                    doQuest(questId: questId)
+                }
+            )
         }
     }
     
@@ -365,7 +379,7 @@ struct HomeScreen: View {
         .padding(.bottom, 20)
     }
     
-    private func doQuest() {
+    private func doQuest(questId: String? = nil) {
         guard !isFetchingJourney else { return }
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             isFetchingJourney = true
@@ -374,15 +388,29 @@ struct HomeScreen: View {
         Task {
             do {
                 let originCoordinate = resolvedCurrentLocation?.coordinate ?? CLLocationCoordinate2D(latitude: -8.702105, longitude: 115.176189)
-                let destinationCoordinate = CLLocationCoordinate2D(latitude: -8.708812, longitude: 115.252362)
                 
-                let response = try await journeyService.fetchJourneyOverview(
-                    origin: originCoordinate,
-                    destination: destinationCoordinate
-                )
+                var response: JourneyResponse?
+                
+                // 1. Try real journey by questId if provided
+                if let qId = questId {
+                    response = try? await journeyService.fetchRealJourney(questId: qId, origin: originCoordinate)
+                }
+                
+                // 2. Fallback to overview calculation if real journey failed or questId is nil
+                if response == nil {
+                    let destinationCoordinate = CLLocationCoordinate2D(latitude: -8.67368, longitude: 115.26337)
+                    response = try await journeyService.fetchJourneyOverview(
+                        origin: originCoordinate,
+                        destination: destinationCoordinate
+                    )
+                }
+                
+                guard let validResponse = response else {
+                    throw TransiumAPIError.serviceUnavailable("Unable to calculate route")
+                }
                 
                 // Pre-resolve all road geometries concurrently before transitioning
-                let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(response.best)
+                let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(validResponse.best)
                 
                 await MainActor.run {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -400,7 +428,7 @@ struct HomeScreen: View {
                     }
                     AppToastCenter.shared.showError(
                         title: "Route Calculation Failed",
-                        message: "Could not plan a journey between your location and the destination."
+                        message: "Could not plan a journey to this destination."
                     )
                 }
             }
@@ -410,24 +438,56 @@ struct HomeScreen: View {
     private var ticketRail: some View {
         ScrollView(.horizontal) {
             HStack(alignment: .bottom, spacing: 14) {
-                recommendedTicket
+                if !kelurahanGroups.isEmpty {
+                    ForEach(Array(kelurahanGroups.enumerated()), id: \.offset) { index, group in
+                        let variant: TransiumTicketVariant = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .mint : .coral)
+                        let isRecommended = (index == 0)
+                        
+                        VStack(alignment: .leading, spacing: 0) {
+                            if isRecommended {
+                                recommendedBadge
+                                    .padding(.leading, 12)
+                                    .padding(.bottom, -1)
+                                    .zIndex(1)
+                            }
+                            
+                            TransiumTicketCard(
+                                title: group.kelurahan.kelurahanName,
+                                subtitle: group.quests.first?.description ?? "\(group.kelurahan.kecamatanName), Bali",
+                                distance: "11 km",
+                                price: "Rp. 4,4k",
+                                imageName: isRecommended ? TransiumAsset.Illustration.onboardingExplore : TransiumAsset.Illustration.onboardingAdventure,
+                                variant: variant
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedKelurahanGroup = group
+                                isDetailPresented = true
+                            }
+                        }
+                        .frame(width: 336)
+                        .id(index)
+                    }
+                } else {
+                    recommendedTicket
+                        .frame(width: 336)
+                        .id(0)
+                    
+                    TransiumTicketCard(
+                        title: ubudDestination.name,
+                        subtitle: ubudDestination.subtitle,
+                        distance: distanceText(to: ubudDestination),
+                        price: ubudDestination.price,
+                        imageName: ubudDestination.imageName,
+                        variant: .mint
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        isDetailPresented = true
+                    }
                     .frame(width: 336)
-                    .id(0)
-                
-                TransiumTicketCard(
-                    title: ubudDestination.name,
-                    subtitle: ubudDestination.subtitle,
-                    distance: distanceText(to: ubudDestination),
-                    price: ubudDestination.price,
-                    imageName: ubudDestination.imageName,
-                    variant: .mint
-                )
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    isDetailPresented = true
+                    .id(1)
                 }
-                .frame(width: 336)
-                .id(1)
             }
             .scrollTargetLayout()
             .padding(.horizontal, 20)
@@ -442,11 +502,11 @@ struct HomeScreen: View {
     private var ticketPageIndicator: some View {
         PageIndicator(
             currentPage: visibleTicketPage ?? 0,
-            totalPages: 2,
+            totalPages: max(kelurahanGroups.count, 2),
             activeColor: TransiumColor.primaryBlue,
             inactiveColor: TransiumColor.ticketInk.opacity(0.26)
         )
-        .accessibilityLabel("Ticket \(min((visibleTicketPage ?? 0) + 1, 2)) of 2")
+        .accessibilityLabel("Ticket \(min((visibleTicketPage ?? 0) + 1, max(kelurahanGroups.count, 2))) of \(max(kelurahanGroups.count, 2))")
     }
     
     private var recommendedTicket: some View {

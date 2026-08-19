@@ -12,12 +12,28 @@ struct DetailPlaceScreen: View {
     // MARK: - Models
     
     struct Quest: Identifiable {
-        let id = UUID()
+        let id: String
         let imageName: String
         let title: String
         let description: String
         let points: Int
         let theme: QuestTheme
+        
+        init(
+            id: String = UUID().uuidString,
+            imageName: String,
+            title: String,
+            description: String,
+            points: Int = 10,
+            theme: QuestTheme = .blue
+        ) {
+            self.id = id
+            self.imageName = imageName
+            self.title = title
+            self.description = description
+            self.points = points
+            self.theme = theme
+        }
     }
     
     enum QuestTheme {
@@ -36,22 +52,30 @@ struct DetailPlaceScreen: View {
         }
     }
     
-    // MARK: - State
+    // MARK: - Properties & State
+    
+    var kelurahan: Kelurahan = Kelurahan(id: "20447277", kelurahanName: "Sanur", kecamatanName: "Denpasar Selatan")
+    var initialQuests: [Quest] = []
+    var onStartQuest: ((String) -> Void)? = nil
     
     @Environment(\.dismiss) private var dismiss
     @State private var selectedImageIndex: Int = 0
+    @State private var quests: [Quest] = []
+    @State private var isLoadingQuests: Bool = false
     
     private let galleryImages = ["gallery-1", "gallery-2", "gallery-3"]
     
-    private let quests: [Quest] = [
+    private let defaultQuests: [Quest] = [
         Quest(
-            imageName: "kintamani",
+            id: "c8e567dc-e321-438f-9a30-33eb8ae06546",
+            imageName: "sanoored",
             title: "Sanoored",
             description: "Enjoy the vibe along the shore of Sanur",
             points: 10,
             theme: .blue
         ),
         Quest(
+            id: "gela-tour-quest",
             imageName: "traveling",
             title: "Gela-tour",
             description: "Gelato + Sanur weather = perfect summer",
@@ -59,6 +83,7 @@ struct DetailPlaceScreen: View {
             theme: .red
         ),
         Quest(
+            id: "little-stalls-quest",
             imageName: "gwk",
             title: "Little Stalls",
             description: "Go local by enjoying snacks from small businesses",
@@ -79,6 +104,9 @@ struct DetailPlaceScreen: View {
         .ignoresSafeArea(edges: .top)
         .background(Color.white)
         .navigationBarBackButtonHidden(true)
+        .task {
+            await loadQuests()
+        }
     }
     
     // MARK: - Image Carousel
@@ -118,7 +146,6 @@ struct DetailPlaceScreen: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 60)
-            
         }
         .frame(height: 400)
     }
@@ -130,16 +157,28 @@ struct DetailPlaceScreen: View {
             dragHandle
 
             titleSection
-            RecommendedQuestCard()
+            
+            RecommendedQuestCard(
+                title: quests.first?.title ?? "Sanoored",
+                subtitle: quests.first?.description ?? "Enjoy the vibe along the shore of Sanur",
+                points: 10
+            ) {
+                let questId = quests.first?.id ?? "c8e567dc-e321-438f-9a30-33eb8ae06546"
+                dismiss()
+                onStartQuest?(questId)
+            }
             
             VStack(spacing: 14) {
                 ForEach(quests) { quest in
-                    QuestRow(quest: quest)
+                    QuestRow(quest: quest) {
+                        dismiss()
+                        onStartQuest?(quest.id)
+                    }
                 }
             }
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 20)
+        .padding(.bottom, 30)
         .background(
             Color.white
                 .clipShape(RoundedCorner(radius: 28, corners: [.topLeft, .topRight]))
@@ -158,7 +197,7 @@ struct DetailPlaceScreen: View {
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .top) {
-                Text("Sanur Street")
+                Text("\(kelurahan.kelurahanName) Quests")
                     .font(TransiumFont.display(28, weight: .bold))
                     .foregroundColor(.black)
                 
@@ -177,31 +216,47 @@ struct DetailPlaceScreen: View {
                 }
             }
             
-            Text("Where earlybirds relax 🌊")
+            Text("\(kelurahan.kecamatanName) • Where earlybirds relax 🌊")
                 .font(TransiumFont.body(15))
                 .foregroundColor(.gray)
         }
     }
     
-    private func tagPill(icon: String, text: String, color: Color, multiline: Bool = false) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-            Text(text)
-                .font(TransiumFont.body(11, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .lineLimit(multiline ? 2 : 1)
-        }
-        .foregroundColor(.white)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(color)
-        .clipShape(Capsule())
-    }
+    // MARK: - Data Loading
     
+    private func loadQuests() async {
+        if !initialQuests.isEmpty {
+            quests = initialQuests
+            return
+        }
+        
+        isLoadingQuests = true
+        defer { isLoadingQuests = false }
+        
+        do {
+            let detail = try await QuestService.shared.getKelurahanQuests(id: kelurahan.id)
+            if !detail.quests.isEmpty {
+                quests = detail.quests.enumerated().map { index, q in
+                    let theme: QuestTheme = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .red : .green)
+                    let imageName = q.badges.first?.badgeName.lowercased().contains("sanur") == true ? "sanoored" : "kintamani"
+                    return Quest(
+                        id: q.id,
+                        imageName: imageName,
+                        title: q.badges.first?.badgeName ?? q.name,
+                        description: q.description,
+                        points: 10,
+                        theme: theme
+                    )
+                }
+                return
+            }
+        } catch {
+            // Fallback to defaults
+        }
+        
+        quests = defaultQuests
+    }
 }
-
-
 
 #Preview {
     DetailPlaceScreen()
