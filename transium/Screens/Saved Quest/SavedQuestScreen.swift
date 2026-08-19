@@ -60,24 +60,20 @@ struct SavedQuestScreen: View {
     private var header: some View {
         ZStack {
             Text("Saved Quest")
-                .font(TransiumFont.display(22, weight: .bold))
+                .font(TransiumFont.display(36, weight: .bold))
                 .foregroundColor(.white)
 
             HStack {
                 Button {
                     dismiss()
                 } label: {
-                    Image("Back")
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 16, height: 16)
+                    Image(systemName: "arrow.left")
                         .foregroundColor(TransiumColor.primaryBlue)
+                        .font(.system(size: 16, weight: .semibold))
                         .frame(width: 44, height: 44)
                         .background(Color.white)
                         .clipShape(Circle())
                 }
-                .accessibilityLabel("Back")
 
                 Spacer()
             }

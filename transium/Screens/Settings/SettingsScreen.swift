@@ -65,7 +65,7 @@ struct SettingsScreen: View {
     private var header: some View {
         ZStack {
             Text("Settings")
-                .font(TransiumFont.display(24, weight: .bold))
+                .font(TransiumFont.display(36, weight: .bold))
                 .foregroundColor(.white)
 
             HStack {
@@ -197,12 +197,12 @@ struct SettingsScreen: View {
             } label: {
                 HStack {
                     Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .foregroundColor(.white)
+                        .foregroundColor(.red)
                         .font(.system(size: 20, weight: .semibold))
 
                     Text("Logout")
                         .font(TransiumFont.body(17, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(.red)
 
                     Spacer()
                 }

@@ -393,7 +393,7 @@ private struct TransiumTicketDivider: View {
         TransiumVerticalLine()
             .stroke(
                 color,
-                style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [5, 6])
+                style: StrokeStyle(lineWidth: 2, lineCap: .round, dash: [5, 6])
             )
     }
 }

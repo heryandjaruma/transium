@@ -61,67 +61,6 @@ struct HomeScreen: View {
     }
     
     var body: some View {
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-            ZStack(alignment: .topLeading) {
-                LocalBaliMapView(currentLocation: locationStore.currentLocation)
-                    .ignoresSafeArea()
-
-                VStack(alignment: .leading, spacing: 10) {
-                    mapBadge
-                    locationCard
-                    searchBarTrigger
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-
-                // Kontrol back + locate, hanya muncul saat mode "drag point"
-                if isSearchPresented && sheetState == .pinning {
-                    pinningOverlayControls
-                    centerPinIndicator
-                }
-            }
-            .task {
-                locationStore.requestCurrentLocation()
-            }
-            .preferredColorScheme(.light)
-            .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
-                SearchSheetView(
-                    state: $sheetState,
-                    searchText: $searchText,
-                    onCancel: { isSearchPresented = false }
-                )
-                .presentationDetents([.medium, .large], selection: $sheetDetent)
-                .presentationDragIndicator(.hidden)
-                .interactiveDismissDisabled(false)
-                .onChange(of: sheetDetent) { _, newDetent in
-                    sheetState = (newDetent == .large) ? .searching : .pinning
-                }
-            }
-        }
-
-        // MARK: - Search bar trigger
-
-        private var searchBarTrigger: some View {
-            Button(action: { presentSearchSheet(in: .searching) }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.secondary)
-
-                    Text("Cari tujuan atau alamat")
-                        .font(TransiumFont.body(13))
-                        .foregroundStyle(.secondary)
-
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial)
-                .background(.white.opacity(0.9))
-                .clipShape(.rect(cornerRadius: 16, style: .continuous))
-                .shadow(color: .black.opacity(0.08), radius: 12, y: 5)
-=======
         ZStack(alignment: .bottom) {
             LocalBaliMapView(
                 displayLocation: resolvedCurrentLocation,
@@ -208,82 +147,6 @@ struct HomeScreen: View {
                     
                     Spacer()
                 }
-=======
-        ZStack(alignment: .bottom) {
-            LocalBaliMapView(
-                displayLocation: resolvedCurrentLocation,
-                markerHeading: previewLocation == nil ? 0 : 22,
-                centerRequestID: mapCenterRequestID,
-                activeJourney: activeJourney
-            )
-            .ignoresSafeArea()
-            
-            if let journey = activeJourney, showNavigationSheet {
-                // MARK: - Navigation Mode
-                VStack {
-                    // Top Bar (Back, Bookmark, Share, Locate)
-                    HStack {
-                        Button(action: {
-                            withAnimation(.spring()) {
-                                activeJourney = nil
-                                showNavigationSheet = false
-                            }
-                        }) {
-                            Image(systemName: "arrow.left")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.black)
-                                .frame(width: 44, height: 44)
-                                .background(.white)
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                        }
-                        
-                        Spacer()
-                        
-                        HStack(spacing: 12) {
-                            Button(action: {
-                                AppToastCenter.shared.showSuccess(title: "Saved", message: "Quest path saved to bookmarks.")
-                            }) {
-                                Image(systemName: "bookmark")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(.black)
-                                    .frame(width: 44, height: 44)
-                                    .background(.white)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                            }
-                            
-                            Button(action: {
-                                AppToastCenter.shared.showSuccess(title: "Share", message: "Sharing option selected.")
-                            }) {
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(.black)
-                                    .frame(width: 44, height: 44)
-                                    .background(.white)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                            }
-                            
-                            Button(action: {
-                                mapCenterRequestID += 1
-                            }) {
-                                Image(systemName: "location.fill")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(TransiumColor.primaryBlue)
-                                    .frame(width: 44, height: 44)
-                                    .background(.white)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                            }
-                        }
-                    }
-                    .padding(.top, 6)
-                    .padding(.horizontal, 20)
-                    
-                    Spacer()
-                }
->>>>>>> dev
                 
                 // Docked Bottom Stack: Floating Go Button + Navigation Bottom Sheet
                 VStack(spacing: 0) {
@@ -323,15 +186,9 @@ struct HomeScreen: View {
                 .transition(.move(edge: .bottom))
             } else {
                 // MARK: - Explore Mode
-<<<<<<< HEAD
                 VStack(alignment: .trailing, spacing: 0) {
                     // Top Search Bar, Locate & Quick Menu Controls
                     HStack(alignment: .top, spacing: 10) {
-=======
-                VStack(spacing: 0) {
-                    // Top Search Bar, Locate & Profile Controls
-                    HStack(spacing: 10) {
->>>>>>> dev
                         searchBarTrigger
                         
                         TransiumIconButton(
@@ -342,22 +199,7 @@ struct HomeScreen: View {
                         }
                         .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                         
-<<<<<<< HEAD
                         quickMenu
-=======
-                        Button(action: {
-                            isProfilePresented = true
-                        }) {
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.system(size: 24, weight: .medium))
-                                .foregroundStyle(TransiumColor.primaryBlue)
-                                .frame(width: 44, height: 44)
-                                .background(.white)
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                        }
-                        .accessibilityLabel("Profile")
->>>>>>> dev
                     }
                     .padding(.top, 6)
                     .padding(.horizontal, 20)
@@ -378,12 +220,9 @@ struct HomeScreen: View {
         .task {
             guard previewLocation == nil else { return }
             locationStore.requestCurrentLocation()
-<<<<<<< HEAD
-=======
             if let groups = try? await QuestService.shared.listKelurahanQuests(), !groups.isEmpty {
                 kelurahanGroups = groups
             }
->>>>>>> dev
         }
         .preferredColorScheme(.light)
         .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
@@ -399,9 +238,15 @@ struct HomeScreen: View {
                 sheetState = (newDetent == .large) ? .searching : .pinning
             }
         }
-<<<<<<< HEAD
         .sheet(isPresented: $isDetailPresented) {
-            DetailPlaceScreen()
+            DetailPlaceScreen(
+                kelurahan: selectedKelurahanGroup?.kelurahan ?? Kelurahan(id: "20447277", kelurahanName: "Sanur", kecamatanName: "Denpasar Selatan"),
+                initialQuests: [],
+                onStartQuest: { questId in
+                    isDetailPresented = false
+                    doQuest(questId: questId)
+                }
+            )
         }
         .fullScreenCover(isPresented: $isProfilePresented) {
             ProfileScreen()
@@ -413,21 +258,6 @@ struct HomeScreen: View {
             SavedQuestScreen()
         }
         .animation(.easeInOut(duration: 0.2), value: isMenuExpanded)
-=======
-        .sheet(isPresented: $isProfilePresented) {
-            ProfileScreen()
-        }
-        .sheet(isPresented: $isDetailPresented) {
-            DetailPlaceScreen(
-                kelurahan: selectedKelurahanGroup?.kelurahan ?? Kelurahan(id: "20447277", kelurahanName: "Sanur", kecamatanName: "Denpasar Selatan"),
-                initialQuests: [],
-                onStartQuest: { questId in
-                    isDetailPresented = false
-                    doQuest(questId: questId)
-                }
-            )
-        }
->>>>>>> dev
     }
     
     private var resolvedCurrentLocation: CLLocation? {
@@ -448,21 +278,11 @@ struct HomeScreen: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(TransiumColor.primaryBlue)
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> dev
 
                 Text("Search destination...")
                     .font(TransiumFont.body(14))
                     .foregroundStyle(.secondary)
 
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-        private var pinningOverlayControls: some View {
-=======
-=======
->>>>>>> dev
                 Spacer()
             }
             .padding(.horizontal, 16)
@@ -473,7 +293,6 @@ struct HomeScreen: View {
         }
         .buttonStyle(.plain)
     }
-<<<<<<< HEAD
 
     // MARK: - Quick Menu (ellipsis button that expands into icon-only buttons)
 
@@ -527,17 +346,11 @@ struct HomeScreen: View {
         .accessibilityLabel(accessibilityLabel)
         .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .top)))
     }
-=======
->>>>>>> dev
     
     // MARK: - Pinning Overlay Controls
     
     private var pinningOverlayControls: some View {
         VStack {
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> dev
             HStack {
                 Button(action: { isSearchPresented = false }) {
                     Image(systemName: "arrow.left")
