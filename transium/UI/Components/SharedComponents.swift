@@ -249,7 +249,7 @@ struct RecommendedQuestCard: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Color.darkBlue.opacity(0.9))
+                .background(TransiumColor.darkBlue.opacity(0.9))
                 .clipShape(Capsule())
             }
             .frame(maxWidth: .infinity, alignment: .leading) // ambil semua ruang tersisa di kiri

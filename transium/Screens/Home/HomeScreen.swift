@@ -42,6 +42,7 @@ struct HomeScreen: View {
     // MARK: - Search & Profile State
     @State private var isSearchPresented = false
     @State private var isProfilePresented = false
+    @State private var isDetailPresented = false
     @State private var sheetState: SearchSheetState = .searching
     @State private var sheetDetent: PresentationDetent = .large
     @State private var searchText = ""
@@ -226,6 +227,9 @@ struct HomeScreen: View {
         }
         .sheet(isPresented: $isProfilePresented) {
             ProfileScreen()
+        }
+        .sheet(isPresented: $isDetailPresented) {
+            DetailPlaceScreen()
         }
     }
     
@@ -418,6 +422,10 @@ struct HomeScreen: View {
                     imageName: ubudDestination.imageName,
                     variant: .mint
                 )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    isDetailPresented = true
+                }
                 .frame(width: 336)
                 .id(1)
             }
@@ -455,6 +463,10 @@ struct HomeScreen: View {
                 price: sanurDestination.price,
                 imageName: sanurDestination.imageName
             )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                isDetailPresented = true
+            }
         }
     }
     
