@@ -7,7 +7,7 @@ import Foundation
 import CoreLocation
 
 // MARK: - LatLng
-public struct LatLng: Codable, Sendable, Equatable, Hashable {
+public nonisolated struct LatLng: Codable, Sendable, Equatable, Hashable {
     public let lat: Double
     public let lng: Double
 
@@ -27,7 +27,7 @@ public struct LatLng: Codable, Sendable, Equatable, Hashable {
 }
 
 // MARK: - MediaAsset
-public struct MediaAsset: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct MediaAsset: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let url: String
     public let mimeType: String
@@ -50,7 +50,7 @@ public struct MediaAsset: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - Kelurahan
-public struct Kelurahan: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct Kelurahan: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let kelurahanName: String
     public let kecamatanName: String
@@ -67,7 +67,7 @@ public struct Kelurahan: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - APIErrorResponse
-public struct APIErrorResponse: Codable, Sendable {
+public nonisolated struct APIErrorResponse: Codable, Sendable {
     public let error: String
 
     public init(error: String) {

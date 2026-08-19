@@ -6,7 +6,7 @@
 import Foundation
 
 // MARK: - Profile
-public struct Profile: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct Profile: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let userId: String
     public let firstName: String
@@ -42,7 +42,7 @@ public struct Profile: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - Update Profile Request
-public struct UpdateProfileRequest: Codable, Sendable {
+public nonisolated struct UpdateProfileRequest: Codable, Sendable {
     public let firstName: String?
     public let lastName: String?
 
@@ -53,7 +53,7 @@ public struct UpdateProfileRequest: Codable, Sendable {
 }
 
 // MARK: - Response Wrappers
-public struct ProfileResponse: Codable, Sendable {
+public nonisolated struct ProfileResponse: Codable, Sendable {
     public let profile: Profile
 
     public init(profile: Profile) {

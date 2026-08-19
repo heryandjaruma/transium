@@ -7,7 +7,7 @@ import Foundation
 import CoreLocation
 
 // MARK: - AutocompleteSuggestion
-public struct AutocompleteSuggestion: Codable, Sendable, Equatable, Hashable {
+public nonisolated struct AutocompleteSuggestion: Codable, Sendable, Equatable, Hashable {
     public let label: String
     public let sublabel: String?
     public let lat: Double?
@@ -39,7 +39,7 @@ public struct AutocompleteSuggestion: Codable, Sendable, Equatable, Hashable {
 }
 
 // MARK: - PlaceSuggestion
-public struct PlaceSuggestion: Codable, Sendable, Equatable, Hashable {
+public nonisolated struct PlaceSuggestion: Codable, Sendable, Equatable, Hashable {
     public let label: String
     public let sublabel: String?
     public let lat: Double
@@ -63,13 +63,13 @@ public struct PlaceSuggestion: Codable, Sendable, Equatable, Hashable {
 }
 
 // MARK: - GeocodeSource
-public enum GeocodeSource: String, Codable, Sendable {
+public nonisolated enum GeocodeSource: String, Codable, Sendable {
     case apple
     case osm
 }
 
 // MARK: - GeocodeResult
-public struct GeocodeResult: Codable, Sendable, Equatable {
+public nonisolated struct GeocodeResult: Codable, Sendable, Equatable {
     public let results: [PlaceSuggestion]
     public let source: GeocodeSource
 
@@ -80,10 +80,10 @@ public struct GeocodeResult: Codable, Sendable, Equatable {
 }
 
 // MARK: - Response Wrappers
-struct AutocompleteSearchResponse: Codable {
+nonisolated struct AutocompleteSearchResponse: Codable {
     let results: [AutocompleteSuggestion]
 }
 
-struct PlaceResolveResponse: Codable {
+nonisolated struct PlaceResolveResponse: Codable {
     let results: [PlaceSuggestion]
 }

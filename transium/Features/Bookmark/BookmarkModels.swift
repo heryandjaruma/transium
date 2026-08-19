@@ -6,7 +6,7 @@
 import Foundation
 
 // MARK: - Bookmark
-public struct Bookmark: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct Bookmark: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let questId: String
     public let questName: String
@@ -29,7 +29,7 @@ public struct Bookmark: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - Request Payloads
-public struct BookmarkRequest: Codable, Sendable {
+public nonisolated struct BookmarkRequest: Codable, Sendable {
     public let questId: String
 
     public init(questId: String) {
@@ -38,10 +38,10 @@ public struct BookmarkRequest: Codable, Sendable {
 }
 
 // MARK: - Response Wrappers
-struct BookmarkListResponse: Codable {
+nonisolated struct BookmarkListResponse: Codable {
     let bookmarks: [Bookmark]
 }
 
-struct BookmarkCreateResponse: Codable {
+nonisolated struct BookmarkCreateResponse: Codable {
     let bookmark: Bookmark
 }

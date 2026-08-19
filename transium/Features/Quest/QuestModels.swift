@@ -6,7 +6,7 @@
 import Foundation
 
 // MARK: - Quest
-public struct Quest: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct Quest: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let name: String
     public let category: String
@@ -29,7 +29,7 @@ public struct Quest: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - QuestBadgeEntry
-public struct QuestBadgeEntry: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct QuestBadgeEntry: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let badgeId: String
     public let badgeName: String
@@ -55,7 +55,7 @@ public struct QuestBadgeEntry: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - BadgeActionStep
-public struct BadgeActionStep: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct BadgeActionStep: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let badgeId: String
     public let actionId: String
@@ -90,7 +90,7 @@ public struct BadgeActionStep: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - QuestBadgeWithSteps
-public struct QuestBadgeWithSteps: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct QuestBadgeWithSteps: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let badgeId: String
     public let badgeName: String
@@ -119,7 +119,7 @@ public struct QuestBadgeWithSteps: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - QuestDetail
-public struct QuestDetail: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct QuestDetail: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let name: String
     public let category: String
@@ -151,7 +151,7 @@ public struct QuestDetail: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - QuestWithBadges
-public struct QuestWithBadges: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct QuestWithBadges: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let name: String
     public let category: String
@@ -177,7 +177,7 @@ public struct QuestWithBadges: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - KelurahanQuestsGroup
-public struct KelurahanQuestsGroup: Codable, Sendable, Equatable {
+public nonisolated struct KelurahanQuestsGroup: Codable, Sendable, Equatable {
     public let kelurahan: Kelurahan
     public let quests: [Quest]
 
@@ -188,23 +188,23 @@ public struct KelurahanQuestsGroup: Codable, Sendable, Equatable {
 }
 
 // MARK: - Response Wrappers
-struct QuestListResponse: Codable {
+nonisolated struct QuestListResponse: Codable {
     let quests: [Quest]
 }
 
-struct QuestDetailResponse: Codable {
+nonisolated struct QuestDetailResponse: Codable {
     let quest: QuestDetail
 }
 
-struct QuestBadgesResponse: Codable {
+nonisolated struct QuestBadgesResponse: Codable {
     let questBadges: [QuestBadgeEntry]
 }
 
-struct KelurahanQuestGroupsResponse: Codable {
+nonisolated struct KelurahanQuestGroupsResponse: Codable {
     let groups: [KelurahanQuestsGroup]
 }
 
-public struct KelurahanDetailQuestsResponse: Codable, Sendable, Equatable {
+public nonisolated struct KelurahanDetailQuestsResponse: Codable, Sendable, Equatable {
     public let kelurahan: Kelurahan
     public let quests: [QuestWithBadges]
 }

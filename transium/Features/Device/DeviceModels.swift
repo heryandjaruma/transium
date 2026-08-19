@@ -6,13 +6,13 @@
 import Foundation
 
 // MARK: - DeviceEnvironment
-public enum DeviceEnvironment: String, Codable, Sendable {
+public nonisolated enum DeviceEnvironment: String, Codable, Sendable {
     case sandbox
     case production
 }
 
 // MARK: - DeviceToken
-public struct DeviceToken: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct DeviceToken: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let environment: DeviceEnvironment
     public let createdAt: Date
@@ -32,7 +32,7 @@ public struct DeviceToken: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - Device Request Payloads
-public struct RegisterDeviceRequest: Codable, Sendable {
+public nonisolated struct RegisterDeviceRequest: Codable, Sendable {
     public let token: String
     public let environment: DeviceEnvironment?
 
@@ -42,7 +42,7 @@ public struct RegisterDeviceRequest: Codable, Sendable {
     }
 }
 
-public struct UnregisterDeviceRequest: Codable, Sendable {
+public nonisolated struct UnregisterDeviceRequest: Codable, Sendable {
     public let token: String
 
     public init(token: String) {
@@ -51,7 +51,7 @@ public struct UnregisterDeviceRequest: Codable, Sendable {
 }
 
 // MARK: - DevicePushTestResult
-public struct DevicePushTestResult: Codable, Sendable, Equatable {
+public nonisolated struct DevicePushTestResult: Codable, Sendable, Equatable {
     public let token: String
     public let ok: Bool
     public let status: Int
@@ -71,14 +71,14 @@ public struct DevicePushTestResult: Codable, Sendable, Equatable {
 }
 
 // MARK: - Response Wrappers
-struct DeviceListResponse: Codable {
+nonisolated struct DeviceListResponse: Codable {
     let deviceTokens: [DeviceToken]
 }
 
-struct DeviceRegisterResponse: Codable {
+nonisolated struct DeviceRegisterResponse: Codable {
     let deviceToken: DeviceToken
 }
 
-struct DevicePushTestResponse: Codable {
+nonisolated struct DevicePushTestResponse: Codable {
     let results: [DevicePushTestResult]
 }
