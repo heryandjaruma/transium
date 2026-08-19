@@ -10,50 +10,74 @@ struct TransiumPrimaryButton: View {
     let backgroundColor: Color
     let foregroundColor: Color
     let shadowColor: Color?
+    let trailingIcon: String?
+    let height: CGFloat
+    let fillWidth: Bool
+    let font: Font
     let action: () -> Void
-
+ 
     init(
         title: String,
         backgroundColor: Color = .white,
         foregroundColor: Color = .black,
         shadowColor: Color? = nil,
+        trailingIcon: String? = nil,
+        height: CGFloat = 60,
+        fillWidth: Bool = true,
+        font: Font = TransiumFont.body(18, weight: .semibold),
         action: @escaping () -> Void
     ) {
         self.title = title
         self.backgroundColor = backgroundColor
         self.foregroundColor = foregroundColor
         self.shadowColor = shadowColor
+        self.trailingIcon = trailingIcon
+        self.height = height
+        self.fillWidth = fillWidth
+        self.font = font
         self.action = action
     }
-
+ 
     var body: some View {
         Button(action: action) {
-            Text(title)
-                .font(TransiumFont.body(18, weight: .semibold))
-                .foregroundStyle(foregroundColor)
-                .frame(maxWidth: .infinity)
-                .frame(height: 60)
-                .background(buttonSurface)
-                .compositingGroup()
-                .clipShape(.capsule)
-                .shadow(color: resolvedShadowColor, radius: 0, y: 5)
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(font)
+                    .foregroundStyle(foregroundColor)
+ 
+                if let trailingIcon {
+                    Image(systemName: trailingIcon)
+                        .font(.system(size: height * 0.2, weight: .bold))
+                        .foregroundColor(backgroundColor)
+                        .padding(height * 0.12)
+                        .background(foregroundColor)
+                        .clipShape(Circle())
+                }
+            }
+            .padding(.horizontal, trailingIcon != nil ? height * 0.35 : 0)
+            .frame(maxWidth: fillWidth ? .infinity : nil)
+            .frame(height: height)
+            .background(buttonSurface)
+            .compositingGroup()
+            .clipShape(.capsule)
+            .shadow(color: resolvedShadowColor, radius: 0, y: height * 0.08)
         }
         .buttonStyle(.transiumNoOpacity)
         .accessibilityAddTraits(.isButton)
     }
-
+ 
     private var buttonSurface: some View {
         Capsule()
             .fill(backgroundColor)
             .overlay(alignment: .top) {
                 Capsule()
                     .fill(.white.opacity(0.18))
-                    .frame(height: 18)
+                    .frame(height: max(height * 0.3, 10))
                     .padding(.horizontal, 2)
                     .padding(.top, 1)
             }
     }
-
+ 
     private var resolvedShadowColor: Color {
         shadowColor ?? backgroundColor.transiumDarkerShadow
     }

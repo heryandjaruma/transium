@@ -157,6 +157,139 @@ struct PaymentMethodRow: View {
     }
 }
 
+// MARK: - Quest Row
+struct QuestRow: View {
+    let quest: DetailPlaceScreen.Quest
+ 
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(quest.imageName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 78, height: 78)
+ 
+            VStack(alignment: .leading, spacing: 4) {
+                Text(quest.title)
+                    .font(TransiumFont.body(14, weight: .semibold))
+                    .foregroundColor(.black)
+ 
+                Text(quest.description)
+                    .font(TransiumFont.body(11, weight: .medium))
+                    .foregroundColor(.gray)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+ 
+            Spacer()
+ 
+            VStack(alignment: .center, spacing: 6) {
+                Button {
+                    // start quest action
+                } label: {
+                    Text("Start Quest")
+                        .font(TransiumFont.body(11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(quest.theme.accent)
+                        .clipShape(Capsule())
+                }
+ 
+                HStack(spacing: 3) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.yellow)
+                    Text("+\(quest.points) pts")
+                        .font(TransiumFont.body(11, weight: .medium))
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+        .padding(14)
+        .background(quest.theme.background)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+}
+
+// MARK: - Recommended Quest Card
+
+var recommendedQuestCard: some View {
+     let accent = Color(red: 0.20, green: 0.42, blue: 0.95)
+
+     return VStack(alignment: .leading, spacing: 16) {
+         ZStack(alignment: .leading, spacing: 16) {
+             VStack(alignment: .leading, spacing: 10) {
+                 Text("RECOMMENDED")
+                     .font(TransiumFont.body(10, weight: .bold))
+                     .foregroundColor(.white)
+                     .padding(.horizontal, 10)
+                     .padding(.vertical, 5)
+                     .background(Color.white.opacity(0.2))
+                     .clipShape(Capsule())
+
+                 Text("Early Bird Walk")
+                     .font(TransiumFont.body(19, weight: .bold))
+                     .foregroundColor(.white)
+
+                 Text("Visit Sanur before 8 AM and capture the sunrise.")
+                     .font(TransiumFont.body(13))
+                     .foregroundColor(.white.opacity(0.9))
+                     .fixedSize(horizontal: false, vertical: true)
+
+                 HStack(spacing: 4) {
+                     Image(systemName: "star.fill")
+                         .foregroundColor(.yellow)
+                         .font(.system(size: 12))
+                     Text("+10 pts")
+                         .font(TransiumFont.body(12, weight: .semibold))
+                         .foregroundColor(.white)
+                 }
+                 .padding(.horizontal, 10)
+                 .padding(.vertical, 6)
+                 .background(Color.white.opacity(0.15))
+                 .clipShape(Capsule())
+             }
+
+             Spacer(minLength: 8)
+             
+             ZStack(alignment: .bottom) {
+                 ZStack(alignment: .center) {
+                     Image("Wow")
+                         .resizable()
+                         .scaledToFit()
+                         .frame(width: 110, height: 110)
+                     Image("sanoored")
+                         .resizable()
+                         .scaledToFill()
+                         .frame(width: 78, height: 78)
+                         .clipShape(RoundedRectangle(cornerRadius: 4))
+                 }
+                 TransiumPrimaryButton(
+                     title: "Start Quest",
+                     backgroundColor: .white,
+                     foregroundColor: accent,
+                     trailingIcon: "arrow.right",
+                     height: 34,
+                     fillWidth: true,
+                     font: TransiumFont.body(12, weight: .semibold)
+                 ) {
+                     // start quest action
+                 }
+             }
+
+         }
+
+     }
+     .padding(18)
+     .background(
+         LinearGradient(
+             colors: [accent, accent.opacity(0.85)],
+             startPoint: .topLeading,
+             endPoint: .bottomTrailing
+         )
+     )
+     .clipShape(RoundedRectangle(cornerRadius: 24))
+ }
 
 #Preview {
     PaymentMethod()
@@ -164,4 +297,8 @@ struct PaymentMethodRow: View {
 
 #Preview {
     Permission()
+}
+
+#Preview {
+    DetailPlaceScreen()
 }

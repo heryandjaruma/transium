@@ -68,37 +68,56 @@ struct CameraScreen: View {
     private var header: some View {
         VStack(spacing: 6) {
             Text("📸")
-                .font(.system(size: 40))
-
-            Text("Capture Your Moment")
-                .font(TransiumFont.display(26, weight: .bold))
-                .foregroundColor(.white)
-                .multilineTextAlignment(.center)
+                .font(.system(size: 48))
+            
+            ZStack {
+                Image("Splash")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 48, height: 48)
+                    .offset(x: 160, y: -20)
+                Text("Capture Your Moment")
+                    .font(TransiumFont.display(37, weight: .bold))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+            }
 
             Text("Your digital keepsake~")
-                .font(TransiumFont.body(13))
-                .foregroundColor(.white.opacity(0.85))
+                .font(TransiumFont.body(14))
+                .foregroundColor(.white)
         }
     }
 
     // MARK: - Camera Preview
     private var cameraPreview: some View {
-        Group {
-            if camera.isAuthorized {
-                CameraPreviewView(session: camera.session)
-            } else {
-                Color.black.opacity(0.3)
+        ZStack {
+            Group {
+                if camera.isAuthorized {
+                    CameraPreviewView(session: camera.session)
+                } else {
+                    Color.black.opacity(0.3)
+                }
             }
+            .aspectRatio(1, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .stroke(Color.white, lineWidth: 4)
+            )
+            .padding(.horizontal, 24)
+
+            Image("Star1")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 60, height: 60)
+                .offset(x: 160, y: -160)
+
+            Image("Star2")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 60, height: 60)
+                .offset(x: -140, y: 170)
         }
-        .aspectRatio(1, contentMode: .fit)
-        .padding(.horizontal, 24)
-        .clipShape(RoundedRectangle(cornerRadius: 28))
-        .overlay(
-            RoundedRectangle(cornerRadius: 28)
-                .stroke(Color.white, lineWidth: 4)
-                .padding(.horizontal, 24)
-        )
-        .padding(.horizontal, 4)
     }
 
     // MARK: - Controls

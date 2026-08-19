@@ -21,18 +21,8 @@ struct PhotoPreviewScreen: View {
             VStack(spacing: 24) {
                 header
 
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .aspectRatio(1, contentMode: .fill)
+                photoPreview
                     .padding(.horizontal, 24)
-                    .clipShape(RoundedRectangle(cornerRadius: 28))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28)
-                            .stroke(Color.white, lineWidth: 4)
-                            .padding(.horizontal, 24)
-                    )
-                    .padding(.horizontal, 4)
 
                 Spacer(minLength: 12)
 
@@ -59,20 +49,67 @@ struct PhotoPreviewScreen: View {
         }
     }
 
+    // MARK: - Photo Preview
+
+    private var photoPreview: some View {
+        // GeometryReader di sini hanya untuk membaca lebar area yang tersedia
+        // (sudah dikurangi horizontal padding lewat modifier .padding di luar),
+        // jadi tidak perlu UIScreen.main sama sekali.
+        
+        ZStack {
+            GeometryReader { proxy in
+                let side = proxy.size.width
+
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: side, height: side)
+                    .clipShape(RoundedRectangle(cornerRadius: 28))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28)
+                            .stroke(Color.white, lineWidth: 4)
+                    )
+            }
+            .aspectRatio(1, contentMode: .fit) // memaksa GeometryReader punya tinggi = lebar (persegi)
+            
+            Image("Star1")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 60, height: 60)
+                .offset(x: 160, y: -160)
+            
+            Image("Star2")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 60, height: 60)
+                .offset(x: -140, y: 170)
+        
+        }
+
+    }
+
     // MARK: - Header
     private var header: some View {
         VStack(spacing: 6) {
             Text("📸")
-                .font(.system(size: 40))
+                .font(.system(size: 48))
+            
+            ZStack {
+                Image("Splash")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 48, height: 48)
+                    .offset(x: 120, y: -20)
+                
+                Text("Looking Good?")
+                    .font(TransiumFont.display(37, weight: .bold))
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+            }
 
-            Text("Your Digital Keepsake")
-                .font(TransiumFont.display(26, weight: .bold))
+            Text("You can retake, by pressing the retake button~")
+                .font(TransiumFont.body(14))
                 .foregroundColor(.white)
-                .multilineTextAlignment(.center)
-
-            Text("Looking good?")
-                .font(TransiumFont.body(13))
-                .foregroundColor(.white.opacity(0.85))
         }
     }
 
@@ -94,7 +131,7 @@ struct PhotoPreviewScreen: View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: 25, weight: .medium))
                     .foregroundColor(.black)
                     .frame(width: 56, height: 56)
                     .background(Color.white)
@@ -121,5 +158,10 @@ struct PhotoPreviewScreen: View {
 }
 
 #Preview {
-    PhotoPreviewScreen(image: UIImage(systemName: "photo")!, onRetake: {}, onSave: {})
+    let renderer = UIGraphicsImageRenderer(size: CGSize(width: 400, height: 400))
+    let dummyImage = renderer.image { ctx in
+        UIColor.systemTeal.setFill()
+        ctx.fill(CGRect(x: 0, y: 0, width: 400, height: 400))
+    }
+    return PhotoPreviewScreen(image: dummyImage, onRetake: {}, onSave: {})
 }

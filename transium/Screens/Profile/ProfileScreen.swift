@@ -56,25 +56,22 @@ struct ProfileScreen: View {
         GalleryPhoto(imageName: "gallery-1"),
         GalleryPhoto(imageName: "gallery-2"),
         GalleryPhoto(imageName: "gallery-3"),
-        GalleryPhoto(imageName: "gallery-4"),
-        GalleryPhoto(imageName: "gallery-5"),
-        GalleryPhoto(imageName: "gallery-6"),
-        GalleryPhoto(imageName: "gallery-7"),
-        GalleryPhoto(imageName: "gallery-8"),
-        GalleryPhoto(imageName: "gallery-9")
     ]
-    @State private var photoPendingDelete: GalleryPhoto? = nil
-    @State private var showDeleteConfirmation: Bool = false
+//    @State private var photoPendingDelete: GalleryPhoto? = nil
+//    @State private var showDeleteConfirmation: Bool = false
+    @State private var likedPhotoIDs: Set<UUID> = []
     @State private var viewingPhoto: GalleryPhoto? = nil
+    
+    @State private var showPhotoSourceDialog = false
+    @State private var activePickerSource: UIImagePickerController.SourceType?
+    @State private var avatarImage: UIImage? = nil
 
     // Badges
     private let badges: [Badge] = [
-        Badge(imageName: "badge-sanoored", title: "Sanoored", date: "27 Aug 2026", borderColor: .black),
-        Badge(imageName: "badge-meandu", title: "Me and U", date: "27 Aug 2026", borderColor: .red),
-        Badge(imageName: "badge-uluwatu", title: "Uluwatu", date: "27 Aug 2026", borderColor: TransiumColor.primaryYellow),
-        Badge(imageName: "badge-kintamani", title: "Kintamani", date: "27 Aug 2026", borderColor: .blue),
-        Badge(imageName: "badge-gwk", title: "GWK", date: "27 Aug 2026", borderColor: .green),
-        Badge(imageName: "badge-traveling", title: "Traveling", date: "27 Aug 2026", borderColor: .red)
+        Badge(imageName: "sanoored", title: "Sanoored", date: "27 Aug 2026", borderColor: .black),
+        Badge(imageName: "kintamani", title: "Kintamani", date: "27 Aug 2026", borderColor: .blue),
+        Badge(imageName: "gwk", title: "GWK", date: "27 Aug 2026", borderColor: .green),
+        Badge(imageName: "traveling", title: "Traveling", date: "27 Aug 2026", borderColor: .red)
     ]
 
     var body: some View {
@@ -102,6 +99,14 @@ struct ProfileScreen: View {
                     .padding(.bottom, 40)
                 }
                 .background(Color(.systemGray6))
+                .safeAreaInset(edge: .bottom) {
+                    if selectedTab == .account {
+                        editAccountButton
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 16)
+                            .background(Color(.systemGray6))
+                    }
+                }
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -114,18 +119,6 @@ struct ProfileScreen: View {
                     userName = trimmed
                 }
             }
-        }
-        .alert(
-            "Delete Photo?",
-            isPresented: $showDeleteConfirmation,
-            presenting: photoPendingDelete
-        ) { photo in
-            Button("Delete", role: .destructive) {
-                deletePhoto(photo)
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: { _ in
-            Text("This photo will be removed from your gallery. This action can't be undone.")
         }
         .sheet(isPresented: $isEditingAccount) {
             editAccountSheet
@@ -142,7 +135,7 @@ struct ProfileScreen: View {
         VStack(spacing: 16) {
             ZStack {
                 Text("Profile")
-                    .font(TransiumFont.display(24, weight: .bold))
+                    .font(TransiumFont.display(27, weight: .bold))
                     .foregroundColor(.white)
 
                 HStack {
@@ -163,24 +156,42 @@ struct ProfileScreen: View {
             .padding(.top, 8)
 
             ZStack(alignment: .bottomTrailing) {
-                Image("profile-avatar")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 130, height: 130)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.white, lineWidth: 4))
+                Group {
+                    if let avatarImage {
+                        Image(uiImage: avatarImage)
+                            .resizable()
+                    } else {
+                        Image("profile_avatar")
+                            .resizable()
+                    }
+                }
+                .scaledToFill()
+                .frame(width: 160, height: 160)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.white, lineWidth: 6))
 
                 Button {
-                    // hook up photo picker here later
+                    showPhotoSourceDialog = true
                 } label: {
                     Image(systemName: "camera.fill")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 21, weight: .semibold))
                         .foregroundColor(.black)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(Color.white)
                         .clipShape(Circle())
                 }
                 .offset(x: -4, y: -4)
+                .confirmationDialog("Change profile photo", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        Button("Take Photo") {
+                            activePickerSource = .camera
+                        }
+                    }
+                    Button("Choose from Library") {
+                        activePickerSource = .photoLibrary
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
             }
 
             VStack(spacing: 8) {
@@ -200,14 +211,20 @@ struct ProfileScreen: View {
                 }
 
                 Label("Explorer", systemImage: "star.fill")
-                    .font(TransiumFont.body(12, weight: .semibold))
+                    .font(TransiumFont.body(14, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.18))
+                    .background(Color.darkBlue.opacity(0.9))
                     .clipShape(Capsule())
             }
             .padding(.bottom, 20)
+            .sheet(item: $activePickerSource) { source in
+                ImagePicker(sourceType: source) { image in
+                    avatarImage = image
+                }
+                .ignoresSafeArea()
+            }
         }
     }
 
@@ -223,9 +240,9 @@ struct ProfileScreen: View {
                     VStack(spacing: 8) {
                         HStack(spacing: 6) {
                             Image(systemName: tab.icon)
-                                .font(.system(size: 14))
+                                .font(.system(size: 17))
                             Text(tab.rawValue)
-                                .font(TransiumFont.body(14, weight: .medium))
+                                .font(TransiumFont.body(17, weight: .medium))
                         }
                         .foregroundColor(selectedTab == tab ? TransiumColor.primaryBlue : .gray)
 
@@ -246,26 +263,26 @@ struct ProfileScreen: View {
 
     // MARK: - Account Tab
     private var accountTab: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 10) {
             accountRow(icon: "envelope", label: "Email", value: email)
             Divider()
             accountRow(icon: "lock", label: "Password", value: String(repeating: "•", count: max(password.count, 6)))
+        }
+    }
 
-            Spacer(minLength: 40)
-
-            Button {
-                editedEmail = email
-                editedPassword = ""
-                isEditingAccount = true
-            } label: {
-                Text("Edit Account")
-                    .font(TransiumFont.body(16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(Color.black)
-                    .clipShape(Capsule())
-            }
+    private var editAccountButton: some View {
+        Button {
+            editedEmail = email
+            editedPassword = ""
+            isEditingAccount = true
+        } label: {
+            Text("Edit Account")
+                .font(TransiumFont.body(16, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .background(Color.black)
+                .clipShape(Capsule())
         }
     }
 
@@ -290,38 +307,42 @@ struct ProfileScreen: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Your Badges")
-                    .font(TransiumFont.body(16, weight: .semibold))
+                    .font(TransiumFont.body(17, weight: .bold))
                     .foregroundColor(.black)
                 Spacer()
                 Text("\(badges.count) Badges")
-                    .font(TransiumFont.body(13, weight: .medium))
+                    .font(TransiumFont.body(17, weight: .bold))
                     .foregroundColor(TransiumColor.primaryBlue)
             }
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+            LazyVGrid(
+                columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                spacing: 10
+            ) {
                 ForEach(badges) { badge in
                     VStack(spacing: 8) {
                         Image(badge.imageName)
                             .resizable()
                             .scaledToFill()
-                            .frame(height: 130)
+                            .aspectRatio(1, contentMode: .fill)   // square, bukan .infinity
                             .frame(maxWidth: .infinity)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(badge.borderColor, lineWidth: 3)
-                            )
+                            .clipped()
                             .onTapGesture {
                                 // optional: open badge detail
                             }
 
-                        Text(badge.title)
-                            .font(TransiumFont.body(13, weight: .semibold))
-                            .foregroundColor(.black)
+                        VStack(spacing: 0) {
+                            Text(badge.title)
+                                .font(TransiumFont.body(14, weight: .semibold))
+                                .foregroundColor(.black)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
 
-                        Text(badge.date)
-                            .font(TransiumFont.body(11))
-                            .foregroundColor(.gray)
+                            Text(badge.date)
+                                .font(TransiumFont.body(11).weight(.medium))
+                                .foregroundColor(.gray)
+                        }
                     }
                 }
             }
@@ -332,7 +353,7 @@ struct ProfileScreen: View {
     private var galleryTab: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Your Adventure Moments")
-                .font(TransiumFont.body(16, weight: .semibold))
+                .font(TransiumFont.body(17, weight: .semibold))
                 .foregroundColor(.black)
 
             LazyVGrid(
@@ -344,36 +365,35 @@ struct ProfileScreen: View {
                         Image(photo.imageName)
                             .resizable()
                             .scaledToFill()
-                            .frame(height: 110)
+                            .frame(height: 145)
                             .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                             .onTapGesture {
                                 viewingPhoto = photo
                             }
 
                         Button {
-                            photoPendingDelete = photo
-                            showDeleteConfirmation = true
+                            toggleLike(for: photo)
                         } label: {
-                            Image(systemName: "heart.fill")
+                            Image(systemName: likedPhotoIDs.contains(photo.id) ? "heart.fill" : "heart")
                                 .font(.system(size: 12))
-                                .foregroundColor(.white)
+                                .foregroundColor(likedPhotoIDs.contains(photo.id) ? .red : .white)
                                 .padding(6)
                                 .background(Color.black.opacity(0.35))
                                 .clipShape(Circle())
                         }
                         .padding(6)
                     }
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            photoPendingDelete = photo
-                            showDeleteConfirmation = true
-                        } label: {
-                            Label("Delete Photo", systemImage: "trash")
-                        }
-                    }
                 }
             }
+        }
+    }
+
+    private func toggleLike(for photo: GalleryPhoto) {
+        if likedPhotoIDs.contains(photo.id) {
+            likedPhotoIDs.remove(photo.id)
+        } else {
+            likedPhotoIDs.insert(photo.id)
         }
     }
 
@@ -405,14 +425,6 @@ struct ProfileScreen: View {
                 }
             }
         }
-    }
-
-    // MARK: - Actions
-    private func deletePhoto(_ photo: GalleryPhoto) {
-        withAnimation {
-            galleryPhotos.removeAll { $0.id == photo.id }
-        }
-        photoPendingDelete = nil
     }
 
     private func saveAccountChanges() {
@@ -458,7 +470,7 @@ private struct PhotoViewer: View {
 
 // MARK: - Rounded Corner Helper
 
-private struct RoundedCorner: Shape {
+struct RoundedCorner: Shape {
     var radius: CGFloat = 25
     var corners: UIRectCorner = .allCorners
 
@@ -469,6 +481,50 @@ private struct RoundedCorner: Shape {
             cornerRadii: CGSize(width: radius, height: radius)
         )
         return Path(path.cgPath)
+    }
+}
+
+
+extension UIImagePickerController.SourceType: @retroactive Identifiable {
+    public var id: Int { rawValue }
+}
+
+struct ImagePicker: UIViewControllerRepresentable {
+    var sourceType: UIImagePickerController.SourceType
+    var onImagePicked: (UIImage) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = sourceType
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
+        init(_ parent: ImagePicker) { self.parent = parent }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.onImagePicked(image)
+            }
+            parent.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
     }
 }
 
