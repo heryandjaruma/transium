@@ -346,8 +346,8 @@ struct LocalBaliMapView: UIViewRepresentable {
             transportType: MKDirectionsTransportType = .automobile
         ) async -> [CLLocationCoordinate2D] {
             let req = MKDirections.Request()
-            req.source = MKMapItem(placemark: MKPlacemark(coordinate: start))
-            req.destination = MKMapItem(placemark: MKPlacemark(coordinate: end))
+            req.source = makeMapItem(coordinate: start)
+            req.destination = makeMapItem(coordinate: end)
             req.transportType = transportType
             
             let directions = MKDirections(request: req)
@@ -364,8 +364,8 @@ struct LocalBaliMapView: UIViewRepresentable {
             } catch {
                 // Fallback to walking directions if driving route has restriction
                 let walkReq = MKDirections.Request()
-                walkReq.source = MKMapItem(placemark: MKPlacemark(coordinate: start))
-                walkReq.destination = MKMapItem(placemark: MKPlacemark(coordinate: end))
+                walkReq.source = makeMapItem(coordinate: start)
+                walkReq.destination = makeMapItem(coordinate: end)
                 walkReq.transportType = .walking
                 
                 if let walkResp = try? await MKDirections(request: walkReq).calculate(),

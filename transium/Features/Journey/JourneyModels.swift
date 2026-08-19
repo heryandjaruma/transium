@@ -8,7 +8,7 @@ import CoreLocation
 
 // MARK: - Journey Overview Response (/journey/overview)
 
-public struct JourneyResponse: Codable, Equatable, Sendable {
+public nonisolated struct JourneyResponse: Codable, Equatable, Sendable {
     public let alternativesAvailable: Bool
     public let best: JourneyResult
     public let lessWalking: JourneyResult?
@@ -27,7 +27,7 @@ public struct JourneyResponse: Codable, Equatable, Sendable {
     }
 }
 
-public struct JourneyResult: Codable, Equatable, Sendable {
+public nonisolated struct JourneyResult: Codable, Equatable, Sendable {
     public let origin: LatLng
     public let destination: LatLng
     public let summary: JourneyOverviewSummary
@@ -49,7 +49,7 @@ public struct JourneyResult: Codable, Equatable, Sendable {
     }
 }
 
-public struct JourneyOverviewSummary: Codable, Equatable, Sendable {
+public nonisolated struct JourneyOverviewSummary: Codable, Equatable, Sendable {
     public let distanceMeters: Double
     public let walkingDistanceMeters: Double
     public let walkingDurationSeconds: Double
@@ -74,7 +74,7 @@ public struct JourneyOverviewSummary: Codable, Equatable, Sendable {
     }
 }
 
-public struct JourneyStep: Codable, Equatable, Sendable, Identifiable {
+public nonisolated struct JourneyStep: Codable, Equatable, Sendable, Identifiable {
     public var id: String {
         "\(type)-\(durationMinutes)-\(routeRef ?? "")-\(routeName ?? "")"
     }
@@ -97,7 +97,7 @@ public struct JourneyStep: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
-public struct JourneyLocationRef: Codable, Equatable, Sendable {
+public nonisolated struct JourneyLocationRef: Codable, Equatable, Sendable {
     public let lat: Double
     public let lng: Double
     public let name: String
@@ -120,7 +120,7 @@ public struct JourneyLocationRef: Codable, Equatable, Sendable {
     }
 }
 
-public struct JourneyWalkStep: Codable, Equatable, Sendable {
+public nonisolated struct JourneyWalkStep: Codable, Equatable, Sendable {
     public let instructions: String
     public let distanceMeters: Double
     public let durationSeconds: Double
@@ -139,7 +139,7 @@ public struct JourneyWalkStep: Codable, Equatable, Sendable {
     }
 }
 
-public struct JourneySegment: Codable, Equatable, Sendable, Identifiable {
+public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifiable {
     public var id: String {
         "\(type)-\(from.name)-\(to.name)-\(routeId ?? "")-\(distanceMeters ?? 0)"
     }
@@ -207,7 +207,7 @@ public struct JourneySegment: Codable, Equatable, Sendable, Identifiable {
 
 // MARK: - Journey Attempt Models (/private/journey/*)
 
-public struct JourneyAttempt: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct JourneyAttempt: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let userQuestId: String
     public let questId: String
@@ -244,12 +244,12 @@ public struct JourneyAttempt: Codable, Identifiable, Sendable, Equatable {
     }
 }
 
-public enum JourneyAttemptStepStatus: String, Codable, Sendable {
+public nonisolated enum JourneyAttemptStepStatus: String, Codable, Sendable {
     case waiting
     case done
 }
 
-public struct JourneyAttemptStep: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let journeyAttemptId: String
     public let sequence: Int
@@ -283,7 +283,7 @@ public struct JourneyAttemptStep: Codable, Identifiable, Sendable, Equatable {
     }
 }
 
-public struct JourneySummary: Codable, Identifiable, Sendable, Equatable {
+public nonisolated struct JourneySummary: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let journeyAttemptId: String
     public let stepsTaken: Int
@@ -313,7 +313,7 @@ public struct JourneySummary: Codable, Identifiable, Sendable, Equatable {
 
 // MARK: - Journey Request & Response Wrappers
 
-public struct StartJourneyRequest: Codable, Sendable {
+public nonisolated struct StartJourneyRequest: Codable, Sendable {
     public let questId: String
 
     public init(questId: String) {
@@ -321,15 +321,15 @@ public struct StartJourneyRequest: Codable, Sendable {
     }
 }
 
-struct StartJourneyResponse: Codable {
+nonisolated struct StartJourneyResponse: Codable {
     let journeyAttempt: JourneyAttempt
 }
 
-struct JourneyAttemptListResponse: Codable {
+nonisolated struct JourneyAttemptListResponse: Codable {
     let journeyAttempts: [JourneyAttempt]
 }
 
-public struct JourneyAttemptDetailResponse: Codable, Sendable, Equatable {
+public nonisolated struct JourneyAttemptDetailResponse: Codable, Sendable, Equatable {
     public let journeyAttempt: JourneyAttempt
     public let journeyAttemptSteps: [JourneyAttemptStep]
     public let journeySummary: JourneySummary?
@@ -345,7 +345,7 @@ public struct JourneyAttemptDetailResponse: Codable, Sendable, Equatable {
     }
 }
 
-public struct JourneyMediaResponse: Codable, Sendable {
+public nonisolated struct JourneyMediaResponse: Codable, Sendable {
     public let media: MediaAsset
 
     public init(media: MediaAsset) {

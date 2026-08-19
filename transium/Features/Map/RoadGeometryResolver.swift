@@ -44,8 +44,8 @@ public actor RoadGeometryResolver {
     }
     
     public func resolveSegmentGeometry(_ segment: JourneySegment) async -> JourneySegment {
-        // If geometry is already high resolution (e.g. walk routes with > 3 points), keep it
-        if segment.type == "walk" && segment.geometry.count >= 3 {
+        // If geometry is already high resolution (e.g. walk routes with > 2 points), keep it
+        if segment.type == "walk" && segment.geometry.count >= 2 {
             return segment
         }
         
@@ -71,7 +71,7 @@ public actor RoadGeometryResolver {
         to end: CLLocationCoordinate2D,
         stops: [JourneyLocationRef]?
     ) async -> [CLLocationCoordinate2D] {
-        // Strategy 1: Direct route calculation from start boarding stop to end alighting stop
+        // Strategy 1: Direct arterial route calculation from boarding stop directly to alighting stop
         let directCoords = await calculateLeg(from: start, to: end)
         if directCoords.count > 2 {
             return directCoords
@@ -108,13 +108,11 @@ public actor RoadGeometryResolver {
     }
     
     private func calculateLeg(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D) async -> [CLLocationCoordinate2D] {
-        // Try automobile first
         let autoPoints = await requestDirections(from: start, to: end, transportType: .automobile)
         if autoPoints.count > 2 {
             return autoPoints
         }
         
-        // Fallback to walking directions if driving route has restricted roads
         let walkPoints = await requestDirections(from: start, to: end, transportType: .walking)
         if walkPoints.count > 2 {
             return walkPoints
@@ -123,14 +121,22 @@ public actor RoadGeometryResolver {
         return [start, end]
     }
     
+    private func makeMapItem(coordinate: CLLocationCoordinate2D) -> MKMapItem {
+        if #available(iOS 26.0, *) {
+            return MKMapItem(location: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude), address: nil)
+        } else {
+            return MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
+        }
+    }
+    
     private func requestDirections(
         from start: CLLocationCoordinate2D,
         to end: CLLocationCoordinate2D,
         transportType: MKDirectionsTransportType
     ) async -> [CLLocationCoordinate2D] {
         let req = MKDirections.Request()
-        req.source = MKMapItem(placemark: MKPlacemark(coordinate: start))
-        req.destination = MKMapItem(placemark: MKPlacemark(coordinate: end))
+        req.source = makeMapItem(coordinate: start)
+        req.destination = makeMapItem(coordinate: end)
         req.transportType = transportType
         
         let directions = MKDirections(request: req)
