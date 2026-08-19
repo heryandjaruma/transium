@@ -13,6 +13,8 @@ enum TransiumAsset {
         static let onboardingShare = "onboard-3"
         static let permissionOnboarding = "Permission_onboarding"
         static let payment = "Payment"
+        static let sanur_beach = "sanur_beach"
+        static let ubud_forest = "ubud_forest"
     
     }
     
@@ -24,12 +26,21 @@ enum TransiumAsset {
         static let postageFrame = "postage-frame"
         static let paperBadge = "paper-badge"
     }
+    
+    enum Profile{
+        static let sanur = "sanoored"
+        static let kintamani = "kintamani"
+        static let gwk = "gwk"
+        static let uluwatu = "uluwatu"
+    }
 }
 
 enum TransiumColor {
     static let primaryBlue = Color("PrimaryBlue")
     static let primaryYellow = Color("PrimaryYellow")
     static let darkBlue = Color("DarkBlue")
+    static let primary9Blue = Color("Primary9Blue")
+    static let mainGreen = Color("MainGreen")
     static let authBlue = Color(red: 0.19, green: 0.43, blue: 0.91)
     static let linkBlue = Color(red: 0.0, green: 0.18, blue: 0.62)
     static let ticketBlue = Color(red: 0.20, green: 0.45, blue: 0.95)

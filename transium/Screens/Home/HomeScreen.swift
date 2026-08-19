@@ -13,6 +13,13 @@ struct HomeScreen: View {
     @State private var mapCenterRequestID = 0
     private let previewLocation: CLLocation?
     private let baliFallbackLocation = CLLocation(latitude: -8.73704, longitude: 115.17570)
+    private let pinningSheetFraction: CGFloat = 0.25
+    
+    private func presentSearchSheet(in state: SearchSheetState) {
+        sheetState = state
+        sheetDetent = (state == .searching) ? .large : .fraction(pinningSheetFraction)
+        isSearchPresented = true
+    }
     
     // MARK: - Ticket Destinations
     
@@ -21,7 +28,7 @@ struct HomeScreen: View {
         subtitle: "A laid-back coastal escape. Where earlybirds relax.",
         fallbackDistance: "11",
         price: "Rp. 4,4k",
-        imageName: TransiumAsset.Illustration.onboardingExplore,
+        imageName: TransiumAsset.Illustration.sanur_beach,
         coordinate: CLLocationCoordinate2D(latitude: -8.6937, longitude: 115.2625)
     )
     private let ubudDestination = TicketDestination(
@@ -29,7 +36,7 @@ struct HomeScreen: View {
         subtitle: "Rice fields, art walks, and calmer mountain air.",
         fallbackDistance: "24",
         price: "Rp. 8,8k",
-        imageName: TransiumAsset.Illustration.onboardingAdventure,
+        imageName: TransiumAsset.Illustration.ubud_forest,
         coordinate: CLLocationCoordinate2D(latitude: -8.5069, longitude: 115.2625)
     )
     
@@ -132,7 +139,7 @@ struct HomeScreen: View {
                             Button(action: {
                                 mapCenterRequestID += 1
                             }) {
-                                Image(systemName: "location.fill")
+                                Image("location.fill")
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundColor(TransiumColor.primaryBlue)
                                     .frame(width: 44, height: 44)
@@ -186,29 +193,36 @@ struct HomeScreen: View {
                 .transition(.move(edge: .bottom))
             } else {
                 // MARK: - Explore Mode
-                VStack(alignment: .trailing, spacing: 0) {
-                    // Top Search Bar, Locate & Quick Menu Controls
-                    HStack(alignment: .top, spacing: 10) {
-                        searchBarTrigger
-                        
-                        TransiumIconButton(
-                            systemName: "location.fill",
-                            accessibilityLabel: "Center map on your location"
-                        ) {
-                            mapCenterRequestID += 1
+                VStack {
+                    HStack {
+                        Spacer()
+
+                        if !isSearchPresented {          // ⬅️ BARU — cegah tumpang tindih dengan pinningOverlayControls
+                            VStack(alignment: .leading, spacing: 10) {
+                                quickMenu
+                                Button(action: {
+                                    mapCenterRequestID += 1
+                                }) {
+                                    Image("focus")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 20, height: 20)
+                                        .frame(width: 44, height: 44)
+                                        .background(.white)
+                                        .clipShape(Circle())
+                                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                                }
+                            }
+                            .padding(.top, 6)
+                            .padding(.horizontal, 20)
                         }
-                        .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                        
-                        quickMenu
                     }
-                    .padding(.top, 6)
-                    .padding(.horizontal, 20)
-                    
                     Spacer()
+                    if !isSearchPresented {
+                        bottomMapContent
+                            .ignoresSafeArea(edges: .bottom)
+                    }
                 }
-                
-                bottomMapContent
-                    .ignoresSafeArea(edges: .bottom)
             }
             
             // Pinning mode overlay controls
@@ -231,7 +245,8 @@ struct HomeScreen: View {
                 searchText: $searchText,
                 onCancel: { isSearchPresented = false }
             )
-            .presentationDetents([.medium, .large], selection: $sheetDetent)
+            .presentationDetents([.large, .fraction(pinningSheetFraction)], selection: $sheetDetent)
+            .presentationBackgroundInteraction(.enabled)
             .presentationDragIndicator(.hidden)
             .interactiveDismissDisabled(false)
             .onChange(of: sheetDetent) { _, newDetent in
@@ -275,18 +290,27 @@ struct HomeScreen: View {
     private var searchBarTrigger: some View {
         Button(action: { presentSearchSheet(in: .searching) }) {
             HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(TransiumColor.primaryBlue)
+                Image("location_blue")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 30, height: 30)
 
                 Text("Search destination...")
                     .font(TransiumFont.body(14))
                     .foregroundStyle(.secondary)
-
+                
                 Spacer()
+                
+                Image(systemName: "bookmark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 25, height: 25)
+                    .foregroundStyle(TransiumColor.primaryBlue)
+
+                
             }
             .padding(.horizontal, 16)
-            .frame(height: 48)
+            .frame(height: 62)
             .background(Color.white.opacity(0.95))
             .clipShape(.capsule)
             .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
@@ -305,7 +329,7 @@ struct HomeScreen: View {
             }) {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(TransiumColor.primaryBlue)
+                    .foregroundStyle(.black)
                     .frame(width: 44, height: 44)
                     .background(.white)
                     .clipShape(Circle())
@@ -337,7 +361,7 @@ struct HomeScreen: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(TransiumColor.primaryBlue)
+                .foregroundStyle(.black)
                 .frame(width: 44, height: 44)
                 .background(.white)
                 .clipShape(Circle())
@@ -350,12 +374,12 @@ struct HomeScreen: View {
     // MARK: - Pinning Overlay Controls
     
     private var pinningOverlayControls: some View {
-        VStack {
+        VStack(spacing: 12) {
             HStack {
                 Button(action: { isSearchPresented = false }) {
                     Image(systemName: "arrow.left")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.black)
                         .frame(width: 44, height: 44)
                         .background(.white)
                         .clipShape(Circle())
@@ -367,9 +391,10 @@ struct HomeScreen: View {
                 Button(action: {
                     mapCenterRequestID += 1
                 }) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(TransiumColor.primaryBlue)
+                    Image("focus")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 20, height: 20)
                         .frame(width: 44, height: 44)
                         .background(.white)
                         .clipShape(Circle())
@@ -377,22 +402,41 @@ struct HomeScreen: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 6)
-            
+
+            dragHintLabel  
+
             Spacer()
         }
+        .padding(.top, 6)
         .transition(.opacity)
     }
     
+    private var dragHintLabel: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "hand.draw")
+                .font(.system(size: 21, weight: .semibold))
+            Text("Drag the point anywhere on the map.")
+                .font(TransiumFont.body(13, weight: .medium))
+        }
+        .foregroundStyle(TransiumColor.primaryBlue)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(TransiumColor.primaryBlue.opacity(0.12))
+        .clipShape(Capsule())
+        .padding(.horizontal, 20)
+    }
+    
+    
     private var centerPinIndicator: some View {
         GeometryReader { proxy in
+            let visibleMapHeight = proxy.size.height * (1 - pinningSheetFraction)
             Image(systemName: "mappin")
                 .font(.system(size: 36))
                 .foregroundStyle(Color(red: 0.94, green: 0.27, blue: 0.27))
                 .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                 .position(
                     x: proxy.size.width / 2,
-                    y: proxy.size.height * 0.44
+                    y: visibleMapHeight / 2
                 )
         }
         .allowsHitTesting(false)
@@ -400,47 +444,15 @@ struct HomeScreen: View {
     }
     
     // MARK: - Bottom Ticket & Action Content
-    
     private var bottomMapContent: some View {
         VStack(spacing: 12) {
             ticketRail
             ticketPageIndicator
-            
-            // "Do Quest" Button
-            Button(action: {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                doQuest()
-            }) {
-                HStack(spacing: 10) {
-                    if isFetchingJourney {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(0.9)
-                        Text("Planning Route...")
-                            .font(TransiumFont.body(15, weight: .bold))
-                    } else {
-                        Image(systemName: "flag.fill")
-                            .font(.system(size: 16, weight: .bold))
-                        Text("Do Quest")
-                            .font(TransiumFont.body(16, weight: .bold))
-                    }
-                }
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(
-                    isFetchingJourney
-                        ? TransiumColor.primaryBlue.opacity(0.85)
-                        : TransiumColor.primaryBlue
-                )
-                .cornerRadius(26)
-                .shadow(color: isFetchingJourney ? TransiumColor.primaryBlue.opacity(0.35) : .black.opacity(0.12), radius: 8, y: 4)
+            HStack{
+                searchBarTrigger
             }
-            .disabled(isFetchingJourney)
-            .padding(.horizontal, 20)
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isFetchingJourney)
-            
-            currentLocationPill
+            .padding(.top, 20)
+            .padding(.horizontal, 10)
         }
         .padding(.bottom, 20)
     }
@@ -506,7 +518,7 @@ struct HomeScreen: View {
             HStack(alignment: .bottom, spacing: 14) {
                 if !kelurahanGroups.isEmpty {
                     ForEach(Array(kelurahanGroups.enumerated()), id: \.offset) { index, group in
-                        let variant: TransiumTicketVariant = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .mint : .coral)
+                        let variant: TransiumTicketVariant = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .green : .coral)
                         let isRecommended = (index == 0)
                         
                         VStack(alignment: .leading, spacing: 0) {
@@ -545,7 +557,7 @@ struct HomeScreen: View {
                         distance: distanceText(to: ubudDestination),
                         price: ubudDestination.price,
                         imageName: ubudDestination.imageName,
-                        variant: .mint
+                        variant: .green
                     )
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -578,9 +590,10 @@ struct HomeScreen: View {
     private var recommendedTicket: some View {
         VStack(alignment: .leading, spacing: 0) {
             recommendedBadge
-                .padding(.leading, 12)
-                .padding(.bottom, -1)
+                .padding(.leading, 1)
+                .padding(.bottom, -10)
                 .zIndex(1)
+                .offset(x: -1.1, y: 12)
             
             TransiumTicketCard(
                 title: sanurDestination.name,
@@ -597,20 +610,20 @@ struct HomeScreen: View {
     }
     
     private var recommendedBadge: some View {
-        HStack(spacing: 7) {
+        HStack(alignment:.center, spacing: 5) {
             Image(systemName: "sparkle")
-                .font(.system(size: 10, weight: .black))
+                .font(.system(size: 14, weight: .black))
                 .foregroundStyle(TransiumColor.primaryYellow)
             
             Text("Recommended")
-                .font(TransiumFont.body(11, weight: .semibold))
+                .font(TransiumFont.body(14, weight: .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 15)
+        .padding(.vertical, 8)
         .background(TransiumColor.ticketBlue)
-        .clipShape(.rect(topLeadingRadius: 9, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 9, style: .continuous))
+        .clipShape(.rect(topLeadingRadius: 9, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 30, style: .continuous))
         .accessibilityElement(children: .combine)
     }
     
@@ -664,12 +677,6 @@ struct HomeScreen: View {
         }
         
         return "\(Int(round(kilometers))) km"
-    }
-    
-    private func presentSearchSheet(in state: SearchSheetState) {
-        sheetState = state
-        sheetDetent = (state == .searching) ? .large : .medium
-        isSearchPresented = true
     }
     
     private func resetSheetState() {

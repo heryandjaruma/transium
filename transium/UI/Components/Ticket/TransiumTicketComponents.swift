@@ -73,17 +73,17 @@ struct TransiumTicketVariant: Equatable {
     let notchColor: Color
 
     static let blue = TransiumTicketVariant(
-        backgroundColor: TransiumColor.ticketBlue,
+        backgroundColor: TransiumColor.primaryBlue,
         foregroundColor: .white,
         secondaryColor: .white.opacity(0.82),
         dividerColor: TransiumColor.ticketInk.opacity(0.18),
         notchColor: TransiumColor.ticketInk
     )
 
-    static let mint = TransiumTicketVariant(
-        backgroundColor: TransiumColor.ticketMint,
-        foregroundColor: TransiumColor.ticketInk,
-        secondaryColor: TransiumColor.ticketInk.opacity(0.68),
+    static let green = TransiumTicketVariant(
+        backgroundColor: TransiumColor.mainGreen,
+        foregroundColor: .white,
+        secondaryColor: .white.opacity(0.82),
         dividerColor: TransiumColor.ticketInk.opacity(0.16),
         notchColor: TransiumColor.ticketInk
     )
@@ -162,9 +162,9 @@ struct TransiumBadge: View {
         var fontSize: CGFloat {
             switch self {
             case .small:
-                10
+                11
             case .regular:
-                12
+                14
             }
         }
 
@@ -173,16 +173,16 @@ struct TransiumBadge: View {
             case .small:
                 9
             case .regular:
-                11
+                14
             }
         }
 
         var horizontalPadding: CGFloat {
             switch self {
             case .small:
-                8
+                9
             case .regular:
-                10
+                14
             }
         }
 
@@ -274,10 +274,10 @@ struct TransiumTicketCard<Stamp: View, BodyContent: View, Footer: View>: View {
     var body: some View {
         HStack(spacing: 14) {
             stamp
-                .frame(width: 104)
+                .frame(width: 106)
 
             TransiumTicketDivider(color: variant.dividerColor)
-                .frame(width: 1, height: 124)
+                .frame(width: 1, height: 150)
 
             VStack(alignment: .leading, spacing: 8) {
                 bodyContent
@@ -313,7 +313,7 @@ extension TransiumTicketCard where Stamp == TransiumStampCard<Image>, BodyConten
         variant: TransiumTicketVariant = .blue
     ) {
         self.init(variant: variant) {
-            TransiumStampCard(imageName: imageName, size: 104)
+            TransiumStampCard(imageName: imageName, size: 110)
         } bodyContent: {
             TransiumTicketCopy(title: title, subtitle: subtitle, variant: variant)
         } footer: {
@@ -329,10 +329,16 @@ struct TransiumTicketCopy: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(TransiumFont.body(23, weight: .bold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            VStack(spacing:0){
+                Text(title)
+                    .font(TransiumFont.body(23, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Image("Line")
+                    .resizable()
+                    .frame(width: 75, height: 5)
+            }
+
 
             Text(subtitle)
                 .font(TransiumFont.body(12, weight: .medium))
@@ -366,7 +372,7 @@ struct TransiumTicketFooter: View {
         HStack(alignment: .bottom, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(parsedDistance.value)
-                    .font(TransiumFont.body(28, weight: .bold))
+                    .font(TransiumFont.body(36, weight: .bold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
 
@@ -464,7 +470,7 @@ private struct TransiumTicketShape: Shape {
                 subtitle: "A laid-back coastal escape. Where earlybirds relax.",
                 distance: "11",
                 price: "Rp. 4,4k",
-                imageName: TransiumAsset.Illustration.onboardingExplore
+                imageName: TransiumAsset.Illustration.sanur_beach
             )
             .frame(width: 336)
 

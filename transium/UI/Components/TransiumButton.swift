@@ -69,7 +69,7 @@ struct TransiumPrimaryButton: View {
         .accessibilityAddTraits(.isButton)
     }
  
-    private var buttonSurface: some View {
+    var buttonSurface: some View {
         Capsule()
             .fill(backgroundColor)
             .overlay(alignment: .top) {
@@ -81,7 +81,7 @@ struct TransiumPrimaryButton: View {
             }
     }
  
-    private var resolvedShadowColor: Color {
+    var resolvedShadowColor: Color {
         shadowColor ?? backgroundColor.transiumDarkerShadow
     }
 }
@@ -102,6 +102,7 @@ struct TransiumIconButton: View {
         }
         .accessibilityLabel(accessibilityLabel)
         .buttonStyle(.transiumNoOpacity)
+        
     }
 }
 
