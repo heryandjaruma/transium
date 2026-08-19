@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ProfileScreen: View {
     enum ProfileTab: String, CaseIterable {
@@ -46,10 +47,8 @@ struct ProfileScreen: View {
 
     // Account editing
     @State private var email: String = "imdk1827319@gmail.com"
-    @State private var password: String = "123456"
     @State private var isEditingAccount: Bool = false
-    @State private var editedEmail: String = ""
-    @State private var editedPassword: String = ""
+    @State private var showDeleteAccountConfirmation: Bool = false
 
     // Gallery
     @State private var galleryPhotos: [GalleryPhoto] = [
@@ -61,7 +60,12 @@ struct ProfileScreen: View {
 //    @State private var showDeleteConfirmation: Bool = false
     @State private var likedPhotoIDs: Set<UUID> = []
     @State private var viewingPhoto: GalleryPhoto? = nil
-    
+
+    // Photo download (save to Photos library)
+    @State private var isSavingPhoto: Bool = false
+    @State private var showSaveResultAlert: Bool = false
+    @State private var saveResultMessage: String = ""
+
     @State private var showPhotoSourceDialog = false
     @State private var activePickerSource: UIImagePickerController.SourceType?
     @State private var avatarImage: UIImage? = nil
@@ -128,9 +132,17 @@ struct ProfileScreen: View {
             SettingsScreen()
         }
         .fullScreenCover(item: $viewingPhoto) { photo in
-            PhotoViewer(imageName: photo.imageName) {
-                viewingPhoto = nil
-            }
+            PhotoViewer(
+                imageName: photo.imageName,
+                isSaving: isSavingPhoto,
+                onClose: { viewingPhoto = nil },
+                onDownload: { downloadPhoto(photo) }
+            )
+        }
+        .alert("Save Photo", isPresented: $showSaveResultAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveResultMessage)
         }
     }
 
@@ -280,15 +292,11 @@ struct ProfileScreen: View {
     private var accountTab: some View {
         VStack(spacing: 10) {
             accountRow(icon: "envelope", label: "Email", value: email)
-            Divider()
-            accountRow(icon: "lock", label: "Password", value: String(repeating: "•", count: max(password.count, 6)))
         }
     }
 
     private var editAccountButton: some View {
         Button {
-            editedEmail = email
-            editedPassword = ""
             isEditingAccount = true
         } label: {
             Text("Edit Account")
@@ -388,11 +396,11 @@ struct ProfileScreen: View {
                             }
 
                         Button {
-                            toggleLike(for: photo)
+                            downloadPhoto(photo)
                         } label: {
-                            Image(systemName: likedPhotoIDs.contains(photo.id) ? "heart.fill" : "heart")
-                                .font(.system(size: 12))
-                                .foregroundColor(likedPhotoIDs.contains(photo.id) ? .red : .white)
+                            Image(systemName: "arrow.down.to.line")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
                                 .padding(6)
                                 .background(Color.black.opacity(0.35))
                                 .clipShape(Circle())
@@ -412,45 +420,79 @@ struct ProfileScreen: View {
         }
     }
 
+    // MARK: - Photo Download
+
+    /// Saves a gallery photo (by asset name) into the user's Photos library.
+    private func downloadPhoto(_ photo: GalleryPhoto) {
+        guard let uiImage = UIImage(named: photo.imageName) else {
+            saveResultMessage = "Couldn't find that photo to download."
+            showSaveResultAlert = true
+            return
+        }
+
+        isSavingPhoto = true
+        ImageSaver { success, error in
+            isSavingPhoto = false
+            if success {
+                saveResultMessage = "Saved to your Photos."
+            } else if let error {
+                saveResultMessage = "Couldn't save the photo: \(error.localizedDescription)"
+            } else {
+                saveResultMessage = "Couldn't save the photo. Check that Transium has permission to add photos in Settings."
+            }
+            showSaveResultAlert = true
+        }.save(uiImage)
+    }
+
     // MARK: - Edit Account Sheet
     private var editAccountSheet: some View {
         NavigationStack {
             Form {
                 Section("Email") {
-                    TextField("Email", text: $editedEmail)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
+                    Text(email)
+                        .foregroundColor(.gray)
                 }
-                Section("New Password") {
-                    SecureField("Leave blank to keep current password", text: $editedPassword)
+
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteAccountConfirmation = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("Delete Account")
+                            Spacer()
+                        }
+                    }
                 }
             }
             .navigationTitle("Edit Account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button("Close") {
                         isEditingAccount = false
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        saveAccountChanges()
-                    }
+            }
+            .confirmationDialog(
+                "Delete Account?",
+                isPresented: $showDeleteAccountConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Account", role: .destructive) {
+                    deleteAccount()
                 }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This action can't be undone. All your account data will be permanently deleted.")
             }
         }
     }
 
-    private func saveAccountChanges() {
-        let trimmedEmail = editedEmail.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedEmail.isEmpty {
-            email = trimmedEmail
-        }
-        if !editedPassword.isEmpty {
-            password = editedPassword
-        }
+    private func deleteAccount() {
+        // TODO: hook this up to the real account-deletion API call.
         isEditingAccount = false
+        dismiss()
     }
 }
 
@@ -458,10 +500,12 @@ struct ProfileScreen: View {
 
 private struct PhotoViewer: View {
     let imageName: String
+    let isSaving: Bool
     let onClose: () -> Void
+    let onDownload: () -> Void
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
 
             Image(imageName)
@@ -469,17 +513,62 @@ private struct PhotoViewer: View {
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
+            HStack {
+                Button(action: onDownload) {
+                    Group {
+                        if isSaving {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "arrow.down.to.line")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                    }
                     .foregroundColor(.white)
                     .frame(width: 40, height: 40)
                     .background(Color.white.opacity(0.2))
                     .clipShape(Circle())
+                }
+                .disabled(isSaving)
+
+                Spacer()
+
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white.opacity(0.2))
+                        .clipShape(Circle())
+                }
             }
             .padding(.top, 50)
-            .padding(.trailing, 20)
+            .padding(.horizontal, 20)
         }
+    }
+}
+
+// MARK: - Image Saver
+
+/// Small helper that saves a UIImage into the user's Photos library and reports the result.
+/// Requires an `NSPhotoLibraryAddUsageDescription` entry in Info.plist.
+final class ImageSaver: NSObject {
+    private let completion: (Bool, Error?) -> Void
+
+    init(completion: @escaping (Bool, Error?) -> Void) {
+        self.completion = completion
+    }
+
+    func save(_ image: UIImage) {
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(didFinishSaving(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+
+    @objc private func didFinishSaving(
+        _ image: UIImage,
+        didFinishSavingWithError error: Error?,
+        contextInfo: UnsafeRawPointer
+    ) {
+        completion(error == nil, error)
     }
 }
 
