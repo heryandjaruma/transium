@@ -39,8 +39,9 @@ struct HomeScreen: View {
     @State private var showNavigationSheet = false
     private let journeyService = JourneyService.shared
     
-    // MARK: - Search Sheet State
+    // MARK: - Search & Profile State
     @State private var isSearchPresented = false
+    @State private var isProfilePresented = false
     @State private var sheetState: SearchSheetState = .searching
     @State private var sheetDetent: PresentationDetent = .large
     @State private var searchText = ""
@@ -119,7 +120,7 @@ struct HomeScreen: View {
                             }
                         }
                     }
-                    .padding(.top, 48)
+                    .padding(.top, 6)
                     .padding(.horizontal, 20)
                     
                     Spacer()
@@ -164,7 +165,7 @@ struct HomeScreen: View {
             } else {
                 // MARK: - Explore Mode
                 VStack(spacing: 0) {
-                    // Top Search Bar & Locate Controls
+                    // Top Search Bar, Locate & Profile Controls
                     HStack(spacing: 10) {
                         searchBarTrigger
                         
@@ -175,8 +176,21 @@ struct HomeScreen: View {
                             mapCenterRequestID += 1
                         }
                         .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                        
+                        Button(action: {
+                            isProfilePresented = true
+                        }) {
+                            Image(systemName: "person.crop.circle.fill")
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundStyle(TransiumColor.primaryBlue)
+                                .frame(width: 44, height: 44)
+                                .background(.white)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                        }
+                        .accessibilityLabel("Profile")
                     }
-                    .padding(.top, 48)
+                    .padding(.top, 6)
                     .padding(.horizontal, 20)
                     
                     Spacer()
@@ -209,6 +223,9 @@ struct HomeScreen: View {
             .onChange(of: sheetDetent) { _, newDetent in
                 sheetState = (newDetent == .large) ? .searching : .pinning
             }
+        }
+        .sheet(isPresented: $isProfilePresented) {
+            ProfileScreen()
         }
     }
     
@@ -276,7 +293,7 @@ struct HomeScreen: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 48)
+            .padding(.top, 6)
             
             Spacer()
         }

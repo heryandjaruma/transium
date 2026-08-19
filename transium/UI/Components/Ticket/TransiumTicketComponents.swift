@@ -348,24 +348,39 @@ struct TransiumTicketFooter: View {
     let price: String
     let variant: TransiumTicketVariant
 
-    var body: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(distance)
-                    .font(TransiumFont.body(30, weight: .bold))
-                    .lineLimit(1)
+    private var parsedDistance: (value: String, unit: String) {
+        let trimmed = distance.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasSuffix(" km") {
+            return (String(trimmed.dropLast(3)), "km")
+        } else if trimmed.hasSuffix(" m") {
+            return (String(trimmed.dropLast(2)), "m")
+        } else if trimmed.hasSuffix("km") {
+            return (String(trimmed.dropLast(2)), "km")
+        } else if trimmed.hasSuffix("m") {
+            return (String(trimmed.dropLast(1)), "m")
+        }
+        return (trimmed, "km")
+    }
 
-                Text("km")
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(parsedDistance.value)
+                    .font(TransiumFont.body(28, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+
+                Text(parsedDistance.unit)
                     .font(TransiumFont.body(13, weight: .bold))
-                    .padding(.bottom, 3)
+                    .padding(.bottom, 2)
             }
             .foregroundStyle(variant.foregroundColor)
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
             TransiumBadge(price, systemImage: "banknote", variant: .paper, size: .small)
                 .rotationEffect(.degrees(-4))
-                .offset(y: -10)
+                .offset(y: -8)
         }
         .frame(maxWidth: .infinity)
     }
