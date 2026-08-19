@@ -30,12 +30,20 @@ struct AuthScreen: View {
 
                 heroArt(metrics)
 
+                Color.authPanelBase
+                    .frame(width: proxy.size.width, height: metrics.bottomSafeAreaFillHeight)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .ignoresSafeArea(edges: .bottom)
+
                 AuthBottomPanel(
                     metrics: metrics,
                     isVerifying: session.isBusy,
                     onRequest: configureAppleSignIn,
-                    onCompletion: handleAppleSignIn
+                    onCompletion: handleAppleSignIn,
+                    onDeveloperSignIn: completeDeveloperSignIn
                 )
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
+                .ignoresSafeArea(edges: .bottom)
 
                 if let onBackToOnboarding {
                     VStack {
@@ -121,6 +129,18 @@ struct AuthScreen: View {
         }
     }
 
+    // MARK: Important Flow - DEV_MODE Preview Auth Bypass
+
+    // TODO: Remove before production. This is only for SwiftUI previews and
+    // local UI iteration where Apple's auth sheet cannot complete reliably.
+    private func completeDeveloperSignIn() {
+        session.signInForDevelopmentPreview()
+        AppToastCenter.shared.showSuccess(
+            title: "Preview signed in",
+            message: "Opened the development home screen."
+        )
+    }
+
     // MARK: Important Flow - Guard Stored Apple Sessions
 
     private func refreshStoredCredentialState(showErrors: Bool) async {
@@ -149,6 +169,7 @@ private struct AuthBottomPanel: View {
     let isVerifying: Bool
     let onRequest: (ASAuthorizationAppleIDRequest) -> Void
     let onCompletion: (Result<ASAuthorization, Error>) -> Void
+    let onDeveloperSignIn: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -158,23 +179,7 @@ private struct AuthBottomPanel: View {
             Spacer()
                 .frame(height: 30)
 
-            SignInWithAppleButton(.continue, onRequest: onRequest, onCompletion: onCompletion)
-                .signInWithAppleButtonStyle(.black)
-                .frame(maxWidth: metrics.buttonMaxWidth)
-                .frame(height: metrics.buttonHeight)
-                .clipShape(.capsule)
-                .accessibilityLabel("Continue with Apple")
-                .accessibilityHint("Signs in to Transium using your Apple Account.")
-                // The server round trip is short but not instant, and a second
-                // tap would start a competing sign-in.
-                .disabled(isVerifying)
-                .opacity(isVerifying ? 0.55 : 1)
-                .overlay {
-                    if isVerifying {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                }
+            authButton
                 .padding(.bottom, metrics.buttonBottomSpacing)
 
             Text(termsText)
@@ -193,6 +198,42 @@ private struct AuthBottomPanel: View {
         .frame(width: metrics.panelWidth, height: metrics.panelHeight, alignment: .top)
         .background(alignment: .top) {
             AuthPanelBackground(metrics: metrics)
+        }
+    }
+
+    @ViewBuilder
+    private var authButton: some View {
+        if AppEnvironment.DEV_MODE {
+            Button(action: onDeveloperSignIn) {
+                Label("Continue with Apple", systemImage: "apple.logo")
+                    .font(TransiumFont.body(21, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: metrics.buttonMaxWidth)
+                    .frame(height: metrics.buttonHeight)
+                    .background(.black)
+                    .clipShape(.capsule)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Continue with Apple")
+            .accessibilityHint("Signs in with a development preview session.")
+        } else {
+            SignInWithAppleButton(.continue, onRequest: onRequest, onCompletion: onCompletion)
+                .signInWithAppleButtonStyle(.black)
+                .frame(maxWidth: metrics.buttonMaxWidth)
+                .frame(height: metrics.buttonHeight)
+                .clipShape(.capsule)
+                .accessibilityLabel("Continue with Apple")
+                .accessibilityHint("Signs in to Transium using your Apple Account.")
+                // The server round trip is short but not instant, and a second
+                // tap would start a competing sign-in.
+                .disabled(isVerifying)
+                .opacity(isVerifying ? 0.55 : 1)
+                .overlay {
+                    if isVerifying {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                }
         }
     }
 
@@ -259,7 +300,6 @@ private struct AuthPanelBackground: View {
 
             Color.authPanelBase
                 .frame(width: metrics.panelWidth, height: metrics.bottomSafeAreaFillHeight)
-                .ignoresSafeArea(edges: .bottom)
         }
     }
 

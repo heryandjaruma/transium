@@ -59,8 +59,8 @@ enum TransiumMapStyleFactory {
         {
           "version": 8,
           "name": "Transium Local Bali",
-          "center": [115.1889, -8.4095],
-          "zoom": 9.35,
+          "center": [115.1757, -8.7370],
+          "zoom": 15.5,
           "pitch": 0,
           "bearing": 0,
           "sources": {
@@ -68,14 +68,14 @@ enum TransiumMapStyleFactory {
               "type": "vector",
               "url": "\(pmtilesStyleURL(for: basemapURL))",
               "minzoom": 0,
-              "maxzoom": 14,
+              "maxzoom": 18,
               "attribution": "Transium local map data"
             },
             "bali-transit": {
               "type": "vector",
               "url": "\(pmtilesStyleURL(for: transitURL))",
               "minzoom": 0,
-              "maxzoom": 14,
+              "maxzoom": 18,
               "attribution": "Transium local transit data"
             }
           },
@@ -162,51 +162,6 @@ enum TransiumMapStyleFactory {
                 "line-color": "#FFFFFF",
                 "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 13, 2.85],
                 "line-opacity": 1.0
-              }
-            },
-            {
-              "id": "bus-routes-casing",
-              "type": "line",
-              "source": "bali-transit",
-              "source-layer": "bus_routes",
-              "paint": {
-                "line-color": "#FFFFFF",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 2.2, 13, 4.8],
-                "line-opacity": 0.82
-              }
-            },
-            {
-              "id": "bus-routes",
-              "type": "line",
-              "source": "bali-transit",
-              "source-layer": "bus_routes",
-              "paint": {
-                "line-color": "#5E9FE8",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.95, 13, 2.55],
-                "line-opacity": 0.78
-              }
-            },
-            {
-              "id": "bus-stops-halo",
-              "type": "circle",
-              "source": "bali-transit",
-              "source-layer": "bus_stops",
-              "paint": {
-                "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 1.5, 13, 5.3],
-                "circle-color": "#FFFFFF",
-                "circle-opacity": 0.82
-              }
-            },
-            {
-              "id": "bus-stops",
-              "type": "circle",
-              "source": "bali-transit",
-              "source-layer": "bus_stops",
-              "paint": {
-                "circle-radius": ["interpolate", ["linear"], ["zoom"], 9, 0.8, 13, 3.2],
-                "circle-color": "#5E9FE8",
-                "circle-stroke-color": "#FFFFFF",
-                "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 13, 1.2]
               }
             }
           ]

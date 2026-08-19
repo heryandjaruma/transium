@@ -84,6 +84,26 @@ final class SessionController {
         }
     }
 
+    // MARK: Important Flow - DEV_MODE Preview Sign In
+
+    // TODO: Remove before production. This keeps previews/simulator UI work
+    // unblocked when Apple Sign In cannot present or complete.
+    func signInForDevelopmentPreview() {
+        guard AppEnvironment.DEV_MODE else {
+            return
+        }
+
+        let profile = BackendProfile(
+            id: "dev-preview-user",
+            firstName: "Transium",
+            method: AuthMethod.apple.rawValue,
+            level: ProfileLevel.standard.rawValue
+        )
+
+        errorMessage = nil
+        phase = .signedIn(profile)
+    }
+
     // End both the server and local session.
     func signOut() async {
         guard !isBusy else {
