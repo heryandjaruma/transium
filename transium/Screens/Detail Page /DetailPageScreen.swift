@@ -85,6 +85,12 @@ struct DetailPlaceScreen: View {
     
     private var imageCarousel: some View {
         ZStack(alignment: .top) {
+            VStack {
+                Spacer()
+                PageIndicator(currentPage: selectedImageIndex, totalPages: galleryImages.count)
+                    .padding(.bottom, 20)
+            }
+            
             TabView(selection: $selectedImageIndex) {
                 ForEach(Array(galleryImages.enumerated()), id: \.offset) { index, imageName in
                     Image(imageName)
@@ -113,11 +119,6 @@ struct DetailPlaceScreen: View {
             .padding(.horizontal, 20)
             .padding(.top, 60)
             
-            VStack {
-                Spacer()
-                PageIndicator(currentPage: selectedImageIndex, totalPages: galleryImages.count)
-                    .padding(.bottom, 14)
-            }
         }
         .frame(height: 400)
     }
@@ -126,8 +127,10 @@ struct DetailPlaceScreen: View {
     
     private var content: some View {
         VStack(alignment: .leading, spacing: 20) {
+            dragHandle
+
             titleSection
-            recommendedQuestCard
+            RecommendedQuestCard()
             
             VStack(spacing: 14) {
                 ForEach(quests) { quest in
@@ -135,12 +138,21 @@ struct DetailPlaceScreen: View {
                 }
             }
         }
-        .padding(20)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
         .background(
             Color.white
                 .clipShape(RoundedCorner(radius: 28, corners: [.topLeft, .topRight]))
         )
-        .offset(y: -14)
+        .offset(y: -130)
+    }
+
+    private var dragHandle: some View {
+        Capsule()
+            .fill(Color.gray.opacity(0.35))
+            .frame(width: 44, height: 5)
+            .padding(.top, 10)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
     
     private var titleSection: some View {

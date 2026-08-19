@@ -14,6 +14,7 @@ struct TransiumPrimaryButton: View {
     let height: CGFloat
     let fillWidth: Bool
     let font: Font
+    let iconHorizontalPadding: CGFloat?
     let action: () -> Void
  
     init(
@@ -25,6 +26,7 @@ struct TransiumPrimaryButton: View {
         height: CGFloat = 60,
         fillWidth: Bool = true,
         font: Font = TransiumFont.body(18, weight: .semibold),
+        iconHorizontalPadding: CGFloat? = nil,
         action: @escaping () -> Void
     ) {
         self.title = title
@@ -35,6 +37,7 @@ struct TransiumPrimaryButton: View {
         self.height = height
         self.fillWidth = fillWidth
         self.font = font
+        self.iconHorizontalPadding = iconHorizontalPadding
         self.action = action
     }
  
@@ -54,7 +57,7 @@ struct TransiumPrimaryButton: View {
                         .clipShape(Circle())
                 }
             }
-            .padding(.horizontal, trailingIcon != nil ? height * 0.35 : 0)
+            .padding(.horizontal, trailingIcon != nil ? (iconHorizontalPadding ?? height * 0.35) : 0)
             .frame(maxWidth: fillWidth ? .infinity : nil)
             .frame(height: height)
             .background(buttonSurface)
