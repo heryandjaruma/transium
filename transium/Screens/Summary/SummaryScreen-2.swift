@@ -8,6 +8,10 @@
 import SwiftUI
 
 struct SummaryScreen_2: View {
+    
+    let cards: [StatCardData]
+    let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    
     var body: some View {
         ZStack {
             Color.primaryBlue
@@ -34,22 +38,51 @@ struct SummaryScreen_2: View {
                 }
                 Spacer()
                 
-                TransiumPrimaryButton(
-                    title: "􀈂 Share your experience") {
+                VStack {
+                    HStack {
+                        Image("RedPoint")
+                            .resizable()
+                            .frame(width: 12, height: 12)
+                        
+                        Text("Jimbaran")
+                        
+                        Image(systemName: "arrow.right")
+                        
+                        Image("GreenPoint")
+                            .resizable()
+                            .frame(width: 12, height: 12)
+                        
+                        Text("Sanur Beach")
+                        
                     }
                     .padding()
-                    .accessibilityLabel("Go to the Next Trip ")
+                    .font(TransiumFont.body(12).weight(.semibold))
+                    
+                    
+                    Divider()
+                    
+                    LazyVGrid(columns: columns) {
+                        ForEach(cards) { SummaryBox(data: $0) }
+                    }
+                    
+                }
+                .foregroundStyle(.black)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 30))
+                
+                TransiumPrimaryButton(
+                    title: "􀈂 Share your experience",
+                    backgroundColor: .black,
+                    foregroundColor: .white
+                ) {}
+                .padding()
                 
                 TransiumPrimaryButton(
                     title: "Go to the Next Trip! 􀄫") {
                     }
                     .padding()
                     .accessibilityLabel("Go to the Next Trip ")
-            }
-            
-            
-            
-            
+            }  
         }
     }
 }
@@ -57,5 +90,14 @@ struct SummaryScreen_2: View {
 
 
 #Preview {
-    SummaryScreen_2()
+    SummaryScreen_2(cards: [
+        StatCardData(title: "Distance", value: "17", unit: "km",
+                     icon: "distance-icon"),
+        StatCardData(title: "Travel Cost", value: "4.4k", unit: "Rp",
+                     icon: "cost-icon"),
+        StatCardData(title: "Calories", value: "2500", unit: nil,
+                     icon: "calorie-icon"),
+        StatCardData(title: "Total Steps", value: "3600", unit: nil,
+                     icon: "steps-icon")
+    ])
 }

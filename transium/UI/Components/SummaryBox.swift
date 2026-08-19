@@ -54,31 +54,35 @@ struct SummaryBox: View {
     let data: StatCardData
 
     var body: some View {
-        HStack(spacing: 15) {
+        HStack(spacing: 13) {
             Image(data.icon)
                 .resizable()
-                .frame(width: 50, height: 50)
+                .frame(width: 45, height: 45)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(data.title)
                     .font(TransiumFont.body(12))
                     .foregroundStyle(.black)
+                    .lineLimit(1)
 
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 2) {
                     if let unit = data.unit, unit == "Rp" {
                         Text(unit).font(TransiumFont.display(15))
                     }
                     Text(data.value)
                         .font(TransiumFont.display(25))
+                        .lineLimit(1)
                     if let unit = data.unit, unit != "Rp" {
                         Text(unit)
                             .font(TransiumFont.display(15))
                     }
                 }
             }
+            Spacer(minLength:(0))
         }
         .padding()
         .background(Color.white)
+        .frame(maxWidth: .infinity, minHeight: 80, maxHeight: 80)
         .clipShape(RoundedRectangle(cornerRadius: 30))
     }
 }

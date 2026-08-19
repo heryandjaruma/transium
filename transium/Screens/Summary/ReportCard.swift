@@ -45,7 +45,6 @@ struct ReportCard: View {
                 }
                 
             }
-            
             .foregroundStyle(.black)
             .background(Color.white)
             .clipShape(RoundedRectangle(cornerRadius: 30))

@@ -22,30 +22,59 @@ struct SummaryScreen_1: View {
                 
                 ZStack {
                     VStack {
-                        Image("ShortcutSementara")
-                            .resizable()
-                            .frame(width: 400, height: 500)
+                        ZStack {
+                            Image("ShortcutSementara")
+                                .resizable()
+                                .frame(width: 400, height: 500)
+                            
+                            Image("2-Stars")
+                                .resizable()
+                                .frame(width: 70, height: 70)
+                                .offset(x: -120
+                                        , y: -55)
+                            
+                            Image("2-Stars")
+                                .resizable()
+                                .frame(width: 70, height: 70)
+                                .offset(x: -120
+                                        , y: 130)
+                                .scaleEffect(x: -1, y: 1)
+                        }
+                        
+                        
                         
                         Spacer()
                     }
                 
-                    VStack (spacing: 20){
+                    VStack (spacing: 10){
                         Spacer()
                         
                         Image("SampleBadge")
                             .resizable()
                             .frame(width: 200, height: 200)
                         
-                       
-                        
+                        HStack{
+                            Image("WhitePoint")
+                                .resizable()
+                                .frame(width: 10, height: 13)
+                            
+                            Text("Sanur Street")
+                                .font(TransiumFont.body(12).bold())
+                                .foregroundStyle(.white)
+                        }
+                        .padding(10)
+                        .background(Color.primary.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 30))
+                        .offset(x: 0
+                                , y: -10)
+ 
                         LazyVGrid(columns: columns) {
                             ForEach(cards) { SummaryBox(data: $0) }
                         }
                         
-                     
-                        
+
                         VStack (alignment: .leading){
-                            Text("Cool! ✨")
+                            Text("Cool! ✨") //\(random texts?)
                                 .font(TransiumFont.display(21))
                             
                             HStack {
@@ -63,6 +92,7 @@ struct SummaryScreen_1: View {
                         .background(Color.primary.opacity(0.15))
                         .clipShape(RoundedRectangle(cornerRadius: 30))
                     }
+                    .padding()
                     
                     
                 }
@@ -75,11 +105,11 @@ struct SummaryScreen_1: View {
 
 #Preview {
     SummaryScreen_1(cards: [
-        StatCardData(title: "Total Distance", value: "17", unit: "km",
+        StatCardData(title: "Distance", value: "17", unit: "km",
                      icon: "distance-icon"),
-        StatCardData(title: "Cost Total", value: "4.4k", unit: "Rp",
+        StatCardData(title: "Travel Cost", value: "4.4k", unit: "Rp",
                      icon: "cost-icon"),
-        StatCardData(title: "Calorie Burn", value: "2500", unit: nil,
+        StatCardData(title: "Calories", value: "2500", unit: nil,
                      icon: "calorie-icon"),
         StatCardData(title: "Total Steps", value: "3600", unit: nil,
                      icon: "steps-icon")
