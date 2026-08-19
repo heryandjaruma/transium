@@ -63,34 +63,74 @@ struct DetailPlaceScreen: View {
     @State private var quests: [Quest] = []
     @State private var isLoadingQuests: Bool = false
     
-    private let galleryImages = ["gallery-1", "gallery-2", "gallery-3"]
+    private var galleryImages: [String] {
+        if isUbud {
+            return ["kintamani", "traveling", "gwk"]
+        }
+        return ["gallery-1", "gallery-2", "gallery-3"]
+    }
     
-    private let defaultQuests: [Quest] = [
-        Quest(
-            id: "c8e567dc-e321-438f-9a30-33eb8ae06546",
-            imageName: "sanoored",
-            title: "Sanoored",
-            description: "Enjoy the vibe along the shore of Sanur",
-            points: 10,
-            theme: .blue
-        ),
-        Quest(
-            id: "gela-tour-quest",
-            imageName: "traveling",
-            title: "Gela-tour",
-            description: "Gelato + Sanur weather = perfect summer",
-            points: 10,
-            theme: .red
-        ),
-        Quest(
-            id: "little-stalls-quest",
-            imageName: "gwk",
-            title: "Little Stalls",
-            description: "Go local by enjoying snacks from small businesses",
-            points: 10,
-            theme: .green
-        )
-    ]
+    private var isUbud: Bool {
+        kelurahan.kelurahanName.localizedCaseInsensitiveContains("ubud")
+    }
+    
+    private var defaultQuests: [Quest] {
+        if isUbud {
+            return [
+                Quest(
+                    id: "ubud-ridge-walk",
+                    imageName: "kintamani",
+                    title: "Campuhan Ridge",
+                    description: "Scenic valley stroll above lush palm rivers",
+                    points: 10,
+                    theme: .green
+                ),
+                Quest(
+                    id: "ubud-monkey-forest",
+                    imageName: "traveling",
+                    title: "Monkey Forest",
+                    description: "Explore ancient sanctuary among playful macaques",
+                    points: 10,
+                    theme: .blue
+                ),
+                Quest(
+                    id: "ubud-art-market",
+                    imageName: "gwk",
+                    title: "Ubud Art Walk",
+                    description: "Traditional handicrafts, coffee & cultural lanes",
+                    points: 10,
+                    theme: .red
+                )
+            ]
+        }
+        
+        return [
+            Quest(
+                id: "c8e567dc-e321-438f-9a30-33eb8ae06546",
+                imageName: "sanoored",
+                title: "Sanoored",
+                description: "Enjoy the vibe along the shore of Sanur",
+                points: 10,
+                theme: .blue
+            ),
+            Quest(
+                id: "gela-tour-quest",
+                imageName: "traveling",
+                title: "Gela-tour",
+                description: "Gelato + Sanur weather = perfect summer",
+                points: 10,
+                theme: .red
+            ),
+            Quest(
+                id: "little-stalls-quest",
+                imageName: "gwk",
+                title: "Little Stalls",
+                description: "Go local by enjoying snacks from small businesses",
+                points: 10,
+                theme: .green
+            )
+        ]
+    }
     
     // MARK: - Body
     
@@ -159,11 +199,11 @@ struct DetailPlaceScreen: View {
             titleSection
             
             RecommendedQuestCard(
-                title: quests.first?.title ?? "Sanoored",
-                subtitle: quests.first?.description ?? "Enjoy the vibe along the shore of Sanur",
+                title: quests.first?.title ?? (isUbud ? "Campuhan Ridge" : "Sanoored"),
+                subtitle: quests.first?.description ?? (isUbud ? "Scenic valley stroll above lush palm rivers" : "Enjoy the vibe along the shore of Sanur"),
                 points: 10
             ) {
-                let questId = quests.first?.id ?? "c8e567dc-e321-438f-9a30-33eb8ae06546"
+                let questId = quests.first?.id ?? (isUbud ? "ubud-ridge-walk" : "c8e567dc-e321-438f-9a30-33eb8ae06546")
                 dismiss()
                 onStartQuest?(questId)
             }
@@ -204,7 +244,7 @@ struct DetailPlaceScreen: View {
                 Spacer()
                 
                 HStack(spacing: 8) {
-                    Image("Beach")
+                    Image(isUbud ? "kintamani" : "Beach")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 95, height: 30)
@@ -216,7 +256,7 @@ struct DetailPlaceScreen: View {
                 }
             }
             
-            Text("\(kelurahan.kecamatanName) • Where earlybirds relax 🌊")
+            Text(isUbud ? "\(kelurahan.kecamatanName) • Rice fields, art walks & mountain air 🌿" : "\(kelurahan.kecamatanName) • Where earlybirds relax 🌊")
                 .font(TransiumFont.body(15))
                 .foregroundColor(.gray)
         }
@@ -251,7 +291,7 @@ struct DetailPlaceScreen: View {
                 return
             }
         } catch {
-            // Fallback to defaults
+            // Fallback to default quests
         }
         
         quests = defaultQuests

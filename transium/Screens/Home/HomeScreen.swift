@@ -49,7 +49,7 @@ struct HomeScreen: View {
     
     // MARK: - Kelurahan Quests State
     @State private var kelurahanGroups: [KelurahanQuestsGroup] = []
-    @State private var selectedKelurahanGroup: KelurahanQuestsGroup? = nil
+    @State private var selectedKelurahan: Kelurahan = Kelurahan(id: "20447277", kelurahanName: "Sanur", kecamatanName: "Denpasar Selatan")
     
     init(previewLocation: CLLocation? = nil) {
         self.previewLocation = previewLocation
@@ -59,7 +59,7 @@ struct HomeScreen: View {
         ZStack(alignment: .bottom) {
             LocalBaliMapView(
                 displayLocation: resolvedCurrentLocation,
-                markerHeading: previewLocation == nil ? 0 : 22,
+                markerHeading: previewLocation == nil ? locationStore.currentHeading : 22,
                 centerRequestID: mapCenterRequestID,
                 activeJourney: activeJourney
             )
@@ -155,7 +155,7 @@ struct HomeScreen: View {
                             .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                         }
                         .padding(.trailing, 20)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 16)
                     }
                     
                     NavigationBottomSheet(journey: journey, onBack: {
@@ -199,16 +199,16 @@ struct HomeScreen: View {
                     .padding(.horizontal, 20)
                     
                     Spacer()
+                    
+                    bottomMapContent
+                        .ignoresSafeArea(edges: .bottom)
                 }
                 
-                bottomMapContent
-                    .ignoresSafeArea(edges: .bottom)
-            }
-            
-            // Pinning mode overlay controls
-            if isSearchPresented && sheetState == .pinning {
-                pinningOverlayControls
-                centerPinIndicator
+                // Pinning mode overlay controls
+                if isSearchPresented && sheetState == .pinning {
+                    pinningOverlayControls
+                    centerPinIndicator
+                }
             }
         }
         .task {
@@ -237,7 +237,7 @@ struct HomeScreen: View {
         }
         .sheet(isPresented: $isDetailPresented) {
             DetailPlaceScreen(
-                kelurahan: selectedKelurahanGroup?.kelurahan ?? Kelurahan(id: "20447277", kelurahanName: "Sanur", kecamatanName: "Denpasar Selatan"),
+                kelurahan: selectedKelurahan,
                 initialQuests: [],
                 onStartQuest: { questId in
                     isDetailPresented = false
@@ -461,7 +461,7 @@ struct HomeScreen: View {
                             )
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                selectedKelurahanGroup = group
+                                selectedKelurahan = group.kelurahan
                                 isDetailPresented = true
                             }
                         }
@@ -483,6 +483,7 @@ struct HomeScreen: View {
                     )
                     .contentShape(Rectangle())
                     .onTapGesture {
+                        selectedKelurahan = Kelurahan(id: "ubud-dest", kelurahanName: "Ubud", kecamatanName: "Gianyar")
                         isDetailPresented = true
                     }
                     .frame(width: 336)
@@ -525,6 +526,7 @@ struct HomeScreen: View {
             )
             .contentShape(Rectangle())
             .onTapGesture {
+                selectedKelurahan = Kelurahan(id: "20447277", kelurahanName: "Sanur", kecamatanName: "Denpasar Selatan")
                 isDetailPresented = true
             }
         }

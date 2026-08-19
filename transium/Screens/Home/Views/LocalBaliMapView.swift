@@ -53,6 +53,8 @@ struct LocalBaliMapView: UIViewRepresentable {
         mapView.compassView.isHidden = true
         mapView.logoView.isHidden = true
         mapView.attributionButton.isHidden = true
+        mapView.minimumZoomLevel = 9.0
+        mapView.maximumZoomLevel = 16.5
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = false
         mapView.showsUserHeadingIndicator = false
@@ -145,6 +147,8 @@ struct LocalBaliMapView: UIViewRepresentable {
             
             if mapView.annotations?.contains(where: { $0 === userAnnotation }) != true {
                 mapView.addAnnotation(userAnnotation)
+            } else if let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView {
+                userView.updateHeading(heading, animated: true)
             }
         }
         
@@ -281,54 +285,57 @@ struct LocalBaliMapView: UIViewRepresentable {
                 guard coords.count >= 2 else { continue }
                 existingRouteSourceIds.append(sourceId)
                 
-                let polyline = MLNPolylineFeature(coordinates: &coords, count: UInt(coords.count))
+                var pts = coords
+                let polyline = MLNPolylineFeature(coordinates: &pts, count: UInt(pts.count))
                 let source = MLNShapeSource(identifier: sourceId, shape: polyline, options: nil)
                 style.addSource(source)
+            }
+            
+            // Pass 1 (Bottom Layers): Add walking & transfer routes first
+            for (index, segment) in activeJourney.segments.enumerated() where segment.type != "bus" {
+                let sourceId = "route-source-\(index)"
+                let lineLayerId = "route-line-\(index)"
+                let casingLayerId = "route-casing-\(index)"
+                guard let source = style.source(withIdentifier: sourceId) else { continue }
                 
-                if segment.type == "bus" {
-                    let casingLayer = MLNLineStyleLayer(identifier: casingLayerId, source: source)
-                    casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white)
-                    casingLayer.lineWidth = NSExpression(forConstantValue: 8.0)
-                    casingLayer.lineCap = NSExpression(forConstantValue: "round")
-                    casingLayer.lineJoin = NSExpression(forConstantValue: "round")
-                    style.addLayer(casingLayer)
-                    
-                    let lineLayer = MLNLineStyleLayer(identifier: lineLayerId, source: source)
-                    lineLayer.lineColor = NSExpression(forConstantValue: busColor)
-                    lineLayer.lineWidth = NSExpression(forConstantValue: 5.0)
-                    lineLayer.lineCap = NSExpression(forConstantValue: "round")
-                    lineLayer.lineJoin = NSExpression(forConstantValue: "round")
-                    style.addLayer(lineLayer)
-                } else if segment.type == "walk" {
-                    let casingLayer = MLNLineStyleLayer(identifier: casingLayerId, source: source)
-                    casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white)
-                    casingLayer.lineWidth = NSExpression(forConstantValue: 6.5)
-                    casingLayer.lineCap = NSExpression(forConstantValue: "round")
-                    casingLayer.lineJoin = NSExpression(forConstantValue: "round")
-                    style.addLayer(casingLayer)
-                    
-                    let lineLayer = MLNLineStyleLayer(identifier: lineLayerId, source: source)
-                    lineLayer.lineColor = NSExpression(forConstantValue: UIColor(red: 0.06, green: 0.72, blue: 0.51, alpha: 1.0))
-                    lineLayer.lineWidth = NSExpression(forConstantValue: 4.5)
-                    lineLayer.lineCap = NSExpression(forConstantValue: "round")
-                    lineLayer.lineJoin = NSExpression(forConstantValue: "round")
-                    lineLayer.lineDashPattern = NSExpression(forConstantValue: [1, 2])
-                    style.addLayer(lineLayer)
-                } else {
-                    let casingLayer = MLNLineStyleLayer(identifier: casingLayerId, source: source)
-                    casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white)
-                    casingLayer.lineWidth = NSExpression(forConstantValue: 5.5)
-                    casingLayer.lineCap = NSExpression(forConstantValue: "round")
-                    casingLayer.lineJoin = NSExpression(forConstantValue: "round")
-                    style.addLayer(casingLayer)
-                    
-                    let lineLayer = MLNLineStyleLayer(identifier: lineLayerId, source: source)
-                    lineLayer.lineColor = NSExpression(forConstantValue: UIColor.systemGray)
-                    lineLayer.lineWidth = NSExpression(forConstantValue: 3.5)
-                    lineLayer.lineCap = NSExpression(forConstantValue: "round")
-                    lineLayer.lineDashPattern = NSExpression(forConstantValue: [1, 2])
-                    style.addLayer(lineLayer)
-                }
+                let casingLayer = MLNLineStyleLayer(identifier: casingLayerId, source: source)
+                casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white.withAlphaComponent(0.85))
+                casingLayer.lineWidth = NSExpression(forConstantValue: 4.8)
+                casingLayer.lineCap = NSExpression(forConstantValue: "round")
+                casingLayer.lineJoin = NSExpression(forConstantValue: "round")
+                style.addLayer(casingLayer)
+                
+                let lineLayer = MLNLineStyleLayer(identifier: lineLayerId, source: source)
+                let walkColor = UIColor(red: 0.20, green: 0.50, blue: 0.98, alpha: 1.0)
+                lineLayer.lineColor = NSExpression(forConstantValue: walkColor)
+                lineLayer.lineWidth = NSExpression(forConstantValue: 3.2)
+                lineLayer.lineCap = NSExpression(forConstantValue: "round")
+                lineLayer.lineJoin = NSExpression(forConstantValue: "round")
+                lineLayer.lineDashPattern = NSExpression(forConstantValue: [0.15, 1.6])
+                style.addLayer(lineLayer)
+            }
+            
+            // Pass 2 (Top Layers): Add bus routes second so they render strictly above walking lines
+            for (index, segment) in activeJourney.segments.enumerated() where segment.type == "bus" {
+                let sourceId = "route-source-\(index)"
+                let lineLayerId = "route-line-\(index)"
+                let casingLayerId = "route-casing-\(index)"
+                let busColor = resolveRouteColor(routeColor: segment.routeColor, routeRef: segment.routeRef)
+                guard let source = style.source(withIdentifier: sourceId) else { continue }
+                
+                let casingLayer = MLNLineStyleLayer(identifier: casingLayerId, source: source)
+                casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white)
+                casingLayer.lineWidth = NSExpression(forConstantValue: 7.5)
+                casingLayer.lineCap = NSExpression(forConstantValue: "round")
+                casingLayer.lineJoin = NSExpression(forConstantValue: "round")
+                style.addLayer(casingLayer)
+                
+                let lineLayer = MLNLineStyleLayer(identifier: lineLayerId, source: source)
+                lineLayer.lineColor = NSExpression(forConstantValue: busColor)
+                lineLayer.lineWidth = NSExpression(forConstantValue: 5.0)
+                lineLayer.lineCap = NSExpression(forConstantValue: "round")
+                lineLayer.lineJoin = NSExpression(forConstantValue: "round")
+                style.addLayer(lineLayer)
             }
             
             // 4. Focus map camera on route start leg at readable street zoom level
@@ -717,8 +724,18 @@ struct LocalBaliMapView: UIViewRepresentable {
         }
         
         func configure(heading: CLLocationDirection) {
+            updateHeading(heading, animated: false)
+        }
+        
+        func updateHeading(_ heading: CLLocationDirection, animated: Bool = true) {
             let radians = CGFloat(heading * .pi / 180)
-            arrowLayer.setAffineTransform(CGAffineTransform(rotationAngle: radians))
+            if animated {
+                UIView.animate(withDuration: 0.25, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
+                    self.arrowLayer.setAffineTransform(CGAffineTransform(rotationAngle: radians))
+                }
+            } else {
+                arrowLayer.setAffineTransform(CGAffineTransform(rotationAngle: radians))
+            }
         }
         
         private func startPulseIfNeeded() {
