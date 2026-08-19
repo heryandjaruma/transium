@@ -44,19 +44,19 @@ public actor RoadGeometryResolver {
     }
     
     public func resolveSegmentGeometry(_ segment: JourneySegment) async -> JourneySegment {
-        // If geometry is already high resolution (e.g. walk routes with > 2 points), keep it
-        if segment.type == "walk" && segment.geometry.count >= 2 {
+        // If geometry is already high resolution (e.g. walk routes with > 3 points), keep it
+        if segment.type == "walk" && segment.geometry.count >= 3 {
             return segment
         }
         
         if segment.type == "bus" {
-            let cacheKey = "bus-\(segment.from.lat),\(segment.from.lng)-\(segment.to.lat),\(segment.to.lng)-\(segment.stops?.count ?? 0)"
-            if let cached = cache[cacheKey], cached.count >= 2 {
+            let cacheKey = "bus-\(segment.from.lat),\(segment.from.lng)-\(segment.to.lat),\(segment.to.lng)"
+            if let cached = cache[cacheKey], cached.count > 2 {
                 return segment.withGeometry(cached)
             }
             
             let coords = await fetchRoadCoordinates(from: segment.from.coordinate, to: segment.to.coordinate, stops: segment.stops)
-            if coords.count >= 2 {
+            if coords.count > 2 {
                 let geom = coords.map { [$0.longitude, $0.latitude] }
                 cache[cacheKey] = geom
                 return segment.withGeometry(geom)
@@ -71,59 +71,67 @@ public actor RoadGeometryResolver {
         to end: CLLocationCoordinate2D,
         stops: [JourneyLocationRef]?
     ) async -> [CLLocationCoordinate2D] {
-        var waypoints: [CLLocationCoordinate2D] = [start]
-        if let stops = stops, stops.count > 2 {
+        // Strategy 1: Direct route calculation from start boarding stop to end alighting stop
+        let directCoords = await calculateLeg(from: start, to: end)
+        if directCoords.count > 2 {
+            return directCoords
+        }
+        
+        // Strategy 2: If direct failed and stops exist, attempt waypoint routing
+        if let stops = stops, stops.count >= 2 {
+            var waypoints: [CLLocationCoordinate2D] = [start]
             for s in stops.dropFirst().dropLast() {
                 waypoints.append(s.coordinate)
             }
-        }
-        waypoints.append(end)
-        
-        if waypoints.count <= 2 {
-            return await calculateLeg(from: start, to: end)
-        }
-        
-        // Calculate intermediate legs concurrently in parallel
-        var results: [(Int, [CLLocationCoordinate2D])] = []
-        await withTaskGroup(of: (Int, [CLLocationCoordinate2D]).self) { group in
+            waypoints.append(end)
+            
+            var collected: [CLLocationCoordinate2D] = []
             for i in 0..<(waypoints.count - 1) {
                 let p1 = waypoints[i]
                 let p2 = waypoints[i + 1]
-                group.addTask {
-                    let legCoords = await self.calculateLeg(from: p1, to: p2)
-                    return (i, legCoords)
-                }
-            }
-            for await res in group {
-                results.append(res)
-            }
-        }
-        results.sort { $0.0 < $1.0 }
-        
-        var combined: [CLLocationCoordinate2D] = []
-        for (_, legCoords) in results {
-            for pt in legCoords {
-                if let last = combined.last {
-                    if abs(last.latitude - pt.latitude) < 0.000001 && abs(last.longitude - pt.longitude) < 0.000001 {
-                        continue
+                let subLeg = await calculateLeg(from: p1, to: p2)
+                for pt in subLeg {
+                    if let last = collected.last {
+                        if abs(last.latitude - pt.latitude) < 0.000001 && abs(last.longitude - pt.longitude) < 0.000001 {
+                            continue
+                        }
                     }
+                    collected.append(pt)
                 }
-                combined.append(pt)
+            }
+            if collected.count > 2 {
+                return collected
             }
         }
-        return combined.count >= 2 ? combined : [start, end]
+        
+        return [start, end]
     }
     
     private func calculateLeg(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D) async -> [CLLocationCoordinate2D] {
-        let req = MKDirections.Request()
-        if #available(iOS 26.0, *) {
-            req.source = MKMapItem(location: CLLocation(latitude: start.latitude, longitude: start.longitude), address: nil)
-            req.destination = MKMapItem(location: CLLocation(latitude: end.latitude, longitude: end.longitude), address: nil)
-        } else {
-            req.source = MKMapItem(placemark: MKPlacemark(coordinate: start))
-            req.destination = MKMapItem(placemark: MKPlacemark(coordinate: end))
+        // Try automobile first
+        let autoPoints = await requestDirections(from: start, to: end, transportType: .automobile)
+        if autoPoints.count > 2 {
+            return autoPoints
         }
-        req.transportType = .automobile
+        
+        // Fallback to walking directions if driving route has restricted roads
+        let walkPoints = await requestDirections(from: start, to: end, transportType: .walking)
+        if walkPoints.count > 2 {
+            return walkPoints
+        }
+        
+        return [start, end]
+    }
+    
+    private func requestDirections(
+        from start: CLLocationCoordinate2D,
+        to end: CLLocationCoordinate2D,
+        transportType: MKDirectionsTransportType
+    ) async -> [CLLocationCoordinate2D] {
+        let req = MKDirections.Request()
+        req.source = MKMapItem(placemark: MKPlacemark(coordinate: start))
+        req.destination = MKMapItem(placemark: MKPlacemark(coordinate: end))
+        req.transportType = transportType
         
         let directions = MKDirections(request: req)
         do {
@@ -132,13 +140,13 @@ public actor RoadGeometryResolver {
                 var buf = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: route.polyline.pointCount)
                 route.polyline.getCoordinates(&buf, range: NSRange(location: 0, length: route.polyline.pointCount))
                 let valid = buf.filter { $0.latitude != kCLLocationCoordinate2DInvalid.latitude }
-                if valid.count >= 2 {
+                if valid.count > 2 {
                     return valid
                 }
             }
         } catch {
-            // Fallback
+            // Failed
         }
-        return [start, end]
+        return []
     }
 }

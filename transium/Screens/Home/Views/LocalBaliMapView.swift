@@ -345,54 +345,41 @@ struct LocalBaliMapView: UIViewRepresentable {
             intermediateStops: [JourneyLocationRef]?,
             transportType: MKDirectionsTransportType = .automobile
         ) async -> [CLLocationCoordinate2D] {
-            var waypoints: [CLLocationCoordinate2D] = [start]
-            if let stops = intermediateStops, stops.count > 2 {
-                for s in stops.dropFirst().dropLast() {
-                    waypoints.append(CLLocationCoordinate2D(latitude: s.lat, longitude: s.lng))
-                }
-            }
-            waypoints.append(end)
+            let req = MKDirections.Request()
+            req.source = MKMapItem(placemark: MKPlacemark(coordinate: start))
+            req.destination = MKMapItem(placemark: MKPlacemark(coordinate: end))
+            req.transportType = transportType
             
-            var roadCoords: [CLLocationCoordinate2D] = []
-            
-            for i in 0..<(waypoints.count - 1) {
-                let p1 = waypoints[i]
-                let p2 = waypoints[i + 1]
-                
-                let req = MKDirections.Request()
-                req.source = makeMapItem(coordinate: p1)
-                req.destination = makeMapItem(coordinate: p2)
-                req.transportType = transportType
-                
-                let directions = MKDirections(request: req)
-                do {
-                    let resp = try await directions.calculate()
-                    if let route = resp.routes.first {
-                        var buf = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: route.polyline.pointCount)
-                        route.polyline.getCoordinates(&buf, range: NSRange(location: 0, length: route.polyline.pointCount))
-                        let valid = buf.filter { $0.latitude != kCLLocationCoordinate2DInvalid.latitude }
-                        roadCoords.append(contentsOf: valid)
-                    } else {
-                        roadCoords.append(p1)
-                        roadCoords.append(p2)
-                    }
-                } catch {
-                    roadCoords.append(p1)
-                    roadCoords.append(p2)
-                }
-            }
-            
-            // Filter out duplicate consecutive points
-            var result: [CLLocationCoordinate2D] = []
-            for c in roadCoords {
-                if let last = result.last {
-                    if abs(last.latitude - c.latitude) < 0.000001 && abs(last.longitude - c.longitude) < 0.000001 {
-                        continue
+            let directions = MKDirections(request: req)
+            do {
+                let resp = try await directions.calculate()
+                if let route = resp.routes.first {
+                    var buf = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: route.polyline.pointCount)
+                    route.polyline.getCoordinates(&buf, range: NSRange(location: 0, length: route.polyline.pointCount))
+                    let valid = buf.filter { $0.latitude != kCLLocationCoordinate2DInvalid.latitude }
+                    if valid.count > 2 {
+                        return valid
                     }
                 }
-                result.append(c)
+            } catch {
+                // Fallback to walking directions if driving route has restriction
+                let walkReq = MKDirections.Request()
+                walkReq.source = MKMapItem(placemark: MKPlacemark(coordinate: start))
+                walkReq.destination = MKMapItem(placemark: MKPlacemark(coordinate: end))
+                walkReq.transportType = .walking
+                
+                if let walkResp = try? await MKDirections(request: walkReq).calculate(),
+                   let walkRoute = walkResp.routes.first {
+                    var buf = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: walkRoute.polyline.pointCount)
+                    walkRoute.polyline.getCoordinates(&buf, range: NSRange(location: 0, length: walkRoute.polyline.pointCount))
+                    let valid = buf.filter { $0.latitude != kCLLocationCoordinate2DInvalid.latitude }
+                    if valid.count > 2 {
+                        return valid
+                    }
+                }
             }
-            return result.count >= 2 ? result : [start, end]
+            
+            return [start, end]
         }
         
         func parseCoordinates(from geometry: [[Double]]) -> [CLLocationCoordinate2D] {
