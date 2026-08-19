@@ -1,108 +1,62 @@
 # Project Context
 
-## Status On August 13, 2026
+## Status On August 19, 2026
 
-`transium` is now a native SwiftUI app with a first-run onboarding flow,
-Apple-only authentication, a post-auth MapLibre home map, and local SwiftData
-auth/profile models. Backend and database choices are still intentionally
-undecided.
+`transium` is a native iOS SwiftUI app for smart transit and urban discovery in Bali. The repository includes a full-featured MapLibre-powered transit navigation engine, comprehensive OpenAPI-compliant backend services, an end-to-end screen suite, and native Sign in with Apple integration.
 
 ## Repository Shape
 
-- `transium/transiumApp.swift` wires the main `WindowGroup` and SwiftData model
-  container
-- `transium/ContentView.swift` gates onboarding before authentication
-- `transium/Screens/Onboarding` contains the first-run onboarding flow
-- `transium/Screens/Auth` contains the Apple sign-in screen
-- `transium/Screens/Home` contains the initial post-auth map experience
-- `transium/UI/System` contains shared colors, fonts, asset names, and
-  app environment flags in `DesignTokens.swift`
-- `transium/UI/Components` contains reusable buttons, page indicators, and
-  global app toast UI
-- `transium/Features/Auth` contains Apple sign-in service/store/local identity
-  models
-- `transium/Features/Map` contains local MapLibre style generation
-- `transium/Features/Profile` contains the local private profile model
-- `transium/Backend` contains backend auth contracts only
-- `transium/Assets.xcassets` holds app icon, color assets, and illustrations
-- `transium/Resources/Fonts` holds Londrina Solid and Poppins font files
-- `transium/Resources/Maps` holds bundled PMTiles data and notes
-- `transium.xcodeproj/project.pbxproj` defines one iOS app target named
-  `transium`
+- `transium/transiumApp.swift`: App lifecycle, SwiftData container, and environment injection.
+- `transium/ContentView.swift`: Top-level routing (Onboarding -> Apple Auth -> Home Map).
+- `transium/Screens/`:
+  - `Onboarding/`: Multi-step onboarding carousel and permission request views (`Permission.swift`).
+  - `Auth/`: Native Sign in with Apple with BetterAuth backend integration and preview bypass.
+  - `Home/`: Interactive MapLibre native map, search/pinning sheet (`SearchSheetView.swift`), ticket carousel, "Do Quest" route calculation, and collapsible navigation drawer (`NavigationBottomSheet.swift`).
+  - `DetailPage/`: Rich place detail screen (`DetailPageScreen.swift`) with photo gallery, quest cards, and transit details.
+  - `Profile/`: User profile (`ProfileScreen.swift`) featuring Account management, Badges/achievements, and quest photo Gallery.
+  - `Settings/`: User preferences, permission management, and legal policies (`SettingsScreen.swift`).
+  - `Camera/`: Custom AVFoundation camera viewfinder (`CameraScreen.swift`) and quest photo capture preview (`PhotoPreviewScreen.swift`).
+  - `Loading/`: Transit-themed loading animation (`LoadingScreen.swift`).
+  - `Payment/`: Transit fare and QRIS payment method selection (`PaymentMethod.swift`).
+- `transium/Backend/`:
+  - `APIClient.swift`: Async network engine supporting JSON and multipart upload payloads with automatic Bearer token injection.
+  - `APIConfiguration.swift`: Base URL definitions (`/api` endpoints and BetterAuth paths).
+  - `APIErrors.swift` & `MultipartFormData.swift`: Error categorization and multipart request builders.
+- `transium/Features/`:
+  - `Auth/`: Authentication state store, Keychain token management (`SessionTokenStore.swift`), and `SessionController.swift`.
+  - `Bookmark/`: Bookmark models and services (`BookmarkService.swift`).
+  - `Camera/`: Camera session manager and UIKit preview integration (`CameraModel.swift`, `CameraPreviewView.swift`).
+  - `Device/`: Push notification device registration service (`DeviceService.swift`).
+  - `Journey/`: Route planning models, multi-leg segments, and overview services (`JourneyService.swift`).
+  - `Location/`: Geocoding, place autocomplete, and token resolution (`LocationService.swift`).
+  - `Map/`: MapLibre PMTiles style generator (`TransiumMapStyleFactory.swift`).
+  - `Profile/`: Server-backed profile models and avatar management (`ProfileService.swift`).
+  - `Quest/`: Quest catalogs, badge retrieval, and kelurahan groupings (`QuestService.swift`).
+- `transium/UI/`:
+  - `System/DesignTokens.swift`: Color palette, typography (`Londrina Solid` & `Poppins`), transit line color mapping (`TransiumTransitColor`), and preview environment flags.
+  - `Components/`: Shared UI buttons (`TransiumButton`), icon buttons, page indicators, ticket cards, and `AppToastCenter`.
+- `transium/Resources/`:
+  - `Fonts/`: Londrina Solid display font and Poppins body font family.
+  - `Maps/`: Bundled offline `bali_basemap.pmtiles` and `bali_transit.pmtiles`.
+  - `Maps/guidelines.md`: Map PMTiles and vector layer documentation.
 
-## Launch Flow
+## Map & Transit Routing Architecture
 
-`ContentView` owns the app's current pre-auth flow:
+- **MapLibre Engine**: Uses offline bundled PMTiles for land, district borders, roads, and transit networks.
+- **Route Visualization**:
+  - Bus segments dynamically follow exact road geometry using MapKit direction requests and render with official route colors (`K1B`, `K2B`, `K3B`, `K4B`, `K5B`, `K6B`, `I1`, `TS1`).
+  - Walking segments render as distinct emerald green dashed trails with white casing.
+  - Interactive transit stop pins highlight departure, intermediate transfer, and arrival points.
 
-1. Show `OnboardingScreen` when onboarding has not completed.
-2. Persist completion with `@AppStorage("hasCompletedOnboarding")`.
-3. If `AppEnvironment.DEV_MODE == true`, reset onboarding completion once from
-   `transiumApp.init()` so onboarding replays on fresh launch.
-4. Show `AuthScreen` after onboarding completes.
-5. Show `HomeScreen` after Apple sign-in succeeds and the local profile is
-   persisted.
+## Backend & API Integration
 
-Onboarding must stay before authentication until product direction changes.
+- Direct integration with Cloudflare Workers backend (`https://transium-api.heryandjaruma.workers.dev/api`).
+- Complete OpenAPI client layer documented in [API.md](file:///Users/msafdev/Code/swift/transium/docs/API.md).
 
-## Design System
+## Branches
 
-- Use `TransiumFont.display` for Londrina Solid display headings.
-- Use `TransiumFont.body` for Poppins body/action text.
-- Use `TransiumColor` for shared product colors.
-- Use `TransiumAsset` for shared image asset names.
-- Keep reusable controls in `UI/Components`, not inside individual screen
-  folders unless they are screen-private.
-- The current visual implementation is light-mode only.
-- Auth should keep the hero artwork large, slightly raised, and clipped by the
-  white bottom panel. The terms copy should remain compact and target two lines
-  on the current phone layout.
+- `main`: Production-ready baseline.
+- `map`: MapLibre rendering, dynamic route calculation, and full API service architecture.
+- `noia_punya`: Feature UI additions (Profile, Settings, Camera, Detail Page, Payments, Search Sheet).
+- `dev`: Unified integration branch consolidating `map` and `noia_punya` with best practices and synchronized build configuration.
 
-## Map Assets
-
-Two PMTiles files are already checked in:
-
-- `bali_basemap.pmtiles`
-- `bali_transit.pmtiles`
-
-The existing notes say these are intended for MapLibre usage and describe the
-available layers:
-
-- Basemap layers include land, district boundaries, water, vegetation, and
-  roads.
-- Transit layers include bus stops and bus routes.
-- `HomeScreen` wraps MapLibre Native's `MLNMapView` in SwiftUI.
-- `TransiumMapStyleFactory` writes a temporary MapLibre style JSON that points
-  to the bundled PMTiles through `pmtiles://file://...` URLs.
-- The initial map style intentionally avoids symbol/text layers because no
-  local glyph or sprite assets are bundled yet.
-
-## Build And Target Notes
-
-- Xcode project format is modern and uses synchronized filesystem groups.
-- iPhone deployment target is currently `26.5`.
-- Sign in with Apple capability is enabled via `transium/transium.entitlements`.
-- `transium/Info.plist` registers bundled app fonts.
-- MapLibre Native `6.28.0` is configured through Swift Package Manager.
-- No test target exists yet.
-
-## What Future Agents Should Assume
-
-- This repo is early enough that many architecture decisions are still open,
-  but the screen/component/UI-system folders should be preserved.
-- Map data is an important product clue, so any navigation, transit, or mapping
-  work should start by respecting the bundled PMTiles assets.
-- Documentation should stay close to the codebase while the project is still
-  forming.
-
-## Good Next Milestones
-
-- Add the post-auth profile destination
-- Add local glyph/sprite support if map labels become necessary
-- Define app navigation and first feature boundaries
-- Add an accessibility baseline early
-- Add tests as soon as domain logic appears
-
-## Known Caveat
-
-- `.gitignore` is currently included in the resources build phase. If bundle
-  contents matter, verify whether that should be removed from the target.

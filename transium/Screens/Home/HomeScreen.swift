@@ -14,7 +14,7 @@ struct HomeScreen: View {
     private let previewLocation: CLLocation?
     private let baliFallbackLocation = CLLocation(latitude: -8.73704, longitude: 115.17570)
     
-    //    MARK: This is for ticket creating
+    // MARK: - Ticket Destinations
     
     private let sanurDestination = TicketDestination(
         name: "Sanur",
@@ -33,10 +33,17 @@ struct HomeScreen: View {
         coordinate: CLLocationCoordinate2D(latitude: -8.5069, longitude: 115.2625)
     )
     
+    // MARK: - Journey State
     @State private var activeJourney: JourneyResult? = nil
     @State private var isFetchingJourney = false
     @State private var showNavigationSheet = false
-    private let journeyService = JourneyService()
+    private let journeyService = JourneyService.shared
+    
+    // MARK: - Search Sheet State
+    @State private var isSearchPresented = false
+    @State private var sheetState: SearchSheetState = .searching
+    @State private var sheetDetent: PresentationDetent = .large
+    @State private var searchText = ""
     
     init(previewLocation: CLLocation? = nil) {
         self.previewLocation = previewLocation
@@ -53,13 +60,10 @@ struct HomeScreen: View {
             .ignoresSafeArea()
             
             if let journey = activeJourney, showNavigationSheet {
-                // NAVIGATION MODE OVERLAYS
-                
-                // Top Action Bar & Floating Go Button Overlay
+                // MARK: - Navigation Mode
                 VStack {
                     // Top Bar (Back, Bookmark, Share, Locate)
                     HStack {
-                        // Back Button
                         Button(action: {
                             withAnimation(.spring()) {
                                 activeJourney = nil
@@ -77,7 +81,6 @@ struct HomeScreen: View {
                         
                         Spacer()
                         
-                        // Right Action Buttons
                         HStack(spacing: 12) {
                             Button(action: {
                                 AppToastCenter.shared.showSuccess(title: "Saved", message: "Quest path saved to bookmarks.")
@@ -116,7 +119,7 @@ struct HomeScreen: View {
                             }
                         }
                     }
-                    .padding(.top, 48) // Positioned higher up right under Dynamic Island
+                    .padding(.top, 48)
                     .padding(.horizontal, 20)
                     
                     Spacer()
@@ -124,7 +127,6 @@ struct HomeScreen: View {
                 
                 // Docked Bottom Stack: Floating Go Button + Navigation Bottom Sheet
                 VStack(spacing: 0) {
-                    // Floating Go button resting on top-right of sheet
                     HStack {
                         Spacer()
                         Button(action: {
@@ -142,7 +144,7 @@ struct HomeScreen: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 24)
                             .padding(.vertical, 14)
-                            .background(Color(red: 0.24, green: 0.65, blue: 0.44)) // Figma green
+                            .background(Color(red: 0.24, green: 0.65, blue: 0.44))
                             .cornerRadius(28)
                             .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                         }
@@ -160,10 +162,11 @@ struct HomeScreen: View {
                 .ignoresSafeArea(edges: .bottom)
                 .transition(.move(edge: .bottom))
             } else {
-                // EXPLORE MODE (DEFAULT)
-                VStack {
-                    HStack {
-                        Spacer()
+                // MARK: - Explore Mode
+                VStack(spacing: 0) {
+                    // Top Search Bar & Locate Controls
+                    HStack(spacing: 10) {
+                        searchBarTrigger
                         
                         TransiumIconButton(
                             systemName: "location.fill",
@@ -173,7 +176,7 @@ struct HomeScreen: View {
                         }
                         .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                     }
-                    .padding(.top, 48) // Positioned higher up under notch
+                    .padding(.top, 48)
                     .padding(.horizontal, 20)
                     
                     Spacer()
@@ -183,67 +186,119 @@ struct HomeScreen: View {
                     .ignoresSafeArea(edges: .bottom)
             }
             
-            // Loading Overlay when fetching journey from Workers
-            if isFetchingJourney {
-                ZStack {
-                    Color.black.opacity(0.32)
-                        .ignoresSafeArea()
-                        .transition(.opacity)
-                    
-                    VStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .fill(TransiumColor.primaryBlue.opacity(0.12))
-                                .frame(width: 56, height: 56)
-                            
-                            ProgressView()
-                                .controlSize(.large)
-                                .tint(TransiumColor.primaryBlue)
-                        }
-                        
-                        VStack(spacing: 4) {
-                            Text("Planning Quest Route")
-                                .font(TransiumFont.body(18, weight: .bold))
-                                .foregroundColor(TransiumColor.ticketInk)
-                            
-                            Text("Finding the optimal transit path...")
-                                .font(TransiumFont.body(13, weight: .medium))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 24)
-                    .background(
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .shadow(color: .black.opacity(0.16), radius: 20, y: 8)
-                    )
-                    .padding(.horizontal, 40)
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            // Pinning mode overlay controls
+            if isSearchPresented && sheetState == .pinning {
+                pinningOverlayControls
+                centerPinIndicator
             }
         }
         .task {
-            guard previewLocation == nil else {
-                return
-            }
-            
+            guard previewLocation == nil else { return }
             locationStore.requestCurrentLocation()
         }
         .preferredColorScheme(.light)
+        .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
+            SearchSheetView(
+                state: $sheetState,
+                searchText: $searchText,
+                onCancel: { isSearchPresented = false }
+            )
+            .presentationDetents([.medium, .large], selection: $sheetDetent)
+            .presentationDragIndicator(.hidden)
+            .interactiveDismissDisabled(false)
+            .onChange(of: sheetDetent) { _, newDetent in
+                sheetState = (newDetent == .large) ? .searching : .pinning
+            }
+        }
     }
     
     private var resolvedCurrentLocation: CLLocation? {
         if let previewLocation {
             return previewLocation
         }
-        
         if let currentLocation = locationStore.currentLocation, currentLocation.coordinate.isWithinBaliRegion {
             return currentLocation
         }
-        
         return baliFallbackLocation
     }
+    
+    // MARK: - Search Bar Trigger
+    
+    private var searchBarTrigger: some View {
+        Button(action: { presentSearchSheet(in: .searching) }) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(TransiumColor.primaryBlue)
+
+                Text("Search destination or stops...")
+                    .font(TransiumFont.body(14))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 48)
+            .background(Color.white.opacity(0.95))
+            .clipShape(.capsule)
+            .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    // MARK: - Pinning Overlay Controls
+    
+    private var pinningOverlayControls: some View {
+        VStack {
+            HStack {
+                Button(action: { isSearchPresented = false }) {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 44, height: 44)
+                        .background(.white)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                }
+
+                Spacer()
+
+                Button(action: {
+                    mapCenterRequestID += 1
+                }) {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(TransiumColor.primaryBlue)
+                        .frame(width: 44, height: 44)
+                        .background(.white)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 48)
+            
+            Spacer()
+        }
+        .transition(.opacity)
+    }
+    
+    private var centerPinIndicator: some View {
+        GeometryReader { proxy in
+            Image(systemName: "mappin")
+                .font(.system(size: 36))
+                .foregroundStyle(Color(red: 0.94, green: 0.27, blue: 0.27))
+                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                .position(
+                    x: proxy.size.width / 2,
+                    y: proxy.size.height * 0.44
+                )
+        }
+        .allowsHitTesting(false)
+        .transition(.opacity)
+    }
+    
+    // MARK: - Bottom Ticket & Action Content
     
     private var bottomMapContent: some View {
         VStack(spacing: 12) {
@@ -409,39 +464,60 @@ struct HomeScreen: View {
             
             Text("Your Current Location")
                 .font(TransiumFont.body(14, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(TransiumColor.ticketInk)
             
             Spacer()
             
-            Image(systemName: "square.and.pencil")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(TransiumColor.primaryBlue)
+            Text(currentLocationText)
+                .font(TransiumFont.body(12, weight: .medium))
+                .foregroundStyle(TransiumColor.ticketInk.opacity(0.6))
         }
         .padding(.horizontal, 16)
-        .frame(height: 54)
-        .background(.white)
-        .clipShape(.capsule)
-        .shadow(color: .black.opacity(0.14), radius: 14, y: 5)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .background(Color.white.opacity(0.92))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
         .padding(.horizontal, 20)
-        .accessibilityElement(children: .combine)
+    }
+    
+    private var currentLocationText: String {
+        if let loc = resolvedCurrentLocation {
+            return String(format: "%.4f, %.4f", loc.coordinate.latitude, loc.coordinate.longitude)
+        }
+        return "Locating..."
     }
     
     private func distanceText(to destination: TicketDestination) -> String {
-        guard let currentLocation = resolvedCurrentLocation else {
-            return destination.fallbackDistance
+        guard let resolvedCurrentLocation else {
+            return "\(destination.fallbackDistance) km"
         }
         
         let destinationLocation = CLLocation(
             latitude: destination.coordinate.latitude,
             longitude: destination.coordinate.longitude
         )
-        let kilometers = currentLocation.distance(from: destinationLocation) / 1_000
         
-        if kilometers < 10 {
-            return String(format: "%.1f", kilometers)
+        let meters = resolvedCurrentLocation.distance(from: destinationLocation)
+        let kilometers = meters / 1000
+        
+        if kilometers < 1 {
+            return "\(Int(meters)) m"
         }
         
-        return "\(Int(kilometers.rounded()))"
+        return "\(Int(round(kilometers))) km"
+    }
+    
+    private func presentSearchSheet(in state: SearchSheetState) {
+        sheetState = state
+        sheetDetent = (state == .searching) ? .large : .medium
+        isSearchPresented = true
+    }
+    
+    private func resetSheetState() {
+        sheetState = .searching
+        sheetDetent = .large
+        searchText = ""
     }
 }
 
@@ -455,10 +531,5 @@ private struct TicketDestination {
 }
 
 #Preview {
-    HomeScreen(
-        previewLocation: CLLocation(
-            latitude: -8.7238,
-            longitude: 115.1752
-        )
-    )
+    HomeScreen(previewLocation: CLLocation(latitude: -8.702105, longitude: 115.176189))
 }
