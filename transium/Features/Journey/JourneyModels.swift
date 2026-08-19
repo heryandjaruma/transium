@@ -186,6 +186,23 @@ public struct JourneySegment: Codable, Equatable, Sendable, Identifiable {
         self.routeColor = routeColor
         self.stops = stops
     }
+
+    public func withGeometry(_ newGeometry: [[Double]]) -> JourneySegment {
+        JourneySegment(
+            type: type,
+            from: from,
+            to: to,
+            distanceMeters: distanceMeters,
+            durationSeconds: durationSeconds,
+            geometry: newGeometry,
+            steps: steps,
+            routeId: routeId,
+            routeRef: routeRef,
+            routeName: routeName,
+            routeColor: routeColor,
+            stops: stops
+        )
+    }
 }
 
 // MARK: - Journey Attempt Models (/private/journey/*)

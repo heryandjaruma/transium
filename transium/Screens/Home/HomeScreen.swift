@@ -248,7 +248,7 @@ struct HomeScreen: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(TransiumColor.primaryBlue)
 
-                Text("Search destination or stops...")
+                Text("Search destination...")
                     .font(TransiumFont.body(14))
                     .foregroundStyle(.secondary)
 
@@ -377,10 +377,13 @@ struct HomeScreen: View {
                     destination: destinationCoordinate
                 )
                 
+                // Pre-resolve all road geometries concurrently before transitioning
+                let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(response.best)
+                
                 await MainActor.run {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
-                        activeJourney = response.best
+                        activeJourney = resolvedJourney
                         showNavigationSheet = true
                         isFetchingJourney = false
                     }
