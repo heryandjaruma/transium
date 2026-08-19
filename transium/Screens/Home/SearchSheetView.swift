@@ -48,12 +48,13 @@ struct SearchSheetView: View {
                 .background(Color(.systemGray6))
                 .clipShape(.rect(cornerRadius: 12, style: .continuous))
 
-                Button("Batal", action: onCancel)
+                Button("Cancel", action: onCancel)
                     .font(TransiumFont.body(13, weight: .semibold))
                     .foregroundStyle(TransiumColor.linkBlue)
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
+            .foregroundStyle(TransiumColor.primaryBlue)
 
             // TODO: list hasil pencarian / recent locations (komponen kartu, menyusul)
             Spacer()
