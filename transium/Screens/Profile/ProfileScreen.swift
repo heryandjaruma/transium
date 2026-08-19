@@ -46,10 +46,8 @@ struct ProfileScreen: View {
 
     // Account editing
     @State private var email: String = "imdk1827319@gmail.com"
-    @State private var password: String = "123456"
     @State private var isEditingAccount: Bool = false
-    @State private var editedEmail: String = ""
-    @State private var editedPassword: String = ""
+    @State private var showDeleteAccountConfirmation: Bool = false
 
     // Gallery
     @State private var galleryPhotos: [GalleryPhoto] = [
@@ -265,15 +263,11 @@ struct ProfileScreen: View {
     private var accountTab: some View {
         VStack(spacing: 10) {
             accountRow(icon: "envelope", label: "Email", value: email)
-            Divider()
-            accountRow(icon: "lock", label: "Password", value: String(repeating: "•", count: max(password.count, 6)))
         }
     }
 
     private var editAccountButton: some View {
         Button {
-            editedEmail = email
-            editedPassword = ""
             isEditingAccount = true
         } label: {
             Text("Edit Account")
@@ -402,40 +396,50 @@ struct ProfileScreen: View {
         NavigationStack {
             Form {
                 Section("Email") {
-                    TextField("Email", text: $editedEmail)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
+                    Text(email)
+                        .foregroundColor(.gray)
                 }
-                Section("New Password") {
-                    SecureField("Leave blank to keep current password", text: $editedPassword)
+
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteAccountConfirmation = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("Delete Account")
+                            Spacer()
+                        }
+                    }
                 }
             }
             .navigationTitle("Edit Account")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button("Close") {
                         isEditingAccount = false
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        saveAccountChanges()
-                    }
+            }
+            .confirmationDialog(
+                "Delete Account?",
+                isPresented: $showDeleteAccountConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Account", role: .destructive) {
+                    deleteAccount()
                 }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This action can't be undone. All your account data will be permanently deleted.")
             }
         }
     }
 
-    private func saveAccountChanges() {
-        let trimmedEmail = editedEmail.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedEmail.isEmpty {
-            email = trimmedEmail
-        }
-        if !editedPassword.isEmpty {
-            password = editedPassword
-        }
+    private func deleteAccount() {
+        // TODO: hook this up to the real account-deletion API call.
         isEditingAccount = false
+        dismiss()
     }
 }
 
