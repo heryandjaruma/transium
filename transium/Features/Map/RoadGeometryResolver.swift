@@ -14,7 +14,7 @@ public actor RoadGeometryResolver {
     
     public init() {}
     
-    /// Concurrently resolves and attaches road-following geometries to all journey segments.
+    /// Concurrently resolves and attaches road-following geometries to all journey segments (bus, transfer, walk).
     public func resolveJourneyGeometries(_ journey: JourneyResult) async -> JourneyResult {
         var resolvedSegments: [JourneySegment] = []
         
@@ -44,18 +44,36 @@ public actor RoadGeometryResolver {
     }
     
     public func resolveSegmentGeometry(_ segment: JourneySegment) async -> JourneySegment {
-        // If geometry is already high resolution (e.g. walk routes with > 2 points), keep it
-        if segment.type == "walk" && segment.geometry.count >= 2 {
+        // If geometry is already high resolution (e.g. walk routes from backend with > 2 points), keep it
+        if segment.type == "walk" && segment.geometry.count > 2 {
             return segment
         }
         
+        let stopsCount = segment.stops?.count ?? 0
+        let cacheKey = "\(segment.type)-\(segment.from.lat),\(segment.from.lng)-\(segment.to.lat),\(segment.to.lng)-\(stopsCount)"
+        if let cached = cache[cacheKey], cached.count > 2 {
+            return segment.withGeometry(cached)
+        }
+        
         if segment.type == "bus" {
-            let cacheKey = "bus-\(segment.from.lat),\(segment.from.lng)-\(segment.to.lat),\(segment.to.lng)-\(segment.stops?.count ?? 0)"
-            if let cached = cache[cacheKey], cached.count > 2 {
-                return segment.withGeometry(cached)
+            let coords = await fetchRoadCoordinates(
+                from: segment.from.coordinate,
+                to: segment.to.coordinate,
+                stops: segment.stops,
+                transportType: .automobile
+            )
+            if coords.count > 2 {
+                let geom = coords.map { [$0.longitude, $0.latitude] }
+                cache[cacheKey] = geom
+                return segment.withGeometry(geom)
             }
-            
-            let coords = await fetchRoadCoordinates(from: segment.from.coordinate, to: segment.to.coordinate, stops: segment.stops)
+        } else if segment.type == "transfer" || segment.type == "walk" {
+            let coords = await fetchRoadCoordinates(
+                from: segment.from.coordinate,
+                to: segment.to.coordinate,
+                stops: nil,
+                transportType: .walking
+            )
             if coords.count > 2 {
                 let geom = coords.map { [$0.longitude, $0.latitude] }
                 cache[cacheKey] = geom
@@ -69,12 +87,12 @@ public actor RoadGeometryResolver {
     private func fetchRoadCoordinates(
         from start: CLLocationCoordinate2D,
         to end: CLLocationCoordinate2D,
-        stops: [JourneyLocationRef]?
+        stops: [JourneyLocationRef]?,
+        transportType: MKDirectionsTransportType
     ) async -> [CLLocationCoordinate2D] {
         // Primary Strategy: When bus stops are provided, route through each consecutive stop corridor
         if let stops = stops, stops.count >= 2 {
             var waypoints: [CLLocationCoordinate2D] = []
-            // Use all stop coordinates in order
             for s in stops {
                 let c = s.coordinate
                 if let last = waypoints.last {
@@ -92,7 +110,7 @@ public actor RoadGeometryResolver {
                         let p1 = waypoints[i]
                         let p2 = waypoints[i + 1]
                         group.addTask {
-                            let legCoords = await self.calculateLeg(from: p1, to: p2)
+                            let legCoords = await self.calculateLeg(from: p1, to: p2, transportType: transportType)
                             return (i, legCoords)
                         }
                     }
@@ -119,8 +137,8 @@ public actor RoadGeometryResolver {
             }
         }
         
-        // Fallback Strategy: Direct start to end routing if no intermediate stops
-        let directCoords = await calculateLeg(from: start, to: end)
+        // Direct start to end routing
+        let directCoords = await calculateLeg(from: start, to: end, transportType: transportType)
         if directCoords.count > 2 {
             return directCoords
         }
@@ -128,15 +146,20 @@ public actor RoadGeometryResolver {
         return [start, end]
     }
     
-    private func calculateLeg(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D) async -> [CLLocationCoordinate2D] {
-        let autoPoints = await requestDirections(from: start, to: end, transportType: .automobile)
-        if autoPoints.count >= 2 {
-            return autoPoints
+    private func calculateLeg(
+        from start: CLLocationCoordinate2D,
+        to end: CLLocationCoordinate2D,
+        transportType: MKDirectionsTransportType
+    ) async -> [CLLocationCoordinate2D] {
+        let primaryPoints = await requestDirections(from: start, to: end, transportType: transportType)
+        if primaryPoints.count >= 2 {
+            return primaryPoints
         }
         
-        let walkPoints = await requestDirections(from: start, to: end, transportType: .walking)
-        if walkPoints.count >= 2 {
-            return walkPoints
+        let fallbackType: MKDirectionsTransportType = (transportType == .automobile) ? .walking : .automobile
+        let fallbackPoints = await requestDirections(from: start, to: end, transportType: fallbackType)
+        if fallbackPoints.count >= 2 {
+            return fallbackPoints
         }
         
         return [start, end]

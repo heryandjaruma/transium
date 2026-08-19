@@ -50,6 +50,9 @@ struct LocalBaliMapView: UIViewRepresentable {
         let mapView = MLNMapView(frame: .zero)
         mapView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         mapView.compassViewPosition = .topRight
+        mapView.compassView.isHidden = true
+        mapView.logoView.isHidden = true
+        mapView.attributionButton.isHidden = true
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = false
         mapView.showsUserHeadingIndicator = false
@@ -237,7 +240,7 @@ struct LocalBaliMapView: UIViewRepresentable {
                 let cacheKey = "\(segment.type)-\(segment.id)"
                 var coords: [CLLocationCoordinate2D] = []
                 
-                if let cached = roadPolylineCache[cacheKey] {
+                if let cached = roadPolylineCache[cacheKey], cached.count > 2 {
                     coords = cached
                 } else {
                     // Initial coordinates from API geometry, steps, or stops
@@ -258,14 +261,18 @@ struct LocalBaliMapView: UIViewRepresentable {
                         coords = [fromCoord, toCoord]
                     }
                     
-                    // Asynchronously calculate street-following polyline for bus segments via MKDirections
-                    if segment.type == "bus" {
+                    // If coordinates are only 2 endpoints and segment is bus or transfer, fetch fallback
+                    if coords.count <= 2 && (segment.type == "bus" || segment.type == "transfer") {
                         let stops = segment.stops
+                        let transportType: MKDirectionsTransportType = (segment.type == "bus") ? .automobile : .walking
                         Task { @MainActor [weak style] in
-                            var roadPoints = await self.fetchRoadPolyline(from: fromCoord, to: toCoord, intermediateStops: stops, transportType: .automobile)
-                            self.roadPolylineCache[cacheKey] = roadPoints
-                            if let source = style?.source(withIdentifier: sourceId) as? MLNShapeSource {
-                                source.shape = MLNPolylineFeature(coordinates: &roadPoints, count: UInt(roadPoints.count))
+                            let roadPoints = await self.fetchRoadPolyline(from: fromCoord, to: toCoord, intermediateStops: stops, transportType: transportType)
+                            if roadPoints.count > 2 {
+                                self.roadPolylineCache[cacheKey] = roadPoints
+                                if let source = style?.source(withIdentifier: sourceId) as? MLNShapeSource {
+                                    var pts = roadPoints
+                                    source.shape = MLNPolylineFeature(coordinates: &pts, count: UInt(pts.count))
+                                }
                             }
                         }
                     }
