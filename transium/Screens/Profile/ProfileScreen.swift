@@ -69,6 +69,7 @@ struct ProfileScreen: View {
     @State private var showPhotoSourceDialog = false
     @State private var activePickerSource: UIImagePickerController.SourceType?
     @State private var avatarImage: UIImage? = nil
+    @State private var isSettingsPresented: Bool = false
 
     // Badges
     private let badges: [Badge] = [
@@ -127,6 +128,9 @@ struct ProfileScreen: View {
         .sheet(isPresented: $isEditingAccount) {
             editAccountSheet
         }
+        .sheet(isPresented: $isSettingsPresented) {
+            SettingsScreen()
+        }
         .fullScreenCover(item: $viewingPhoto) { photo in
             PhotoViewer(
                 imageName: photo.imageName,
@@ -162,6 +166,17 @@ struct ProfileScreen: View {
                             .clipShape(Circle())
                     }
                     Spacer()
+
+                    Button {
+                        isSettingsPresented = true
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .foregroundColor(TransiumColor.primaryBlue)
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                    }
                 }
             }
             .padding(.horizontal, 20)
@@ -227,7 +242,7 @@ struct ProfileScreen: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
-                    .background(Color.darkBlue.opacity(0.9))
+                    .background(TransiumColor.darkBlue.opacity(0.9))
                     .clipShape(Capsule())
             }
             .padding(.bottom, 20)

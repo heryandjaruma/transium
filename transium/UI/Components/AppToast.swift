@@ -53,7 +53,7 @@ final class AppToastCenter: ObservableObject {
     func show(_ toast: AppToast, duration: Duration = .seconds(3)) {
         dismissalTask?.cancel()
 
-        withAnimation(.snappy(duration: 0.28, extraBounce: 0)) {
+        withAnimation(.easeOut(duration: 0.3)) {
             self.toast = toast
         }
 
@@ -82,7 +82,7 @@ final class AppToastCenter: ObservableObject {
         dismissalTask?.cancel()
         dismissalTask = nil
 
-        withAnimation(.snappy(duration: 0.22, extraBounce: 0)) {
+        withAnimation(.easeIn(duration: 0.22)) {
             toast = nil
         }
     }
@@ -94,15 +94,20 @@ struct AppToastOverlay: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .top) {
-                if let toast = toastCenter.toast {
-                    AppToastView(toast: toast) {
-                        toastCenter.dismiss()
+                GeometryReader { proxy in
+                    if let toast = toastCenter.toast {
+                        AppToastView(toast: toast) {
+                            toastCenter.dismiss()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, max(proxy.safeAreaInsets.top, 56) + 12)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .transition(.toastSlide)
+                        .zIndex(100)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .transition(.move(edge: .top).combined(with: .scale(scale: 0.96, anchor: .top)))
-                    .zIndex(100)
                 }
+                .ignoresSafeArea()
+                .allowsHitTesting(toastCenter.toast != nil)
             }
     }
 }
@@ -153,6 +158,23 @@ private struct AppToastView: View {
         }
         .shadow(color: .black.opacity(0.12), radius: 22, y: 10)
         .accessibilityElement(children: .combine)
+    }
+}
+
+private extension AnyTransition {
+    static var toastSlide: AnyTransition {
+        .modifier(
+            active: AppToastSlideModifier(yOffset: -112),
+            identity: AppToastSlideModifier(yOffset: 0)
+        )
+    }
+}
+
+private struct AppToastSlideModifier: ViewModifier {
+    let yOffset: CGFloat
+
+    func body(content: Content) -> some View {
+        content.offset(y: yOffset)
     }
 }
 

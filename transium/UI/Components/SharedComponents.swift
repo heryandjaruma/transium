@@ -161,6 +161,7 @@ struct PaymentMethodRow: View {
 
 struct QuestRow: View {
     let quest: DetailPlaceScreen.Quest
+    var onStart: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 14) {
@@ -186,7 +187,7 @@ struct QuestRow: View {
 
             VStack(alignment: .center, spacing: 6) {
                 Button {
-                    // start quest action
+                    onStart?()
                 } label: {
                     Text("Start Quest")
                         .font(TransiumFont.body(11, weight: .semibold))
@@ -215,6 +216,11 @@ struct QuestRow: View {
 
 // MARK: - Recommended Quest Card
 struct RecommendedQuestCard: View {
+    var title: String = "Early Bird Walk"
+    var subtitle: String = "Visit Sanur before 8 AM and capture the sunrise."
+    var points: Int = 10
+    var onStart: (() -> Void)? = nil
+
     var body: some View {
         let accent = Color(red: 0.20, green: 0.42, blue: 0.95)
  
@@ -230,11 +236,11 @@ struct RecommendedQuestCard: View {
                     .background(Color.white.opacity(0.2))
                     .clipShape(Capsule())
  
-                Text("Early Bird Walk")
+                Text(title)
                     .font(TransiumFont.body(19, weight: .bold))
                     .foregroundColor(.white)
  
-                Text("Visit Sanur before 8 AM and capture the sunrise.")
+                Text(subtitle)
                     .font(TransiumFont.body(13))
                     .foregroundColor(.white.opacity(0.9))
                     .fixedSize(horizontal: false, vertical: true)
@@ -243,13 +249,13 @@ struct RecommendedQuestCard: View {
                     Image(systemName: "star.fill")
                         .foregroundColor(.yellow)
                         .font(.system(size: 12))
-                    Text("+10 pts")
+                    Text("+\(points) pts")
                         .font(TransiumFont.body(12, weight: .semibold))
                         .foregroundColor(.white)
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Color.darkBlue.opacity(0.9))
+                .background(TransiumColor.darkBlue.opacity(0.9))
                 .clipShape(Capsule())
             }
             .frame(maxWidth: .infinity, alignment: .leading) // ambil semua ruang tersisa di kiri
@@ -278,7 +284,7 @@ struct RecommendedQuestCard: View {
                     font: TransiumFont.body(15, weight: .semibold),
                     iconHorizontalPadding: 10
                 ) {
-                    // start quest action
+                    onStart?()
                 }
             }
             .frame(width: 120)
