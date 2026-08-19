@@ -74,64 +74,6 @@ struct DetailPlaceScreen: View {
         kelurahan.kelurahanName.localizedCaseInsensitiveContains("ubud")
     }
     
-    private var defaultQuests: [Quest] {
-        if isUbud {
-            return [
-                Quest(
-                    id: "ubud-ridge-walk",
-                    imageName: "kintamani",
-                    title: "Campuhan Ridge",
-                    description: "Scenic valley stroll above lush palm rivers",
-                    points: 10,
-                    theme: .green
-                ),
-                Quest(
-                    id: "ubud-monkey-forest",
-                    imageName: "traveling",
-                    title: "Monkey Forest",
-                    description: "Explore ancient sanctuary among playful macaques",
-                    points: 10,
-                    theme: .blue
-                ),
-                Quest(
-                    id: "ubud-art-market",
-                    imageName: "gwk",
-                    title: "Ubud Art Walk",
-                    description: "Traditional handicrafts, coffee & cultural lanes",
-                    points: 10,
-                    theme: .red
-                )
-            ]
-        }
-        
-        return [
-            Quest(
-                id: "c8e567dc-e321-438f-9a30-33eb8ae06546",
-                imageName: "sanoored",
-                title: "Sanoored",
-                description: "Enjoy the vibe along the shore of Sanur",
-                points: 10,
-                theme: .blue
-            ),
-            Quest(
-                id: "gela-tour-quest",
-                imageName: "traveling",
-                title: "Gela-tour",
-                description: "Gelato + Sanur weather = perfect summer",
-                points: 10,
-                theme: .red
-            ),
-            Quest(
-                id: "little-stalls-quest",
-                imageName: "gwk",
-                title: "Little Stalls",
-                description: "Go local by enjoying snacks from small businesses",
-                points: 10,
-                theme: .green
-            )
-        ]
-    }
-    
     // MARK: - Body
     
     var body: some View {
@@ -198,14 +140,15 @@ struct DetailPlaceScreen: View {
 
             titleSection
             
-            RecommendedQuestCard(
-                title: quests.first?.title ?? (isUbud ? "Campuhan Ridge" : "Sanoored"),
-                subtitle: quests.first?.description ?? (isUbud ? "Scenic valley stroll above lush palm rivers" : "Enjoy the vibe along the shore of Sanur"),
-                points: 10
-            ) {
-                let questId = quests.first?.id ?? (isUbud ? "ubud-ridge-walk" : "c8e567dc-e321-438f-9a30-33eb8ae06546")
-                dismiss()
-                onStartQuest?(questId)
+            if let firstQuest = quests.first {
+                RecommendedQuestCard(
+                    title: firstQuest.title,
+                    subtitle: firstQuest.description,
+                    points: firstQuest.points
+                ) {
+                    dismiss()
+                    onStartQuest?(firstQuest.id)
+                }
             }
             
             VStack(spacing: 14) {
@@ -276,25 +219,46 @@ struct DetailPlaceScreen: View {
         do {
             let detail = try await QuestService.shared.getKelurahanQuests(id: kelurahan.id)
             if !detail.quests.isEmpty {
-                quests = detail.quests.enumerated().map { index, q in
-                    let theme: QuestTheme = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .red : .green)
-                    let imageName = q.badges.first?.badgeName.lowercased().contains("sanur") == true ? "sanoored" : "kintamani"
-                    return Quest(
-                        id: q.id,
-                        imageName: imageName,
-                        title: q.badges.first?.badgeName ?? q.name,
-                        description: q.description,
-                        points: 10,
-                        theme: theme
-                    )
+                var loaded: [Quest] = []
+                for q in detail.quests {
+                    if !q.badges.isEmpty {
+                        for (index, badge) in q.badges.enumerated() {
+                            let theme: QuestTheme = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .red : .green)
+                            let imageName: String = {
+                                let name = badge.badgeName.lowercased()
+                                if name.contains("sanur") { return "sanoored" }
+                                if name.contains("gela") { return "traveling" }
+                                if name.contains("art") || name.contains("stalls") { return "gwk" }
+                                return "kintamani"
+                            }()
+                            loaded.append(Quest(
+                                id: q.id,
+                                imageName: imageName,
+                                title: badge.badgeName,
+                                description: "\(badge.badgeCategory) • \(badge.badgeName) in \(kelurahan.kelurahanName)",
+                                points: 10,
+                                theme: theme
+                            ))
+                        }
+                    } else {
+                        loaded.append(Quest(
+                            id: q.id,
+                            imageName: isUbud ? "kintamani" : "sanoored",
+                            title: q.name,
+                            description: q.description,
+                            points: 10,
+                            theme: .blue
+                        ))
+                    }
                 }
-                return
+                if !loaded.isEmpty {
+                    quests = loaded
+                    return
+                }
             }
         } catch {
-            // Fallback to default quests
+            print("Failed to load kelurahan quests: \(error)")
         }
-        
-        quests = defaultQuests
     }
 }
 

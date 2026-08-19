@@ -31,6 +31,7 @@ public nonisolated struct Quest: Codable, Identifiable, Sendable, Equatable {
 // MARK: - QuestBadgeEntry
 public nonisolated struct QuestBadgeEntry: Codable, Identifiable, Sendable, Equatable {
     public let id: String
+    public let questId: String?
     public let badgeId: String
     public let badgeName: String
     public let badgeCategory: String
@@ -39,6 +40,7 @@ public nonisolated struct QuestBadgeEntry: Codable, Identifiable, Sendable, Equa
 
     public init(
         id: String,
+        questId: String? = nil,
         badgeId: String,
         badgeName: String,
         badgeCategory: String,
@@ -46,6 +48,7 @@ public nonisolated struct QuestBadgeEntry: Codable, Identifiable, Sendable, Equa
         badgeImageUrl: String? = nil
     ) {
         self.id = id
+        self.questId = questId
         self.badgeId = badgeId
         self.badgeName = badgeName
         self.badgeCategory = badgeCategory

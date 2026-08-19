@@ -14,25 +14,6 @@ struct HomeScreen: View {
     private let previewLocation: CLLocation?
     private let baliFallbackLocation = CLLocation(latitude: -8.73704, longitude: 115.17570)
     
-    // MARK: - Ticket Destinations
-    
-    private let sanurDestination = TicketDestination(
-        name: "Sanur",
-        subtitle: "A laid-back coastal escape. Where earlybirds relax.",
-        fallbackDistance: "11",
-        price: "Rp. 4,4k",
-        imageName: TransiumAsset.Illustration.onboardingExplore,
-        coordinate: CLLocationCoordinate2D(latitude: -8.6937, longitude: 115.2625)
-    )
-    private let ubudDestination = TicketDestination(
-        name: "Ubud",
-        subtitle: "Rice fields, art walks, and calmer mountain air.",
-        fallbackDistance: "24",
-        price: "Rp. 8,8k",
-        imageName: TransiumAsset.Illustration.onboardingAdventure,
-        coordinate: CLLocationCoordinate2D(latitude: -8.5069, longitude: 115.2625)
-    )
-    
     // MARK: - Journey State
     @State private var activeJourney: JourneyResult? = nil
     @State private var isFetchingJourney = false
@@ -49,7 +30,7 @@ struct HomeScreen: View {
     
     // MARK: - Kelurahan Quests State
     @State private var kelurahanGroups: [KelurahanQuestsGroup] = []
-    @State private var selectedKelurahan: Kelurahan = Kelurahan(id: "20447277", kelurahanName: "Sanur", kecamatanName: "Denpasar Selatan")
+    @State private var selectedKelurahan: Kelurahan = Kelurahan(id: "20447626", kelurahanName: "Ubud", kecamatanName: "Ubud")
     
     init(previewLocation: CLLocation? = nil) {
         self.previewLocation = previewLocation
@@ -88,35 +69,35 @@ struct HomeScreen: View {
                         Spacer()
                         
                         HStack(spacing: 12) {
-                            Button(action: {
-                                AppToastCenter.shared.showSuccess(title: "Saved", message: "Quest path saved to bookmarks.")
-                            }) {
-                                Image(systemName: "bookmark")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(.black)
-                                    .frame(width: 44, height: 44)
-                                    .background(.white)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                            TransiumIconButton(
+                                systemName: "bookmark",
+                                accessibilityLabel: "Save route"
+                            ) {
+                                AppToastCenter.shared.showSuccess(title: "Saved", message: "Route bookmarked.")
                             }
+                            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                             
-                            Button(action: {
-                                AppToastCenter.shared.showSuccess(title: "Share", message: "Sharing option selected.")
-                            }) {
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(.black)
-                                    .frame(width: 44, height: 44)
-                                    .background(.white)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                            TransiumIconButton(
+                                systemName: "square.and.arrow.up",
+                                accessibilityLabel: "Share route"
+                            ) {
+                                AppToastCenter.shared.showSuccess(title: "Shared", message: "Route link copied.")
                             }
+                            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                             
-                            Button(action: {
+                            TransiumIconButton(
+                                systemName: "location.fill",
+                                accessibilityLabel: "Center on route"
+                            ) {
                                 mapCenterRequestID += 1
+                            }
+                            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                            
+                            Button(action: {
+                                isProfilePresented = true
                             }) {
-                                Image(systemName: "location.fill")
-                                    .font(.system(size: 18, weight: .medium))
+                                Image(systemName: "person.crop.circle.fill")
+                                    .font(.system(size: 24, weight: .medium))
                                     .foregroundColor(TransiumColor.primaryBlue)
                                     .frame(width: 44, height: 44)
                                     .background(.white)
@@ -138,7 +119,7 @@ struct HomeScreen: View {
                         Button(action: {
                             AppToastCenter.shared.showSuccess(
                                 title: "Quest Started!",
-                                message: "Follow the green path to reach your destination."
+                                message: "Follow the route to reach your destination."
                             )
                         }) {
                             HStack(spacing: 8) {
@@ -212,11 +193,8 @@ struct HomeScreen: View {
             }
         }
         .task {
-            guard previewLocation == nil else { return }
             locationStore.requestCurrentLocation()
-            if let groups = try? await QuestService.shared.listKelurahanQuests(), !groups.isEmpty {
-                kelurahanGroups = groups
-            }
+            await fetchKelurahanGroups()
         }
         .preferredColorScheme(.light)
         .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
@@ -247,6 +225,20 @@ struct HomeScreen: View {
         }
     }
     
+    private func fetchKelurahanGroups() async {
+        do {
+            let groups = try await QuestService.shared.listKelurahanQuests()
+            if !groups.isEmpty {
+                kelurahanGroups = groups
+                if let first = groups.first {
+                    selectedKelurahan = first.kelurahan
+                }
+            }
+        } catch {
+            print("Failed to fetch kelurahan quests: \(error)")
+        }
+    }
+    
     private var resolvedCurrentLocation: CLLocation? {
         if let previewLocation {
             return previewLocation
@@ -257,77 +249,100 @@ struct HomeScreen: View {
         return baliFallbackLocation
     }
     
-    // MARK: - Search Bar Trigger
+    // MARK: - Search Trigger
     
     private var searchBarTrigger: some View {
-        Button(action: { presentSearchSheet(in: .searching) }) {
-            HStack(spacing: 10) {
+        Button(action: {
+            presentSearchSheet(in: .searching)
+        }) {
+            HStack(spacing: 12) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(TransiumColor.primaryBlue)
-
-                Text("Search destination...")
-                    .font(TransiumFont.body(14))
-                    .foregroundStyle(.secondary)
-
+                    .foregroundColor(.gray)
+                    .font(.system(size: 16, weight: .medium))
+                
+                Text(searchText.isEmpty ? "Where do you want to go?" : searchText)
+                    .font(TransiumFont.body(15))
+                    .foregroundColor(searchText.isEmpty ? .gray : .black)
+                    .lineLimit(1)
+                
                 Spacer()
             }
             .padding(.horizontal, 16)
             .frame(height: 48)
-            .background(Color.white.opacity(0.95))
-            .clipShape(.capsule)
-            .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
+            .background(Color.white)
+            .cornerRadius(24)
+            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
         }
-        .buttonStyle(.plain)
+        .accessibilityLabel("Search destinations")
     }
     
-    // MARK: - Pinning Overlay Controls
+    // MARK: - Pinning Overlay
     
     private var pinningOverlayControls: some View {
         VStack {
-            HStack {
-                Button(action: { isSearchPresented = false }) {
-                    Image(systemName: "arrow.left")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 44, height: 44)
-                        .background(.white)
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
-                }
-
-                Spacer()
-
+            Spacer()
+            
+            HStack(spacing: 12) {
                 Button(action: {
-                    mapCenterRequestID += 1
+                    sheetDetent = .large
+                    sheetState = .searching
                 }) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(TransiumColor.primaryBlue)
-                        .frame(width: 44, height: 44)
-                        .background(.white)
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.left")
+                            .font(.system(size: 14, weight: .bold))
+                        Text("List")
+                            .font(TransiumFont.body(14, weight: .bold))
+                    }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 16)
+                    .frame(height: 44)
+                    .background(Color.white)
+                    .cornerRadius(22)
+                    .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+                }
+                
+                Spacer()
+                
+                Button(action: {
+                    AppToastCenter.shared.showSuccess(
+                        title: "Location Pinned",
+                        message: "Pinned destination selected."
+                    )
+                    sheetDetent = .large
+                    sheetState = .searching
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 14, weight: .bold))
+                        Text("Confirm Pin")
+                            .font(TransiumFont.body(14, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 20)
+                    .frame(height: 44)
+                    .background(TransiumColor.primaryBlue)
+                    .cornerRadius(22)
+                    .shadow(color: TransiumColor.primaryBlue.opacity(0.4), radius: 6, y: 3)
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 6)
-            
-            Spacer()
+            .padding(.bottom, 360)
         }
         .transition(.opacity)
     }
     
     private var centerPinIndicator: some View {
-        GeometryReader { proxy in
-            Image(systemName: "mappin")
+        VStack(spacing: 0) {
+            Image(systemName: "mappin.circle.fill")
                 .font(.system(size: 36))
-                .foregroundStyle(Color(red: 0.94, green: 0.27, blue: 0.27))
-                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
-                .position(
-                    x: proxy.size.width / 2,
-                    y: proxy.size.height * 0.44
-                )
+                .foregroundColor(TransiumColor.primaryBlue)
+                .background(Circle().fill(Color.white).padding(2))
+                .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
+            
+            Image(systemName: "arrowtriangle.down.fill")
+                .font(.system(size: 10))
+                .foregroundColor(TransiumColor.primaryBlue)
+                .offset(y: -3)
         }
         .allowsHitTesting(false)
         .transition(.opacity)
@@ -389,14 +404,23 @@ struct HomeScreen: View {
             do {
                 let originCoordinate = resolvedCurrentLocation?.coordinate ?? CLLocationCoordinate2D(latitude: -8.702105, longitude: 115.176189)
                 
+                let targetQuestId: String? = {
+                    if let questId { return questId }
+                    let page = visibleTicketPage ?? 0
+                    if kelurahanGroups.indices.contains(page) {
+                        return kelurahanGroups[page].quests.first?.id
+                    }
+                    return kelurahanGroups.first?.quests.first?.id
+                }()
+                
                 var response: JourneyResponse?
                 
-                // 1. Try real journey by questId if provided
-                if let qId = questId {
-                    response = try? await journeyService.fetchRealJourney(questId: qId, origin: originCoordinate)
+                // 1. Try real journey by questId if provided or discovered from kelurahan group
+                if let targetQuestId {
+                    response = try? await journeyService.fetchRealJourney(questId: targetQuestId, origin: originCoordinate)
                 }
                 
-                // 2. Fallback to overview calculation if real journey failed or questId is nil
+                // 2. Fallback to overview calculation if real journey failed
                 if response == nil {
                     let destinationCoordinate = CLLocationCoordinate2D(latitude: -8.67368, longitude: 115.26337)
                     response = try await journeyService.fetchJourneyOverview(
@@ -469,25 +493,20 @@ struct HomeScreen: View {
                         .id(index)
                     }
                 } else {
-                    recommendedTicket
+                    // Placeholder shimmer tickets while fetching from live API
+                    ForEach(0..<2, id: \.self) { placeholderIndex in
+                        TransiumTicketCard(
+                            title: placeholderIndex == 0 ? "Loading Places..." : "Loading...",
+                            subtitle: "Fetching places with quests in Bali...",
+                            distance: "-- km",
+                            price: "Rp. 4,4k",
+                            imageName: TransiumAsset.Illustration.onboardingExplore,
+                            variant: placeholderIndex == 0 ? .blue : .mint
+                        )
                         .frame(width: 336)
-                        .id(0)
-                    
-                    TransiumTicketCard(
-                        title: ubudDestination.name,
-                        subtitle: ubudDestination.subtitle,
-                        distance: distanceText(to: ubudDestination),
-                        price: ubudDestination.price,
-                        imageName: ubudDestination.imageName,
-                        variant: .mint
-                    )
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectedKelurahan = Kelurahan(id: "ubud-dest", kelurahanName: "Ubud", kecamatanName: "Gianyar")
-                        isDetailPresented = true
+                        .id(placeholderIndex)
+                        .redacted(reason: .placeholder)
                     }
-                    .frame(width: 336)
-                    .id(1)
                 }
             }
             .scrollTargetLayout()
@@ -508,28 +527,6 @@ struct HomeScreen: View {
             inactiveColor: TransiumColor.ticketInk.opacity(0.26)
         )
         .accessibilityLabel("Ticket \(min((visibleTicketPage ?? 0) + 1, max(kelurahanGroups.count, 2))) of \(max(kelurahanGroups.count, 2))")
-    }
-    
-    private var recommendedTicket: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            recommendedBadge
-                .padding(.leading, 12)
-                .padding(.bottom, -1)
-                .zIndex(1)
-            
-            TransiumTicketCard(
-                title: sanurDestination.name,
-                subtitle: sanurDestination.subtitle,
-                distance: distanceText(to: sanurDestination),
-                price: sanurDestination.price,
-                imageName: sanurDestination.imageName
-            )
-            .contentShape(Rectangle())
-            .onTapGesture {
-                selectedKelurahan = Kelurahan(id: "20447277", kelurahanName: "Sanur", kecamatanName: "Denpasar Selatan")
-                isDetailPresented = true
-            }
-        }
     }
     
     private var recommendedBadge: some View {
@@ -582,26 +579,6 @@ struct HomeScreen: View {
         return "Locating..."
     }
     
-    private func distanceText(to destination: TicketDestination) -> String {
-        guard let resolvedCurrentLocation else {
-            return "\(destination.fallbackDistance) km"
-        }
-        
-        let destinationLocation = CLLocation(
-            latitude: destination.coordinate.latitude,
-            longitude: destination.coordinate.longitude
-        )
-        
-        let meters = resolvedCurrentLocation.distance(from: destinationLocation)
-        let kilometers = meters / 1000
-        
-        if kilometers < 1 {
-            return "\(Int(meters)) m"
-        }
-        
-        return "\(Int(round(kilometers))) km"
-    }
-    
     private func presentSearchSheet(in state: SearchSheetState) {
         sheetState = state
         sheetDetent = (state == .searching) ? .large : .medium
@@ -613,15 +590,6 @@ struct HomeScreen: View {
         sheetDetent = .large
         searchText = ""
     }
-}
-
-private struct TicketDestination {
-    let name: String
-    let subtitle: String
-    let fallbackDistance: String
-    let price: String
-    let imageName: String
-    let coordinate: CLLocationCoordinate2D
 }
 
 #Preview {
