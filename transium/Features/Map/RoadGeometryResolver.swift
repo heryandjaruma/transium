@@ -50,7 +50,7 @@ public actor RoadGeometryResolver {
         }
         
         if segment.type == "bus" {
-            let cacheKey = "bus-\(segment.from.lat),\(segment.from.lng)-\(segment.to.lat),\(segment.to.lng)"
+            let cacheKey = "bus-\(segment.from.lat),\(segment.from.lng)-\(segment.to.lat),\(segment.to.lng)-\(segment.stops?.count ?? 0)"
             if let cached = cache[cacheKey], cached.count > 2 {
                 return segment.withGeometry(cached)
             }
@@ -71,37 +71,58 @@ public actor RoadGeometryResolver {
         to end: CLLocationCoordinate2D,
         stops: [JourneyLocationRef]?
     ) async -> [CLLocationCoordinate2D] {
-        // Strategy 1: Direct arterial route calculation from boarding stop directly to alighting stop
+        // Primary Strategy: When bus stops are provided, route through each consecutive stop corridor
+        if let stops = stops, stops.count >= 2 {
+            var waypoints: [CLLocationCoordinate2D] = []
+            // Use all stop coordinates in order
+            for s in stops {
+                let c = s.coordinate
+                if let last = waypoints.last {
+                    if abs(last.latitude - c.latitude) < 0.00001 && abs(last.longitude - c.longitude) < 0.00001 {
+                        continue
+                    }
+                }
+                waypoints.append(c)
+            }
+            
+            if waypoints.count >= 2 {
+                var results: [(Int, [CLLocationCoordinate2D])] = []
+                await withTaskGroup(of: (Int, [CLLocationCoordinate2D]).self) { group in
+                    for i in 0..<(waypoints.count - 1) {
+                        let p1 = waypoints[i]
+                        let p2 = waypoints[i + 1]
+                        group.addTask {
+                            let legCoords = await self.calculateLeg(from: p1, to: p2)
+                            return (i, legCoords)
+                        }
+                    }
+                    for await res in group {
+                        results.append(res)
+                    }
+                }
+                results.sort { $0.0 < $1.0 }
+                
+                var combined: [CLLocationCoordinate2D] = []
+                for (_, legCoords) in results {
+                    for pt in legCoords {
+                        if let last = combined.last {
+                            if abs(last.latitude - pt.latitude) < 0.000001 && abs(last.longitude - pt.longitude) < 0.000001 {
+                                continue
+                            }
+                        }
+                        combined.append(pt)
+                    }
+                }
+                if combined.count > 2 {
+                    return combined
+                }
+            }
+        }
+        
+        // Fallback Strategy: Direct start to end routing if no intermediate stops
         let directCoords = await calculateLeg(from: start, to: end)
         if directCoords.count > 2 {
             return directCoords
-        }
-        
-        // Strategy 2: If direct failed and stops exist, attempt waypoint routing
-        if let stops = stops, stops.count >= 2 {
-            var waypoints: [CLLocationCoordinate2D] = [start]
-            for s in stops.dropFirst().dropLast() {
-                waypoints.append(s.coordinate)
-            }
-            waypoints.append(end)
-            
-            var collected: [CLLocationCoordinate2D] = []
-            for i in 0..<(waypoints.count - 1) {
-                let p1 = waypoints[i]
-                let p2 = waypoints[i + 1]
-                let subLeg = await calculateLeg(from: p1, to: p2)
-                for pt in subLeg {
-                    if let last = collected.last {
-                        if abs(last.latitude - pt.latitude) < 0.000001 && abs(last.longitude - pt.longitude) < 0.000001 {
-                            continue
-                        }
-                    }
-                    collected.append(pt)
-                }
-            }
-            if collected.count > 2 {
-                return collected
-            }
         }
         
         return [start, end]
@@ -109,12 +130,12 @@ public actor RoadGeometryResolver {
     
     private func calculateLeg(from start: CLLocationCoordinate2D, to end: CLLocationCoordinate2D) async -> [CLLocationCoordinate2D] {
         let autoPoints = await requestDirections(from: start, to: end, transportType: .automobile)
-        if autoPoints.count > 2 {
+        if autoPoints.count >= 2 {
             return autoPoints
         }
         
         let walkPoints = await requestDirections(from: start, to: end, transportType: .walking)
-        if walkPoints.count > 2 {
+        if walkPoints.count >= 2 {
             return walkPoints
         }
         
@@ -146,7 +167,7 @@ public actor RoadGeometryResolver {
                 var buf = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: route.polyline.pointCount)
                 route.polyline.getCoordinates(&buf, range: NSRange(location: 0, length: route.polyline.pointCount))
                 let valid = buf.filter { $0.latitude != kCLLocationCoordinate2DInvalid.latitude }
-                if valid.count > 2 {
+                if valid.count >= 2 {
                     return valid
                 }
             }

@@ -345,6 +345,59 @@ struct LocalBaliMapView: UIViewRepresentable {
             intermediateStops: [JourneyLocationRef]?,
             transportType: MKDirectionsTransportType = .automobile
         ) async -> [CLLocationCoordinate2D] {
+            if let stops = intermediateStops, stops.count >= 2 {
+                var waypoints: [CLLocationCoordinate2D] = []
+                for s in stops {
+                    let c = s.coordinate
+                    if let last = waypoints.last {
+                        if abs(last.latitude - c.latitude) < 0.00001 && abs(last.longitude - c.longitude) < 0.00001 {
+                            continue
+                        }
+                    }
+                    waypoints.append(c)
+                }
+                if waypoints.count >= 2 {
+                    var results: [(Int, [CLLocationCoordinate2D])] = []
+                    await withTaskGroup(of: (Int, [CLLocationCoordinate2D]).self) { group in
+                        for i in 0..<(waypoints.count - 1) {
+                            let p1 = waypoints[i]
+                            let p2 = waypoints[i + 1]
+                            group.addTask {
+                                let legCoords = await self.fetchSingleLeg(from: p1, to: p2, transportType: transportType)
+                                return (i, legCoords)
+                            }
+                        }
+                        for await res in group {
+                            results.append(res)
+                        }
+                    }
+                    results.sort { $0.0 < $1.0 }
+                    
+                    var combined: [CLLocationCoordinate2D] = []
+                    for (_, legCoords) in results {
+                        for pt in legCoords {
+                            if let last = combined.last {
+                                if abs(last.latitude - pt.latitude) < 0.000001 && abs(last.longitude - pt.longitude) < 0.000001 {
+                                    continue
+                                }
+                            }
+                            combined.append(pt)
+                        }
+                    }
+                    if combined.count > 2 {
+                        return combined
+                    }
+                }
+            }
+            
+            return await fetchSingleLeg(from: start, to: end, transportType: transportType)
+        }
+        
+        private func fetchSingleLeg(
+            from start: CLLocationCoordinate2D,
+            to end: CLLocationCoordinate2D,
+            transportType: MKDirectionsTransportType
+        ) async -> [CLLocationCoordinate2D] {
             let req = MKDirections.Request()
             req.source = makeMapItem(coordinate: start)
             req.destination = makeMapItem(coordinate: end)
@@ -357,12 +410,11 @@ struct LocalBaliMapView: UIViewRepresentable {
                     var buf = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: route.polyline.pointCount)
                     route.polyline.getCoordinates(&buf, range: NSRange(location: 0, length: route.polyline.pointCount))
                     let valid = buf.filter { $0.latitude != kCLLocationCoordinate2DInvalid.latitude }
-                    if valid.count > 2 {
+                    if valid.count >= 2 {
                         return valid
                     }
                 }
             } catch {
-                // Fallback to walking directions if driving route has restriction
                 let walkReq = MKDirections.Request()
                 walkReq.source = makeMapItem(coordinate: start)
                 walkReq.destination = makeMapItem(coordinate: end)
@@ -373,7 +425,7 @@ struct LocalBaliMapView: UIViewRepresentable {
                     var buf = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: walkRoute.polyline.pointCount)
                     walkRoute.polyline.getCoordinates(&buf, range: NSRange(location: 0, length: walkRoute.polyline.pointCount))
                     let valid = buf.filter { $0.latitude != kCLLocationCoordinate2DInvalid.latitude }
-                    if valid.count > 2 {
+                    if valid.count >= 2 {
                         return valid
                     }
                 }
