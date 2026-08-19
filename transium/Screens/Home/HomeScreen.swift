@@ -15,9 +15,15 @@ struct HomeScreen: View {
     @State private var sheetState: SearchSheetState = .searching
     @State private var sheetDetent: PresentationDetent = .large
     @State private var searchText = ""
+
+    // MARK: - Quick Menu State
+    @State private var isMenuExpanded = false
+    @State private var isSettingsPresented = false
+    @State private var isSavedQuestPresented = false
     
     
     var body: some View {
+<<<<<<< Updated upstream
             ZStack(alignment: .topLeading) {
                 LocalBaliMapView(currentLocation: locationStore.currentLocation)
                     .ignoresSafeArea()
@@ -76,14 +82,292 @@ struct HomeScreen: View {
                 .background(.white.opacity(0.9))
                 .clipShape(.rect(cornerRadius: 16, style: .continuous))
                 .shadow(color: .black.opacity(0.08), radius: 12, y: 5)
+=======
+        ZStack(alignment: .bottom) {
+            LocalBaliMapView(
+                displayLocation: resolvedCurrentLocation,
+                markerHeading: previewLocation == nil ? 0 : 22,
+                centerRequestID: mapCenterRequestID,
+                activeJourney: activeJourney
+            )
+            .ignoresSafeArea()
+
+            if isMenuExpanded {
+                // Transparent tap-catcher: tap anywhere outside the quick menu to collapse it.
+                Color.clear
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isMenuExpanded = false
+                        }
+                    }
+            }
+            
+            if let journey = activeJourney, showNavigationSheet {
+                // MARK: - Navigation Mode
+                VStack {
+                    // Top Bar (Back, Bookmark, Share, Locate)
+                    HStack {
+                        Button(action: {
+                            withAnimation(.spring()) {
+                                activeJourney = nil
+                                showNavigationSheet = false
+                            }
+                        }) {
+                            Image(systemName: "arrow.left")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(.black)
+                                .frame(width: 44, height: 44)
+                                .background(.white)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                        }
+                        
+                        Spacer()
+                        
+                        HStack(spacing: 12) {
+                            Button(action: {
+                                AppToastCenter.shared.showSuccess(title: "Saved", message: "Quest path saved to bookmarks.")
+                            }) {
+                                Image(systemName: "bookmark")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(.black)
+                                    .frame(width: 44, height: 44)
+                                    .background(.white)
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                            }
+                            
+                            Button(action: {
+                                AppToastCenter.shared.showSuccess(title: "Share", message: "Sharing option selected.")
+                            }) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(.black)
+                                    .frame(width: 44, height: 44)
+                                    .background(.white)
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                            }
+                            
+                            Button(action: {
+                                mapCenterRequestID += 1
+                            }) {
+                                Image(systemName: "location.fill")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(TransiumColor.primaryBlue)
+                                    .frame(width: 44, height: 44)
+                                    .background(.white)
+                                    .clipShape(Circle())
+                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                            }
+                        }
+                    }
+                    .padding(.top, 6)
+                    .padding(.horizontal, 20)
+                    
+                    Spacer()
+                }
+                
+                // Docked Bottom Stack: Floating Go Button + Navigation Bottom Sheet
+                VStack(spacing: 0) {
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            AppToastCenter.shared.showSuccess(
+                                title: "Quest Started!",
+                                message: "Follow the green path to reach your destination."
+                            )
+                        }) {
+                            HStack(spacing: 8) {
+                                Text("Go")
+                                    .font(TransiumFont.body(17, weight: .bold))
+                                Image(systemName: "chevron.right.2")
+                                    .font(.system(size: 14, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 14)
+                            .background(Color(red: 0.24, green: 0.65, blue: 0.44))
+                            .cornerRadius(28)
+                            .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 12)
+                    }
+                    
+                    NavigationBottomSheet(journey: journey, onBack: {
+                        withAnimation(.spring()) {
+                            activeJourney = nil
+                            showNavigationSheet = false
+                        }
+                    })
+                }
+                .ignoresSafeArea(edges: .bottom)
+                .transition(.move(edge: .bottom))
+            } else {
+                // MARK: - Explore Mode
+                VStack(alignment: .trailing, spacing: 0) {
+                    // Top Search Bar, Locate & Quick Menu Controls
+                    HStack(alignment: .top, spacing: 10) {
+                        searchBarTrigger
+                        
+                        TransiumIconButton(
+                            systemName: "location.fill",
+                            accessibilityLabel: "Center map on your location"
+                        ) {
+                            mapCenterRequestID += 1
+                        }
+                        .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                        
+                        quickMenu
+                    }
+                    .padding(.top, 6)
+                    .padding(.horizontal, 20)
+                    
+                    Spacer()
+                }
+                
+                bottomMapContent
+                    .ignoresSafeArea(edges: .bottom)
+            }
+            
+            // Pinning mode overlay controls
+            if isSearchPresented && sheetState == .pinning {
+                pinningOverlayControls
+                centerPinIndicator
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .task {
+            guard previewLocation == nil else { return }
+            locationStore.requestCurrentLocation()
+        }
+        .preferredColorScheme(.light)
+        .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
+            SearchSheetView(
+                state: $sheetState,
+                searchText: $searchText,
+                onCancel: { isSearchPresented = false }
+            )
+            .presentationDetents([.medium, .large], selection: $sheetDetent)
+            .presentationDragIndicator(.hidden)
+            .interactiveDismissDisabled(false)
+            .onChange(of: sheetDetent) { _, newDetent in
+                sheetState = (newDetent == .large) ? .searching : .pinning
+            }
+        }
+        .sheet(isPresented: $isDetailPresented) {
+            DetailPlaceScreen()
+        }
+        .fullScreenCover(isPresented: $isProfilePresented) {
+            ProfileScreen()
+        }
+        .fullScreenCover(isPresented: $isSettingsPresented) {
+            SettingsScreen()
+        }
+        .fullScreenCover(isPresented: $isSavedQuestPresented) {
+            SavedQuestScreen()
+        }
+        .animation(.easeInOut(duration: 0.2), value: isMenuExpanded)
+    }
+    
+    private var resolvedCurrentLocation: CLLocation? {
+        if let previewLocation {
+            return previewLocation
+        }
+        if let currentLocation = locationStore.currentLocation, currentLocation.coordinate.isWithinBaliRegion {
+            return currentLocation
+        }
+        return baliFallbackLocation
+    }
+    
+    // MARK: - Search Bar Trigger
+    
+    private var searchBarTrigger: some View {
+        Button(action: { presentSearchSheet(in: .searching) }) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(TransiumColor.primaryBlue)
+>>>>>>> Stashed changes
 
         // MARK: - Overlay saat mode drag point (image 2)
 
+<<<<<<< Updated upstream
         private var pinningOverlayControls: some View {
+=======
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 48)
+            .background(Color.white.opacity(0.95))
+            .clipShape(.capsule)
+            .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Quick Menu (ellipsis button that expands into icon-only buttons)
+
+    private var quickMenu: some View {
+        VStack(spacing: 12) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isMenuExpanded.toggle()
+                }
+            }) {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(TransiumColor.primaryBlue)
+                    .frame(width: 44, height: 44)
+                    .background(.white)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+            }
+            .accessibilityLabel("More options")
+
+            if isMenuExpanded {
+                quickMenuButton(icon: "gearshape.fill", accessibilityLabel: "Settings") {
+                    isMenuExpanded = false
+                    isSettingsPresented = true
+                }
+
+                quickMenuButton(icon: "person.fill", accessibilityLabel: "Profile") {
+                    isMenuExpanded = false
+                    isProfilePresented = true
+                }
+
+                quickMenuButton(icon: "bookmark.fill", accessibilityLabel: "Saved Quest") {
+                    isMenuExpanded = false
+                    isSavedQuestPresented = true
+                }
+            }
+        }
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
+    private func quickMenuButton(icon: String, accessibilityLabel: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(TransiumColor.primaryBlue)
+                .frame(width: 44, height: 44)
+                .background(.white)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+        }
+        .accessibilityLabel(accessibilityLabel)
+        .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .top)))
+    }
+    
+    // MARK: - Pinning Overlay Controls
+    
+    private var pinningOverlayControls: some View {
+        VStack {
+>>>>>>> Stashed changes
             HStack {
                 Button(action: { isSearchPresented = false }) {
                     Image(systemName: "arrow.left")
