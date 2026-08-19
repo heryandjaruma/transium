@@ -22,8 +22,8 @@ final class LocationStore: NSObject, ObservableObject {
 
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
-        locationManager.distanceFilter = kCLDistanceFilterNone
-        locationManager.headingFilter = 1.0
+        locationManager.distanceFilter = 5.0
+        locationManager.headingFilter = 3.0
         
         if authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse {
             locationManager.startUpdatingLocation()
@@ -74,7 +74,11 @@ extension LocationStore: CLLocationManagerDelegate {
         }
 
         Task { @MainActor in
-            currentLocation = location
+            if let current = self.currentLocation {
+                let distance = current.distance(from: location)
+                guard distance >= 5.0 else { return }
+            }
+            self.currentLocation = location
         }
     }
     

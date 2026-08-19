@@ -129,6 +129,7 @@ struct LocalBaliMapView: UIViewRepresentable {
         var lastSyncedJourneyId: String?
         var roadPolylineCache: [String: [CLLocationCoordinate2D]] = [:]
         private let userAnnotation = PreviewUserPointAnnotation()
+        private var lastRenderedLocation: CLLocation?
         
         func syncUserAnnotation(
             on mapView: MLNMapView,
@@ -139,9 +140,23 @@ struct LocalBaliMapView: UIViewRepresentable {
                 if mapView.annotations?.contains(where: { $0 === userAnnotation }) == true {
                     mapView.removeAnnotation(userAnnotation)
                 }
+                lastRenderedLocation = nil
                 return
             }
             
+            if let previousLoc = lastRenderedLocation {
+                let distance = previousLoc.distance(from: location)
+                if distance < 5.0 {
+                    // Update only compass heading, avoid coordinate jitter
+                    userAnnotation.heading = heading
+                    if let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView {
+                        userView.updateHeading(heading, animated: true)
+                    }
+                    return
+                }
+            }
+            
+            lastRenderedLocation = location
             userAnnotation.coordinate = location.coordinate
             userAnnotation.heading = heading
             

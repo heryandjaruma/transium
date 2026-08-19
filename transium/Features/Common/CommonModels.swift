@@ -30,19 +30,22 @@ public nonisolated struct LatLng: Codable, Sendable, Equatable, Hashable {
 public nonisolated struct MediaAsset: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let url: String
-    public let mimeType: String
-    public let sizeBytes: Int
-    public let createdAt: Date
+    public let type: String?
+    public let mimeType: String?
+    public let sizeBytes: Int?
+    public let createdAt: String?
 
     public init(
         id: String,
         url: String,
-        mimeType: String,
-        sizeBytes: Int,
-        createdAt: Date
+        type: String? = nil,
+        mimeType: String? = nil,
+        sizeBytes: Int? = nil,
+        createdAt: String? = nil
     ) {
         self.id = id
         self.url = url
+        self.type = type
         self.mimeType = mimeType
         self.sizeBytes = sizeBytes
         self.createdAt = createdAt
