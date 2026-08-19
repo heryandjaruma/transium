@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ProfileScreen: View {
     enum ProfileTab: String, CaseIterable {
@@ -59,7 +60,12 @@ struct ProfileScreen: View {
 //    @State private var showDeleteConfirmation: Bool = false
     @State private var likedPhotoIDs: Set<UUID> = []
     @State private var viewingPhoto: GalleryPhoto? = nil
-    
+
+    // Photo download (save to Photos library)
+    @State private var isSavingPhoto: Bool = false
+    @State private var showSaveResultAlert: Bool = false
+    @State private var saveResultMessage: String = ""
+
     @State private var showPhotoSourceDialog = false
     @State private var activePickerSource: UIImagePickerController.SourceType?
     @State private var avatarImage: UIImage? = nil
@@ -122,9 +128,17 @@ struct ProfileScreen: View {
             editAccountSheet
         }
         .fullScreenCover(item: $viewingPhoto) { photo in
-            PhotoViewer(imageName: photo.imageName) {
-                viewingPhoto = nil
-            }
+            PhotoViewer(
+                imageName: photo.imageName,
+                isSaving: isSavingPhoto,
+                onClose: { viewingPhoto = nil },
+                onDownload: { downloadPhoto(photo) }
+            )
+        }
+        .alert("Save Photo", isPresented: $showSaveResultAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(saveResultMessage)
         }
     }
 
@@ -367,11 +381,11 @@ struct ProfileScreen: View {
                             }
 
                         Button {
-                            toggleLike(for: photo)
+                            downloadPhoto(photo)
                         } label: {
-                            Image(systemName: likedPhotoIDs.contains(photo.id) ? "heart.fill" : "heart")
-                                .font(.system(size: 12))
-                                .foregroundColor(likedPhotoIDs.contains(photo.id) ? .red : .white)
+                            Image(systemName: "arrow.down.to.line")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
                                 .padding(6)
                                 .background(Color.black.opacity(0.35))
                                 .clipShape(Circle())
@@ -389,6 +403,30 @@ struct ProfileScreen: View {
         } else {
             likedPhotoIDs.insert(photo.id)
         }
+    }
+
+    // MARK: - Photo Download
+
+    /// Saves a gallery photo (by asset name) into the user's Photos library.
+    private func downloadPhoto(_ photo: GalleryPhoto) {
+        guard let uiImage = UIImage(named: photo.imageName) else {
+            saveResultMessage = "Couldn't find that photo to download."
+            showSaveResultAlert = true
+            return
+        }
+
+        isSavingPhoto = true
+        ImageSaver { success, error in
+            isSavingPhoto = false
+            if success {
+                saveResultMessage = "Saved to your Photos."
+            } else if let error {
+                saveResultMessage = "Couldn't save the photo: \(error.localizedDescription)"
+            } else {
+                saveResultMessage = "Couldn't save the photo. Check that Transium has permission to add photos in Settings."
+            }
+            showSaveResultAlert = true
+        }.save(uiImage)
     }
 
     // MARK: - Edit Account Sheet
@@ -447,10 +485,12 @@ struct ProfileScreen: View {
 
 private struct PhotoViewer: View {
     let imageName: String
+    let isSaving: Bool
     let onClose: () -> Void
+    let onDownload: () -> Void
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
 
             Image(imageName)
@@ -458,17 +498,62 @@ private struct PhotoViewer: View {
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
+            HStack {
+                Button(action: onDownload) {
+                    Group {
+                        if isSaving {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "arrow.down.to.line")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                    }
                     .foregroundColor(.white)
                     .frame(width: 40, height: 40)
                     .background(Color.white.opacity(0.2))
                     .clipShape(Circle())
+                }
+                .disabled(isSaving)
+
+                Spacer()
+
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.white.opacity(0.2))
+                        .clipShape(Circle())
+                }
             }
             .padding(.top, 50)
-            .padding(.trailing, 20)
+            .padding(.horizontal, 20)
         }
+    }
+}
+
+// MARK: - Image Saver
+
+/// Small helper that saves a UIImage into the user's Photos library and reports the result.
+/// Requires an `NSPhotoLibraryAddUsageDescription` entry in Info.plist.
+final class ImageSaver: NSObject {
+    private let completion: (Bool, Error?) -> Void
+
+    init(completion: @escaping (Bool, Error?) -> Void) {
+        self.completion = completion
+    }
+
+    func save(_ image: UIImage) {
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(didFinishSaving(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+
+    @objc private func didFinishSaving(
+        _ image: UIImage,
+        didFinishSavingWithError error: Error?,
+        contextInfo: UnsafeRawPointer
+    ) {
+        completion(error == nil, error)
     }
 }
 
