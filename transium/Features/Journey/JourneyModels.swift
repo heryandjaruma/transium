@@ -629,12 +629,16 @@ public nonisolated struct JourneyGoResult: Codable, Sendable, Equatable {
     }
 }
 
+/// A located step (has lat/lng) is proven by geofence: `lat`/`lng` are required and checked
+/// against the step's own coordinates (~150m). An unlocated step has nothing to prove against,
+/// so they're optional and ignored if sent — passing just `stepId` is itself the "I did this"
+/// attestation, trusted client-side with no server-side verification.
 public nonisolated struct AdvanceJourneyRequest: Codable, Sendable {
     public let stepId: String
-    public let lat: Double
-    public let lng: Double
+    public let lat: Double?
+    public let lng: Double?
 
-    public init(stepId: String, lat: Double, lng: Double) {
+    public init(stepId: String, lat: Double? = nil, lng: Double? = nil) {
         self.stepId = stepId
         self.lat = lat
         self.lng = lng

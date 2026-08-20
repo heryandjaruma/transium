@@ -104,6 +104,13 @@ struct GoTripDetailsPanel: View {
             .flatMap { $0.distance <= 50 ? $0.step : nil }
     }
 
+    /// Steps with no coordinates at all — no `missionCard` in `journey.segments` accounts for
+    /// these (a located step's own route entry), so they'd otherwise never appear anywhere in
+    /// this timeline. Shown via `manualActionCard` instead, each with its own "I've done it".
+    private var unlocatedActionSteps: [JourneyAttemptStep] {
+        steps.filter { $0.status == .waiting && $0.lat == nil }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             RoundedRectangle(cornerRadius: 2.5)
@@ -296,6 +303,10 @@ struct GoTripDetailsPanel: View {
                     } else {
                         inactiveWalkCard(segment, index: index, isDone: index < currentSegmentIndex)
                     }
+                }
+
+                ForEach(unlocatedActionSteps) { step in
+                    manualActionCard(step)
                 }
             }
         }
@@ -599,13 +610,15 @@ struct GoTripDetailsPanel: View {
 
     /// A manual fallback for POST /private/journey/{id}/advance's own documented "manual
     /// arrival check" case — wired by the caller to the exact same handler a real geofence
-    /// trigger uses, for when the geofence itself doesn't fire.
-    private func markDoneButton(for step: JourneyAttemptStep, tint: Color) -> some View {
+    /// trigger uses, for when the geofence itself doesn't fire. `label`/`icon` default to the
+    /// located-step "I'm here" wording; `manualActionCard` overrides them for unlocated steps,
+    /// where tapping is the *only* way that step ever gets marked done.
+    private func markDoneButton(for step: JourneyAttemptStep, tint: Color, label: String = "I'm here", icon: String = "checkmark.circle") -> some View {
         Button(action: { onManualAdvance(step.id) }) {
             HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle")
+                Image(systemName: icon)
                     .font(.system(size: 11, weight: .semibold))
-                Text("I'm here")
+                Text(label)
                     .font(TransiumFont.body(11, weight: .semibold))
             }
             .foregroundColor(tint)
@@ -615,6 +628,63 @@ struct GoTripDetailsPanel: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.transiumNoOpacity)
+    }
+
+    // MARK: - Manual Action Card
+
+    /// A quest step with no coordinates at all — nothing to geofence, so it has no `missionCard`
+    /// counterpart in `journey.segments` (a located step's own account of itself) and would
+    /// otherwise be entirely invisible in this timeline. POST /private/journey/{id}/advance
+    /// treats just submitting its `stepId` as the "I did this" attestation, trusted client-side
+    /// — this card is that attestation's UI. Capture-type steps still get the same camera sheet
+    /// on tap, via `onManualAdvance` → HomeScreen.handleGeofenceEntered, which already pops it
+    /// for any `isPhotoCheckpoint` step regardless of whether it's located.
+    private func manualActionCard(_ step: JourneyAttemptStep) -> some View {
+        let isCapture = step.isPhotoCheckpoint
+        let icon: String = {
+            if isCapture { return "camera.fill" }
+            if step.actionType?.localizedCaseInsensitiveContains("step") == true { return "shoeprints.fill" }
+            if step.actionType?.localizedCaseInsensitiveContains("walk") == true { return "figure.walk" }
+            return "questionmark.app.fill"
+        }()
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().fill(TransiumColor.primaryYellow).frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Mission")
+                        .font(TransiumFont.body(11, weight: .bold))
+                        .foregroundColor(.secondary)
+                    Text(step.description.isEmpty ? step.name : step.description)
+                        .font(TransiumFont.body(15, weight: .bold))
+                        .foregroundColor(.black)
+                }
+
+                Spacer()
+            }
+
+            Divider()
+            HStack {
+                Spacer()
+                markDoneButton(
+                    for: step,
+                    tint: TransiumColor.primaryYellow,
+                    label: isCapture ? "Take a Photo" : "I've Done It",
+                    icon: isCapture ? "camera.fill" : "checkmark.circle"
+                )
+            }
+        }
+        .padding(14)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(TransiumColor.primaryYellow.opacity(0.5), lineWidth: 1))
     }
 
     #if DEBUG

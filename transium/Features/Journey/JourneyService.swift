@@ -26,7 +26,10 @@ public protocol JourneyServiceProtocol: Sendable {
     func startJourney(questId: String) async throws -> JourneyGoResult
 
     /// Report a geofence trigger (or a manual arrival check) for a step on an in-progress attempt.
-    func advanceJourney(attemptId: String, stepId: String, lat: Double, lng: Double) async throws -> JourneyAdvanceResult
+    /// `lat`/`lng` are only required for a located step (geofence-verified against its own
+    /// coordinates); omit them for an unlocated step, where passing just `stepId` is itself the
+    /// "I did this" attestation.
+    func advanceJourney(attemptId: String, stepId: String, lat: Double?, lng: Double?) async throws -> JourneyAdvanceResult
 
     /// Finalize an attempt whose steps are all already "done" — awards XP/badges and records
     /// the journey summary/path. Fails with 400 (and `pendingStepIds`) if any step isn't done yet.
@@ -135,7 +138,7 @@ public final class JourneyService: JourneyServiceProtocol, Sendable {
         }
     }
 
-    public func advanceJourney(attemptId: String, stepId: String, lat: Double, lng: Double) async throws -> JourneyAdvanceResult {
+    public func advanceJourney(attemptId: String, stepId: String, lat: Double? = nil, lng: Double? = nil) async throws -> JourneyAdvanceResult {
         let body = AdvanceJourneyRequest(stepId: stepId, lat: lat, lng: lng)
         let response: AdvanceJourneyResponse = try await apiClient.request(
             path: "/private/journey/\(attemptId)/advance",

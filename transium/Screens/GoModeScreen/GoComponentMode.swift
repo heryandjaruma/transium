@@ -99,21 +99,23 @@ struct GoComponentMode: View {
             return .walking
         }
 
-        // Primary signal: the live position is on/near the bus's own road — this alone is
-        // enough to call it "riding", regardless of whether the walk to the stop ever
-        // registered as close (GPS noise, boarding slightly off the marked stop coordinate,
-        // or a missed update near the stop can all mean that moment is never observed).
+        // Primary signal: precise distance to the boarding stop. Checked before road-alignment
+        // below because the stop itself typically sits right on the bus's own road — so
+        // `isAligned` (100m tolerance) can trip the moment we're merely near the stop, before
+        // ever boarding, which would wrongly skip straight past `.commute` to `.commuteOnGoing`.
+        if let distance = liveDistance(to: segment), distance <= Self.busStopProximityMeters {
+            return .commute
+        }
+
+        // Secondary signal: the live position is on/near the bus's own road, once we're no
+        // longer within range of the boarding stop — this still catches "riding" when the walk
+        // to the stop was never observed close (GPS noise, boarding slightly off the marked
+        // stop coordinate, or a missed update near the stop can all mean that moment is never
+        // observed).
         if busSegment.isAligned(with: currentLocation) {
             return .commuteOnGoing
         }
 
-        guard let distance = liveDistance(to: segment) else {
-            return everNearStopSegmentIds.contains(segment.id) ? .commuteOnGoing : .walking
-        }
-
-        if distance <= Self.busStopProximityMeters {
-            return .commute
-        }
         // Far from the stop, not aligned to the route road (e.g. geometry resolution fell back
         // to a straight line): fall back to "was ever close, now far" as a secondary signal.
         return everNearStopSegmentIds.contains(segment.id) ? .commuteOnGoing : .walking

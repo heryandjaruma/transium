@@ -128,7 +128,7 @@ struct HomeScreen: View {
                     },
                     onManualAdvance: { stepId in
                         guard let attemptId = goJourneyAttempt?.id else { return }
-                        handleGeofenceEntered(stepId: stepId, attemptId: attemptId)
+                        handleGeofenceEntered(stepId: stepId, attemptId: attemptId, isManualConfirmation: true)
                     }
                 )
                 .transition(.opacity)
@@ -939,11 +939,20 @@ struct HomeScreen: View {
         }
     }
 
-    private func handleGeofenceEntered(stepId: String, attemptId: String) {
+    /// `isManualConfirmation` is set only when this came from a user tap (the mission "I'm
+    /// here" button, or an unlocated step's "I've done it"/"Take a Photo" card) rather than a
+    /// real geofence trigger — it shows a small acknowledgement toast so tapping the button
+    /// visibly does something, since the step itself may have no other on-screen change (an
+    /// unlocated step's card simply disappears once `.done`). Skipped when this call is also
+    /// the one that finishes the whole journey — the completion summary screen is
+    /// acknowledgement enough there.
+    private func handleGeofenceEntered(stepId: String, attemptId: String, isManualConfirmation: Bool = false) {
         guard let coordinate = locationStore.currentLocation?.coordinate ?? resolvedCurrentLocation?.coordinate else { return }
 
         // Pop the camera immediately, before the network round-trip below — a photo-capture
-        // step is a moment-in-time prompt, not something that should wait on `advance`.
+        // step is a moment-in-time prompt, not something that should wait on `advance`. Applies
+        // whether the step is located (geofence-triggered) or not (manually tapped) — either
+        // way it's still a capture-type step.
         // Skip it if this step is already done (a re-firing region, or a previous catch-up
         // advance already covered it) so the user isn't nagged for the same spot twice.
         if let step = goJourneySteps.first(where: { $0.id == stepId }),
@@ -969,7 +978,10 @@ struct HomeScreen: View {
                 goGeofences = remaining
                 geofenceMonitor.startMonitoring(geofences: remaining)
 
-                finishJourneyIfNeeded(steps: result.steps, attemptId: attemptId)
+                let didFinishJourney = finishJourneyIfNeeded(steps: result.steps, attemptId: attemptId)
+                if isManualConfirmation, !didFinishJourney {
+                    AppToastCenter.shared.showSuccess(title: "Marked as Done", message: "Nice work — logged as complete.")
+                }
             }
         }
     }
@@ -990,8 +1002,9 @@ struct HomeScreen: View {
     /// badges and records the summary + breadcrumb, so that's called here to make the journey
     /// actually finish. Must be called from a MainActor context (it touches @State directly,
     /// not through `MainActor.run`, since every caller already is one).
-    private func finishJourneyIfNeeded(steps: [JourneyAttemptStep], attemptId: String) {
-        guard !hasSubmittedJourneyCompletion, !steps.isEmpty, steps.allSatisfy({ $0.status == .done }) else { return }
+    @discardableResult
+    private func finishJourneyIfNeeded(steps: [JourneyAttemptStep], attemptId: String) -> Bool {
+        guard !hasSubmittedJourneyCompletion, !steps.isEmpty, steps.allSatisfy({ $0.status == .done }) else { return false }
         hasSubmittedJourneyCompletion = true
 
         let distanceMeters = activeJourney?.summary.distanceMeters ?? 0
@@ -1029,6 +1042,8 @@ struct HomeScreen: View {
                 }
             }
         }
+
+        return true
     }
 
     /// `CameraScreen`'s `onCaptured` for a photo-capture step — uploads via POST
