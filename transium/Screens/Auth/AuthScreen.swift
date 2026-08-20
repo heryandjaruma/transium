@@ -13,6 +13,7 @@ struct AuthScreen: View {
     @Environment(SessionController.self) private var session
     @Environment(\.modelContext) private var modelContext
     @State private var appleSignInService = AppleSignInService()
+    @State private var signInError: String?
 
     let onBackToOnboarding: (() -> Void)?
 
@@ -62,6 +63,23 @@ struct AuthScreen: View {
                         Spacer()
                     }
                 }
+
+                if let signInError {
+                    VStack {
+                        Spacer()
+
+                        AuthErrorBanner(message: signInError) {
+                            withAnimation(.easeIn(duration: 0.2)) {
+                                self.signInError = nil
+                            }
+                        }
+                        .padding(.horizontal, metrics.panelHorizontalPadding)
+                        .padding(.bottom, metrics.panelHeight + 16)
+                    }
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(50)
+                }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
@@ -95,10 +113,9 @@ struct AuthScreen: View {
         do {
             try appleSignInService.configure(request)
         } catch {
-            AppToastCenter.shared.showError(
-                title: "Sign in could not start",
-                message: "Please try again in a moment."
-            )
+            withAnimation(.easeOut(duration: 0.25)) {
+                signInError = "Sign in could not start. Please try again in a moment."
+            }
         }
     }
 
@@ -117,15 +134,22 @@ struct AuthScreen: View {
                 )
 
                 if let errorMessage = session.errorMessage {
-                    AppToastCenter.shared.showError(title: "Sign in failed", message: errorMessage)
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        signInError = errorMessage
+                    }
+                    session.errorMessage = nil
                 }
             }
         } catch let error as ASAuthorizationError where error.code == .canceled {
             // Closing the Apple sign-in sheet is not an error.
         } catch let error as AuthError {
-            AppToastCenter.shared.showError(title: "Sign in failed", message: error.userFacingMessage)
+            withAnimation(.easeOut(duration: 0.25)) {
+                signInError = error.userFacingMessage
+            }
         } catch {
-            AppToastCenter.shared.showError(title: "Sign in failed", message: error.localizedDescription)
+            withAnimation(.easeOut(duration: 0.25)) {
+                signInError = error.localizedDescription
+            }
         }
     }
 
@@ -271,6 +295,54 @@ private struct AuthBottomPanel: View {
         }
 
         return text
+    }
+}
+
+private struct AuthErrorBanner: View {
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "xmark.octagon.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color(red: 0.82, green: 0.16, blue: 0.18))
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Sign in failed")
+                    .font(TransiumFont.body(15, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(message)
+                    .font(TransiumFont.body(13))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss error")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+        .background(.ultraThinMaterial)
+        .background(.white.opacity(0.92))
+        .clipShape(.rect(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(.white.opacity(0.72), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.14), radius: 20, y: 8)
+        .accessibilityElement(children: .combine)
     }
 }
 
