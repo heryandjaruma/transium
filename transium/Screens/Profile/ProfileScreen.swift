@@ -37,16 +37,20 @@ struct ProfileScreen: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(SessionController.self) private var session
 
     @State private var selectedTab: ProfileTab = .gallery
 
+    // Remote profile
+    @State private var profile: Profile?
+
     // Name editing
-    @State private var userName: String = "IMDK"
+    @State private var userName: String = ""
     @State private var isEditingName: Bool = false
     @State private var editedName: String = ""
 
     // Account editing
-    @State private var email: String = "imdk1827319@gmail.com"
+    @State private var email: String = ""
     @State private var isEditingAccount: Bool = false
     @State private var showDeleteAccountConfirmation: Bool = false
 
@@ -115,6 +119,9 @@ struct ProfileScreen: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .task {
+            await loadProfile()
+        }
         .alert("Edit Name", isPresented: $isEditingName) {
             TextField("Name", text: $editedName)
             Button("Cancel", role: .cancel) {}
@@ -144,6 +151,37 @@ struct ProfileScreen: View {
         } message: {
             Text(saveResultMessage)
         }
+    }
+
+    // MARK: - Remote Profile
+
+    private func loadProfile() async {
+        // Seed from the already-loaded session profile so the name isn't
+        // blank while the network request for the full profile is in flight.
+        if let sessionProfile = session.profile {
+            userName = [sessionProfile.firstName, sessionProfile.lastName]
+                .compactMap { $0 }
+                .joined(separator: " ")
+        }
+
+        guard let userId = session.profile?.id else { return }
+
+        do {
+            let fetched = try await ProfileService.shared.getProfile(userId: userId)
+            profile = fetched
+            userName = fetched.fullName
+            email = fetched.email
+        } catch {
+            // Keep the placeholder values if the fetch fails; the user can
+            // still browse the rest of the screen.
+        }
+    }
+
+    private func resolvedImageURL(_ raw: String) -> URL? {
+        if raw.hasPrefix("http") {
+            return URL(string: raw)
+        }
+        return APIConfiguration.origin.appending(path: raw.hasPrefix("/") ? String(raw.dropFirst()) : raw)
     }
 
     // MARK: - Header
@@ -176,6 +214,16 @@ struct ProfileScreen: View {
                     if let avatarImage {
                         Image(uiImage: avatarImage)
                             .resizable()
+                    } else if let imageURL = profile?.image.flatMap(resolvedImageURL) {
+                        AsyncImage(url: imageURL) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image.resizable()
+                            default:
+                                Image("profile_avatar")
+                                    .resizable()
+                            }
+                        }
                     } else {
                         Image("profile_avatar")
                             .resizable()
@@ -623,4 +671,5 @@ struct ImagePicker: UIViewControllerRepresentable {
 
 #Preview {
     ProfileScreen()
+        .environment(SessionController())
 }
