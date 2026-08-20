@@ -25,6 +25,7 @@ struct GoTripDetailsPanel: View {
     var currentLocation: CLLocationCoordinate2D? = nil
     @Binding var isExpanded: Bool
     var geofenceMonitor: JourneyGeofenceMonitor = JourneyGeofenceMonitor()
+    var goStartResult: JourneyGoResult? = nil
 
     @State private var isStopsExpanded: [String: Bool] = [:]
     #if DEBUG
@@ -73,6 +74,12 @@ struct GoTripDetailsPanel: View {
                     .foregroundStyle(TransiumColor.primaryBlue)
                 Spacer()
                 #if DEBUG
+                Button(action: shareGoStartResultJSON) {
+                    Image(systemName: "play.circle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(goStartResult == nil ? Color(.systemGray4) : .secondary)
+                }
+                .disabled(goStartResult == nil)
                 Button(action: shareActiveGeofencesJSON) {
                     Image(systemName: "location.circle")
                         .font(.system(size: 16, weight: .medium))
@@ -504,6 +511,29 @@ struct GoTripDetailsPanel: View {
             debugShareItem = DebugShareItem(url: url)
         } catch {
             AppToastCenter.shared.showSuccess(title: "Debug", message: "Failed to write journey JSON.")
+        }
+    }
+
+    /// Writes the raw POST /private/journey/go response this Go Mode session started with to a
+    /// temp .json file and shares it the same way. Only ever set when this session actually hit
+    /// /go (`HomeScreen.startGoMode`) — resuming an ongoing trip doesn't call it, so the button
+    /// stays disabled/greyed out for the lifetime of that session instead of showing stale data.
+    private func shareGoStartResultJSON() {
+        guard let goStartResult else { return }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(goStartResult) else {
+            AppToastCenter.shared.showSuccess(title: "Debug", message: "Failed to encode /go response JSON.")
+            return
+        }
+
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("journey-go-\(Int(Date().timeIntervalSince1970)).json")
+        do {
+            try data.write(to: url)
+            debugShareItem = DebugShareItem(url: url)
+        } catch {
+            AppToastCenter.shared.showSuccess(title: "Debug", message: "Failed to write /go response JSON.")
         }
     }
 

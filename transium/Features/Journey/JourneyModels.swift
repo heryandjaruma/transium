@@ -404,7 +404,7 @@ nonisolated struct StartJourneyResponse: Codable {
 
 /// Result of POST /private/journey/go: the created attempt, its ordered quest steps,
 /// and the geofences the client should register a CLCircularRegion for.
-public nonisolated struct JourneyGoResult: Sendable, Equatable {
+public nonisolated struct JourneyGoResult: Codable, Sendable, Equatable {
     public let journeyAttempt: JourneyAttempt
     public let steps: [JourneyAttemptStep]
     public let geofences: [JourneyGeofence]

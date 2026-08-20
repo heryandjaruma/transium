@@ -36,6 +36,9 @@ struct GoComponentMode: View {
     /// Only read from for the debug "active geofences" share button on GoTripDetailsPanel;
     /// defaults so preview/test call sites don't need one of their own.
     var geofenceMonitor: JourneyGeofenceMonitor = JourneyGeofenceMonitor()
+    /// The raw POST /private/journey/go response, when this session actually started that way
+    /// (nil if resumed instead). Only read from GoTripDetailsPanel's debug share button.
+    var goStartResult: JourneyGoResult? = nil
 
     var onBack: () -> Void = {}
     var onEnd: () -> Void = {}
@@ -175,7 +178,8 @@ struct GoComponentMode: View {
                 steps: steps,
                 currentLocation: currentLocation,
                 isExpanded: $isTripDetailsExpanded,
-                geofenceMonitor: geofenceMonitor
+                geofenceMonitor: geofenceMonitor,
+                goStartResult: goStartResult
             )
         }
         .padding(.bottom, 8)

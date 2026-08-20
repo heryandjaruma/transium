@@ -39,6 +39,10 @@ struct HomeScreen: View {
     @State private var isCancelingJourney = false
     @State private var journeyConflict: JourneyStartConflictError? = nil
     @State private var isJourneyConflictPresented = false
+    /// The raw POST /private/journey/go response, kept only when this Go Mode session actually
+    /// started that way — nil when it was entered via `resumeOngoingTrip()` instead, since that
+    /// path never hits /go. Backs GoTripDetailsPanel's debug "show /go response" button.
+    @State private var goStartDebugResult: JourneyGoResult? = nil
     
     // MARK: - Search & Profile State
     @State private var isSearchPresented = false
@@ -88,6 +92,7 @@ struct HomeScreen: View {
                     steps: goJourneySteps,
                     currentLocation: locationStore.currentLocation?.coordinate,
                     geofenceMonitor: geofenceMonitor,
+                    goStartResult: goStartDebugResult,
                     onBack: { endGoMode() },
                     onEnd: { endGoMode(cancelAttempt: true) },
                     onLocate: { mapCenterRequestID += 1 },
@@ -670,6 +675,7 @@ struct HomeScreen: View {
                     goGeofences = geofences
                     goCurrentSegmentIndex = 0
                     showOngoingTripCard = false
+                    goStartDebugResult = nil
 
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -716,6 +722,7 @@ struct HomeScreen: View {
                     goJourneySteps = result.steps
                     goGeofences = result.geofences
                     goCurrentSegmentIndex = 0
+                    goStartDebugResult = result
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         showGoMode = true
                         showNavigationSheet = false
@@ -803,6 +810,7 @@ struct HomeScreen: View {
             showNavigationSheet = true
             goCurrentSegmentIndex = 0
         }
+        goStartDebugResult = nil
 
         if cancelAttempt {
             cancelActiveJourneyAttempt()
