@@ -86,7 +86,7 @@ enum GoTravelMode {
     fileprivate var badgeCode: String? {
         switch self {
         case .walking: nil
-        case .bus(let providerCode): providerCode.split(separator: "-").first.map(String.init) ?? providerCode
+        case .bus(let providerCode): providerCode.truncatedAtDash
         }
     }
 }

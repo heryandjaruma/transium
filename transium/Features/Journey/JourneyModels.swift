@@ -6,6 +6,14 @@
 import Foundation
 import CoreLocation
 
+extension String {
+    /// "K5B-0" -> "K5B" — the suffix after a dash is an internal variant/direction marker,
+    /// not part of the line name shown to users. Used wherever a `routeRef` is displayed.
+    var truncatedAtDash: String {
+        split(separator: "-").first.map(String.init) ?? self
+    }
+}
+
 // MARK: - Journey Overview Response (/journey/overview)
 
 public nonisolated struct JourneyResponse: Codable, Equatable, Sendable {

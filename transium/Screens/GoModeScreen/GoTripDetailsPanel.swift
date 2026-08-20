@@ -158,7 +158,7 @@ struct GoTripDetailsPanel: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "bus.fill")
                                     .font(.system(size: 11))
-                                Text(step.routeRef ?? "Bus")
+                                Text((step.routeRef ?? "Bus").truncatedAtDash)
                                     .font(TransiumFont.body(11, weight: .bold))
                             }
                             .foregroundColor(.white)
