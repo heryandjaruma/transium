@@ -26,6 +26,9 @@ struct GoTripDetailsPanel: View {
     @Binding var isExpanded: Bool
 
     @State private var isStopsExpanded: [String: Bool] = [:]
+    #if DEBUG
+    @State private var debugShareItem: DebugShareItem?
+    #endif
 
     private static let doneBackground = Color(red: 0.86, green: 0.97, blue: 0.89)
     private static let doneAccent = Color(red: 0.06, green: 0.72, blue: 0.51)
@@ -68,6 +71,13 @@ struct GoTripDetailsPanel: View {
                     .font(TransiumFont.body(20, weight: .bold))
                     .foregroundStyle(TransiumColor.primaryBlue)
                 Spacer()
+                #if DEBUG
+                Button(action: shareJourneyDebugJSON) {
+                    Image(systemName: "ladybug")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                #endif
             }
             .padding(.horizontal, 20)
             .padding(.bottom, isExpanded ? 10 : 16)
@@ -121,6 +131,11 @@ struct GoTripDetailsPanel: View {
                 .frame(height: 120)
                 .offset(y: 120)
         }
+        #if DEBUG
+        .sheet(item: $debugShareItem) { item in
+            ActivityShareSheet(activityItems: [item.url])
+        }
+        #endif
     }
 
     private func toggle() {
@@ -461,6 +476,32 @@ struct GoTripDetailsPanel: View {
         .padding(.leading, 8)
     }
 
+    #if DEBUG
+    // MARK: - Debug
+
+    /// Writes the `JourneyResult` this panel was handed — i.e. the `best`/`lessWalking`/
+    /// `lessTransit` payload from GET /journey/real — to a temp .json file and hands it to the
+    /// system share sheet (AirDrop, Save to Files, Mail, etc.) so it can be pulled onto desktop.
+    /// A pasteboard copy was tried first but real journeys are big enough that pasting them
+    /// anywhere reliably choked, hence a file instead.
+    private func shareJourneyDebugJSON() {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(journey) else {
+            AppToastCenter.shared.showSuccess(title: "Debug", message: "Failed to encode journey JSON.")
+            return
+        }
+
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("journey-real-\(Int(Date().timeIntervalSince1970)).json")
+        do {
+            try data.write(to: url)
+            debugShareItem = DebugShareItem(url: url)
+        } catch {
+            AppToastCenter.shared.showSuccess(title: "Debug", message: "Failed to write journey JSON.")
+        }
+    }
+    #endif
+
     // MARK: - Finish Card
 
     private var finishCard: some View {
@@ -541,3 +582,20 @@ struct GoTripDetailsPanel: View {
         return formatter.string(from: arrivalDate)
     }
 }
+
+#if DEBUG
+private struct DebugShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct ActivityShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+#endif
