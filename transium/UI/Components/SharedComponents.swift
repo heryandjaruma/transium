@@ -267,7 +267,7 @@ struct RecommendedQuestCard: View {
     var body: some View {
         let accent = Color(red: 0.20, green: 0.42, blue: 0.95)
  
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 10) {
                 TransiumRecommendedSeal(style: .cardPill)
  
@@ -295,8 +295,15 @@ struct RecommendedQuestCard: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
  
-            // Right postage column
+            // Right postage column with wow glow background
             ZStack(alignment: .bottom) {
+                Image(TransiumAsset.Illustration.wow)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 140, height: 140)
+                    .offset(y: -14)
+                    .allowsHitTesting(false)
+
                 TransiumStampCard(
                     size: 96,
                     tilt: .degrees(0),
@@ -337,13 +344,13 @@ struct RecommendedQuestCard: View {
                     trailingIcon: "arrow.right",
                     height: 36,
                     fillWidth: false,
-                    font: TransiumFont.body(14, weight: .bold),
-                    iconHorizontalPadding: 8
+                    font: TransiumFont.body(13, weight: .bold),
+                    iconHorizontalPadding: 6
                 ) {
                     onStart?()
                 }
             }
-            .frame(width: 120)
+            .frame(width: 128)
         }
         .padding(18)
         .background(
@@ -365,7 +372,7 @@ struct RecommendedQuestCardSkeleton: View {
     var body: some View {
         let accent = Color(red: 0.20, green: 0.42, blue: 0.95)
 
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 10) {
                 // "RECOMMENDED" seal badge skeleton
                 TransiumSkeletonBlock(
@@ -416,6 +423,14 @@ struct RecommendedQuestCardSkeleton: View {
 
             // Right postage column skeleton
             ZStack(alignment: .bottom) {
+                Image(TransiumAsset.Illustration.wow)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 140, height: 140)
+                    .opacity(0.3)
+                    .offset(y: -14)
+                    .allowsHitTesting(false)
+
                 TransiumStampCard(
                     size: 96,
                     tilt: .degrees(0),
@@ -440,7 +455,7 @@ struct RecommendedQuestCardSkeleton: View {
                     shimmerHighlight: Color.white.opacity(0.65)
                 )
             }
-            .frame(width: 120)
+            .frame(width: 128)
         }
         .padding(18)
         .background(

@@ -15,7 +15,7 @@ enum TransiumAsset {
         static let payment = "Payment"
         static let sanur_beach = "sanur_beach"
         static let ubud_forest = "ubud_forest"
-    
+        static let wow = "Wow"
     }
     
     enum Logo {
