@@ -29,7 +29,6 @@ struct HomeScreen: View {
     @State private var goJourneySteps: [JourneyAttemptStep] = []
     @State private var goGeofences: [JourneyGeofence] = []
     @State private var goCurrentSegmentIndex = 0
-    @State private var isTripDetailsPresented = false
     @State private var isCancelingJourney = false
     @State private var journeyConflict: JourneyStartConflictError? = nil
     @State private var isJourneyConflictPresented = false
@@ -79,13 +78,10 @@ struct HomeScreen: View {
                 GoComponentMode(
                     journey: journey,
                     currentSegmentIndex: goCurrentSegmentIndex,
+                    steps: goJourneySteps,
                     onBack: { endGoMode() },
                     onEnd: { endGoMode(cancelAttempt: true) },
                     onLocate: { mapCenterRequestID += 1 },
-                    onTripDetails: {
-                        print("[GoMode] Trip Details tapped (isTripDetailsPresented was \(isTripDetailsPresented))")
-                        isTripDetailsPresented = true
-                    },
                     onAdvanceSegment: {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                             goCurrentSegmentIndex = min(goCurrentSegmentIndex + 1, journey.segments.count)
@@ -249,12 +245,6 @@ struct HomeScreen: View {
             await fetchKelurahanGroups()
         }
         .preferredColorScheme(.light)
-        .sheet(isPresented: $isTripDetailsPresented) {
-            if let journey = activeJourney {
-                TripDetailsSheet(journey: journey, onClose: { isTripDetailsPresented = false })
-                    .onAppear { print("[GoMode] TripDetailsSheet appeared with \(journey.segments.count) segment(s)") }
-            }
-        }
         .alert(
             "Journey Already in Progress",
             isPresented: $isJourneyConflictPresented,

@@ -8,6 +8,11 @@
 //  real JourneyResult a quest was started with. Has no background of its own — it's meant
 //  to be overlaid directly on top of HomeScreen's existing LocalBaliMapView, the same way
 //  the pre-Go "Navigation Mode" overlay works.
+//
+//  The bottom panel is a collapsed/expanded toggle, not a modal sheet: collapsed shows the
+//  current step as a floating card (no background, matching the map behind it); expanded
+//  shows GoTripDetailsPanel, a docked white sheet like NavigationBottomSheet's — so it never
+//  fully covers the map/top bar the way a system .sheet() would.
 
 import SwiftUI
 
@@ -20,17 +25,19 @@ struct GoComponentMode: View {
 
     let journey: JourneyResult
     let currentSegmentIndex: Int
+    var steps: [JourneyAttemptStep] = []
     var isMuted: Bool = false
 
     var onBack: () -> Void = {}
     var onEnd: () -> Void = {}
     var onLocate: () -> Void = {}
     var onToggleMute: () -> Void = {}
-    var onTripDetails: () -> Void = {}
     /// Tapped the current step's card — advances to the next leg of the trip.
     /// Only offered on walking legs; bus legs are display-only (their card already hosts
     /// the "Download App" action).
     var onAdvanceSegment: () -> Void = {}
+
+    @State private var isTripDetailsExpanded = false
 
     private var currentSegment: JourneySegment? {
         journey.segments.indices.contains(currentSegmentIndex) ? journey.segments[currentSegmentIndex] : nil
@@ -59,13 +66,21 @@ struct GoComponentMode: View {
 
     @ViewBuilder
     private var bottomPanel: some View {
-        if let segment = currentSegment {
+        if isTripDetailsExpanded {
+            GoTripDetailsPanel(
+                journey: journey,
+                currentSegmentIndex: currentSegmentIndex,
+                steps: steps,
+                onCollapse: collapseTripDetails
+            )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        } else if let segment = currentSegment {
             switch variant {
             case .walking:
                 GoBottomPanel(
                     livePill: nil,
                     card: AnyView(walkCard(segment)),
-                    onTripDetails: onTripDetails
+                    onTripDetails: expandTripDetails
                 )
 
             case .commute, .commuteOnGoing:
@@ -84,15 +99,27 @@ struct GoComponentMode: View {
                             onDownload: {}
                         )
                     ),
-                    onTripDetails: onTripDetails
+                    onTripDetails: expandTripDetails
                 )
             }
         } else {
             GoBottomPanel(
                 livePill: nil,
                 card: AnyView(arrivedCard),
-                onTripDetails: onTripDetails
+                onTripDetails: expandTripDetails
             )
+        }
+    }
+
+    private func expandTripDetails() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            isTripDetailsExpanded = true
+        }
+    }
+
+    private func collapseTripDetails() {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            isTripDetailsExpanded = false
         }
     }
 
