@@ -77,9 +77,9 @@ struct GoTripDetailsPanel: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 12)
 
-                leaveArriveBar
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 16)
+//                leaveArriveBar
+//                    .padding(.horizontal, 20)
+//                    .padding(.bottom, 16)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     timeline
@@ -404,7 +404,7 @@ struct GoTripDetailsPanel: View {
                             .foregroundColor(.white)
                     }
                 } else {
-                    Text(routeRef)
+                    Text(routeRef.truncatedAtDash)
                         .font(TransiumFont.body(12, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 10)
