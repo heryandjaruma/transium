@@ -16,9 +16,23 @@ struct HomeScreen: View {
     
     // MARK: - Journey State
     @State private var activeJourney: JourneyResult? = nil
+    @State private var activeQuestId: String? = nil
     @State private var isFetchingJourney = false
     @State private var showNavigationSheet = false
     private let journeyService = JourneyService.shared
+
+    // MARK: - Go Mode State
+    @StateObject private var geofenceMonitor = JourneyGeofenceMonitor()
+    @State private var isStartingGoMode = false
+    @State private var showGoMode = false
+    @State private var goJourneyAttempt: JourneyAttempt? = nil
+    @State private var goJourneySteps: [JourneyAttemptStep] = []
+    @State private var goGeofences: [JourneyGeofence] = []
+    @State private var goCurrentSegmentIndex = 0
+    @State private var isTripDetailsPresented = false
+    @State private var isCancelingJourney = false
+    @State private var journeyConflict: JourneyStartConflictError? = nil
+    @State private var isJourneyConflictPresented = false
     
     // MARK: - Search & Profile State
     @State private var isSearchPresented = false
@@ -60,7 +74,23 @@ struct HomeScreen: View {
                     }
             }
             
-            if let journey = activeJourney, showNavigationSheet {
+            if let journey = activeJourney, showGoMode {
+                // MARK: - Go Mode (real journey in progress)
+                GoComponentMode(
+                    journey: journey,
+                    currentSegmentIndex: goCurrentSegmentIndex,
+                    onBack: { endGoMode() },
+                    onEnd: { endGoMode(cancelAttempt: true) },
+                    onLocate: { mapCenterRequestID += 1 },
+                    onTripDetails: { isTripDetailsPresented = true },
+                    onAdvanceSegment: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            goCurrentSegmentIndex = min(goCurrentSegmentIndex + 1, journey.segments.count)
+                        }
+                    }
+                )
+                .transition(.opacity)
+            } else if let journey = activeJourney, showNavigationSheet {
                 // MARK: - Navigation Mode
                 VStack {
                     // Top Bar (Back, Bookmark, Share, Locate, Profile)
@@ -77,8 +107,22 @@ struct HomeScreen: View {
                         }
                         
                         Spacer()
-                        
+
                         HStack(spacing: 12) {
+                            if goJourneyAttempt != nil {
+                                TransiumIconButton(
+                                    systemName: "xmark",
+                                    accessibilityLabel: "Cancel journey",
+                                    backgroundColor: TransiumColor.lightRed,
+                                    foregroundColor: .white,
+                                    size: 44
+                                ) {
+                                    cancelActiveJourneyAttempt()
+                                }
+                                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                                .disabled(isCancelingJourney)
+                            }
+
                             TransiumIconButton(
                                 systemName: "bookmark",
                                 accessibilityLabel: "Save route",
@@ -87,7 +131,7 @@ struct HomeScreen: View {
                                 AppToastCenter.shared.showSuccess(title: "Saved", message: "Route bookmarked.")
                             }
                             .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                            
+
                             TransiumIconButton(
                                 systemName: "square.and.arrow.up",
                                 accessibilityLabel: "Share route",
@@ -117,12 +161,7 @@ struct HomeScreen: View {
                 VStack(spacing: 0) {
                     HStack {
                         Spacer()
-                        Button(action: {
-                            AppToastCenter.shared.showSuccess(
-                                title: "Quest Started!",
-                                message: "Follow the route to reach your destination."
-                            )
-                        }) {
+                        Button(action: { startGoMode() }) {
                             HStack(spacing: 8) {
                                 Text("Go")
                                     .font(TransiumFont.body(17, weight: .bold))
@@ -136,6 +175,7 @@ struct HomeScreen: View {
                             .cornerRadius(28)
                             .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                         }
+                        .disabled(isStartingGoMode)
                         .padding(.trailing, 20)
                         .padding(.bottom, 16)
                     }
@@ -194,12 +234,38 @@ struct HomeScreen: View {
                 .transition(.move(edge: .trailing))
                 .zIndex(100)
             }
+
+            if isStartingGoMode {
+                LoadingScreen()
+                    .transition(.opacity)
+                    .zIndex(300)
+            }
         }
         .task {
             locationStore.requestCurrentLocation()
             await fetchKelurahanGroups()
         }
         .preferredColorScheme(.light)
+        .sheet(isPresented: $isTripDetailsPresented) {
+            if let journey = activeJourney {
+                TripDetailsSheet(journey: journey, onClose: { isTripDetailsPresented = false })
+            }
+        }
+        .alert(
+            "Journey Already in Progress",
+            isPresented: $isJourneyConflictPresented,
+            presenting: journeyConflict
+        ) { conflict in
+            if canResumeLocally(conflict) {
+                Button("Resume Journey") { resumeCachedGoMode() }
+            }
+            Button("Cancel That Journey & Start This One", role: .destructive) {
+                cancelConflictingAttemptAndRetry(conflict)
+            }
+            Button("Not Now", role: .cancel) { journeyConflict = nil }
+        } message: { conflict in
+            Text(conflict.message)
+        }
         .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
             SearchSheetView(
                 state: $sheetState,
@@ -499,6 +565,7 @@ struct HomeScreen: View {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                         activeJourney = resolvedJourney
+                        activeQuestId = targetQuestId
                         showNavigationSheet = true
                         isFetchingJourney = false
                     }
@@ -517,7 +584,179 @@ struct HomeScreen: View {
             }
         }
     }
-    
+
+    // MARK: - Go Mode
+
+    private func startGoMode() {
+        guard !isStartingGoMode, let questId = activeQuestId else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            isStartingGoMode = true
+        }
+
+        Task {
+            do {
+                let result = try await journeyService.startJourney(questId: questId)
+
+                geofenceMonitor.onRegionEntered = { stepId in
+                    handleGeofenceEntered(stepId: stepId, attemptId: result.journeyAttempt.id)
+                }
+                geofenceMonitor.startMonitoring(geofences: result.geofences)
+
+                await MainActor.run {
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    goJourneyAttempt = result.journeyAttempt
+                    goJourneySteps = result.steps
+                    goGeofences = result.geofences
+                    goCurrentSegmentIndex = 0
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        showGoMode = true
+                        showNavigationSheet = false
+                        isStartingGoMode = false
+                    }
+                }
+            } catch let conflict as JourneyStartConflictError {
+                await MainActor.run {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        isStartingGoMode = false
+                    }
+                    journeyConflict = conflict
+                    isJourneyConflictPresented = true
+                }
+            } catch {
+                await MainActor.run {
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        isStartingGoMode = false
+                    }
+                    AppToastCenter.shared.showError(
+                        title: "Couldn't Start Journey",
+                        message: (error as? TransiumAPIError)?.errorDescription ?? "Please try again."
+                    )
+                }
+            }
+        }
+    }
+
+    /// True when the conflicting attempt is the one this screen already has cached
+    /// (steps + geofences), so "Resume Journey" can re-enter Go Mode without a network call.
+    private func canResumeLocally(_ conflict: JourneyStartConflictError) -> Bool {
+        activeJourney != nil && goJourneyAttempt?.id == conflict.activeJourneyAttemptId
+    }
+
+    private func resumeCachedGoMode() {
+        guard let attempt = goJourneyAttempt else { return }
+        journeyConflict = nil
+
+        geofenceMonitor.onRegionEntered = { [attemptId = attempt.id] stepId in
+            handleGeofenceEntered(stepId: stepId, attemptId: attemptId)
+        }
+        geofenceMonitor.startMonitoring(geofences: goGeofences)
+
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            showGoMode = true
+            showNavigationSheet = false
+        }
+    }
+
+    private func cancelConflictingAttemptAndRetry(_ conflict: JourneyStartConflictError) {
+        journeyConflict = nil
+        guard let attemptId = conflict.activeJourneyAttemptId else { return }
+
+        Task {
+            do {
+                _ = try await journeyService.cancelJourney(attemptId: attemptId)
+                await MainActor.run {
+                    if goJourneyAttempt?.id == attemptId {
+                        goJourneyAttempt = nil
+                        goJourneySteps = []
+                        goGeofences = []
+                    }
+                }
+                startGoMode()
+            } catch {
+                await MainActor.run {
+                    AppToastCenter.shared.showError(
+                        title: "Couldn't Cancel",
+                        message: (error as? TransiumAPIError)?.errorDescription ?? "Please try again."
+                    )
+                }
+            }
+        }
+    }
+
+    /// Leaves the live Go Mode UI, returning to the Navigation Mode overview of the same
+    /// journey (the attempt keeps running server-side unless `cancelAttempt` is set).
+    private func endGoMode(cancelAttempt: Bool = false) {
+        geofenceMonitor.stopMonitoring()
+        geofenceMonitor.onRegionEntered = nil
+
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            showGoMode = false
+            showNavigationSheet = true
+            goCurrentSegmentIndex = 0
+        }
+
+        if cancelAttempt {
+            cancelActiveJourneyAttempt()
+        }
+    }
+
+    /// Cancels the caller's in-progress journey attempt, if any — reachable from Go Mode's
+    /// "End" button and from the cancel button in the Navigation Mode bar (e.g. after backing
+    /// out of Go Mode without ending the attempt).
+    private func cancelActiveJourneyAttempt() {
+        guard let attempt = goJourneyAttempt, !isCancelingJourney else { return }
+        isCancelingJourney = true
+
+        Task {
+            do {
+                _ = try await journeyService.cancelJourney(attemptId: attempt.id)
+                await MainActor.run {
+                    goJourneyAttempt = nil
+                    goJourneySteps = []
+                    goGeofences = []
+                    isCancelingJourney = false
+                    AppToastCenter.shared.showSuccess(
+                        title: "Journey Canceled",
+                        message: "You can start a new quest anytime."
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    isCancelingJourney = false
+                    AppToastCenter.shared.showError(
+                        title: "Couldn't Cancel",
+                        message: (error as? TransiumAPIError)?.errorDescription ?? "Please try again."
+                    )
+                }
+            }
+        }
+    }
+
+    private func handleGeofenceEntered(stepId: String, attemptId: String) {
+        guard let coordinate = locationStore.currentLocation?.coordinate ?? resolvedCurrentLocation?.coordinate else { return }
+
+        Task {
+            guard let result = try? await journeyService.advanceJourney(
+                attemptId: attemptId,
+                stepId: stepId,
+                lat: coordinate.latitude,
+                lng: coordinate.longitude
+            ) else { return }
+
+            await MainActor.run {
+                goJourneyAttempt = result.journeyAttempt
+                goJourneySteps = result.steps
+                if result.journeyAttempt.status == "completed" {
+                    AppToastCenter.shared.showSuccess(
+                        title: "Quest Complete!",
+                        message: "You've finished every step of this journey."
+                    )
+                }
+            }
+        }
+    }
+
     private var ticketRail: some View {
         ScrollView(.horizontal) {
             HStack(alignment: .bottom, spacing: 14) {

@@ -4,9 +4,10 @@
 //
 //  Created by Abigail Metanoia Melody on 20/08/26.
 //
-//  Screen that assembles the reusable pieces from GoComponents.swift.
-//  Swap `Color(.systemGray5)` for the real `LocalBaliMapView` when wiring
-//  this into HomeScreen's navigation mode.
+//  Screen that assembles the reusable pieces from GoComponentOnly.swift, driven by the
+//  real JourneyResult a quest was started with. Has no background of its own — it's meant
+//  to be overlaid directly on top of HomeScreen's existing LocalBaliMapView, the same way
+//  the pre-Go "Navigation Mode" overlay works.
 
 import SwiftUI
 
@@ -17,101 +18,161 @@ struct GoComponentMode: View {
         case commuteOnGoing
     }
 
-    var variant: Variant = .walking
+    let journey: JourneyResult
+    let currentSegmentIndex: Int
     var isMuted: Bool = false
 
+    var onBack: () -> Void = {}
+    var onEnd: () -> Void = {}
+    var onLocate: () -> Void = {}
+    var onToggleMute: () -> Void = {}
+    var onTripDetails: () -> Void = {}
+    /// Tapped the current step's card — advances to the next leg of the trip.
+    /// Only offered on walking legs; bus legs are display-only (their card already hosts
+    /// the "Download App" action).
+    var onAdvanceSegment: () -> Void = {}
+
+    private var currentSegment: JourneySegment? {
+        journey.segments.indices.contains(currentSegmentIndex) ? journey.segments[currentSegmentIndex] : nil
+    }
+
+    private var variant: Variant {
+        currentSegment?.type == "bus" ? .commute : .walking
+    }
+
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(.systemGray5)
-                .ignoresSafeArea()
+        VStack {
+            GoTopBar(
+                onBack: onBack,
+                onEnd: onEnd,
+                onLocate: onLocate,
+                isMuted: isMuted,
+                onToggleMute: onToggleMute
+            )
+            .padding(.top, 6)
 
-            VStack {
-                GoTopBar(
-                    onBack: {},
-                    onEnd: {},
-                    onLocate: {},
-                    isMuted: isMuted,
-                    onToggleMute: {}
-                )
-                .padding(.top, 6)
+            Spacer()
 
-                Spacer()
-
-                bottomPanel
-            }
+            bottomPanel
         }
     }
 
     @ViewBuilder
     private var bottomPanel: some View {
-        switch variant {
-        case .walking:
-            // Cuma 1 metrik: "5 min"
+        if let segment = currentSegment {
+            switch variant {
+            case .walking:
+                GoBottomPanel(
+                    livePill: nil,
+                    card: AnyView(walkCard(segment)),
+                    onTripDetails: onTripDetails
+                )
+
+            case .commute, .commuteOnGoing:
+                GoBottomPanel(
+                    livePill: (
+                        title: "Check Bus Live Location",
+                        subtitle: "Open \(segment.routeName ?? "Transit App")",
+                        action: {}
+                    ),
+                    card: AnyView(
+                        GoBusAppCard(
+                            providerCode: segment.routeRef ?? "BUS",
+                            promptText: "Check bus live location on",
+                            appName: segment.routeName ?? "Transit App",
+                            downloadLabel: "Download App",
+                            onDownload: {}
+                        )
+                    ),
+                    onTripDetails: onTripDetails
+                )
+            }
+        } else {
             GoBottomPanel(
                 livePill: nil,
-                card: AnyView(
-                    GoStepCard(
-                        mode: .walking,
-                        verb: "Walk to",
-                        destination: "Sanur Beach",
-                        metrics: [.init("15", "min"), .init("1.2", "kilometer")]
-                    )
-                ),
-                onTripDetails: {}
-            )
-
-        case .commute:
-            GoBottomPanel(
-                livePill: (
-                    title: "Check Bus Live Location",
-                    subtitle: "Open Trans Metro Dewata",
-                    action: {}
-                ),
-                card: AnyView(
-                    GoBusAppCard(
-                        providerCode: "KIB",
-                        promptText: "Check bus live location on",
-                        appName: "Trans Metro Dewata App",
-                        downloadLabel: "Download TMD App",
-                        onDownload: {}
-                    )
-                ),
-                onTripDetails: {}
-            )
-
-        case .commuteOnGoing:
-            // 2 metrik sekaligus: "15 min · 1.2 kilometer"
-            GoBottomPanel(
-                livePill: (
-                    title: "Check Bus Live Location",
-                    subtitle: "Open Trans Metro Dewata",
-                    action: {}
-                ),
-                card: AnyView(
-                    GoStepCard(
-                        mode: .bus(providerCode: "KIB"),
-                        verb: "Ride to",
-                        destination: "Jimbaran Side Walk",
-                        metrics: [
-                            .init("15", "min"),
-                            .init("1.2", "kilometer")
-                        ]
-                    )
-                ),
-                onTripDetails: {}
+                card: AnyView(arrivedCard),
+                onTripDetails: onTripDetails
             )
         }
+    }
+
+    private func walkCard(_ segment: JourneySegment) -> some View {
+        Button(action: onAdvanceSegment) {
+            GoStepCard(
+                mode: .walking,
+                verb: "Walk to",
+                destination: segment.to.name,
+                metrics: metrics(for: segment)
+            )
+        }
+        .buttonStyle(.transiumNoOpacity)
+    }
+
+    private var arrivedCard: some View {
+        GoStepCard(
+            mode: .walking,
+            verb: "You've arrived at",
+            destination: journey.segments.last?.to.name ?? "your destination",
+            metricValue: "0",
+            metricUnit: "min"
+        )
+    }
+
+    private func metrics(for segment: JourneySegment) -> [GoStepCard.Metric] {
+        var result: [GoStepCard.Metric] = []
+        if let duration = segment.durationSeconds {
+            result.append(.init("\(Int(round(duration / 60)))", "min"))
+        }
+        if let distance = segment.distanceMeters {
+            result.append(.init(String(format: "%.1f", distance / 1000), "kilometer"))
+        }
+        return result.isEmpty ? [.init("--", "min")] : result
     }
 }
 
 #Preview("Walking") {
-    GoComponentMode(variant: .walking)
+    ZStack {
+        Color(.systemGray5).ignoresSafeArea()
+        GoComponentMode(journey: .previewMock, currentSegmentIndex: 0)
+    }
 }
 
 #Preview("Commute") {
-    GoComponentMode(variant: .commute)
+    ZStack {
+        Color(.systemGray5).ignoresSafeArea()
+        GoComponentMode(journey: .previewMock, currentSegmentIndex: 1)
+    }
 }
 
-#Preview("Commute On Going") {
-    GoComponentMode(variant: .commuteOnGoing)
+#Preview("Arrived") {
+    ZStack {
+        Color(.systemGray5).ignoresSafeArea()
+        GoComponentMode(journey: .previewMock, currentSegmentIndex: 2)
+    }
+}
+
+private extension JourneyResult {
+    static var previewMock: JourneyResult {
+        let origin = JourneyLocationRef(lat: -8.702105, lng: 115.176189, name: "Current Location", stopId: nil)
+        let stop = JourneyLocationRef(lat: -8.6975, lng: 115.1800, name: "Sanur Beach Stop", stopId: "stop-1")
+        let destination = JourneyLocationRef(lat: -8.67368, lng: 115.26337, name: "Jimbaran Side Walk", stopId: nil)
+
+        return JourneyResult(
+            origin: LatLng(lat: origin.lat, lng: origin.lng),
+            destination: LatLng(lat: destination.lat, lng: destination.lng),
+            summary: JourneyOverviewSummary(
+                distanceMeters: 5200,
+                walkingDistanceMeters: 1200,
+                walkingDurationSeconds: 900,
+                transitDistanceMeters: 4000,
+                busLegCount: 1,
+                transferCount: 0
+            ),
+            segments: [
+                JourneySegment(type: "walk", from: origin, to: stop, distanceMeters: 1200, durationSeconds: 900),
+                JourneySegment(type: "bus", from: stop, to: destination, distanceMeters: 4000, durationSeconds: 900, routeId: "kib-1", routeRef: "KIB", routeName: "Trans Metro Dewata")
+            ],
+            steps: []
+        )
+    }
 }

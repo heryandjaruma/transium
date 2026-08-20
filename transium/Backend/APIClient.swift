@@ -196,7 +196,7 @@ public final class APIClient: APIClientProtocol, @unchecked Sendable {
         case 404:
             throw TransiumAPIError.notFound(serverMessage ?? "Resource not found")
         case 409:
-            throw TransiumAPIError.conflict(serverMessage ?? "Conflict")
+            throw TransiumAPIError.conflict(serverMessage ?? "Conflict", data)
         case 422:
             throw TransiumAPIError.unprocessableEntity(serverMessage ?? "Unprocessable entity")
         case 503:

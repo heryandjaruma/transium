@@ -355,16 +355,3 @@ struct GoBottomPanel: View {
         .padding(.bottom, 8)
     }
 }
-
-
-#Preview("Walking") {
-    GoComponentMode(variant: .walking)
-}
-
-#Preview("Commute") {
-    GoComponentMode(variant: .commute)
-}
-
-#Preview("Commute On Going") {
-    GoComponentMode(variant: .commuteOnGoing)
-}

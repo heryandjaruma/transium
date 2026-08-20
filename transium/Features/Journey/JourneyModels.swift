@@ -258,6 +258,7 @@ public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, E
     public let type: String
     public let lat: Double?
     public let lng: Double?
+    public let radiusMeters: Double?
     public let status: JourneyAttemptStepStatus
 
     public init(
@@ -269,6 +270,7 @@ public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, E
         type: String,
         lat: Double? = nil,
         lng: Double? = nil,
+        radiusMeters: Double? = nil,
         status: JourneyAttemptStepStatus = .waiting
     ) {
         self.id = id
@@ -279,7 +281,30 @@ public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, E
         self.type = type
         self.lat = lat
         self.lng = lng
+        self.radiusMeters = radiusMeters
         self.status = status
+    }
+}
+
+/// A location the client should register a `CLCircularRegion` (or equivalent) for.
+/// `radiusMeters` matches the owning step's tolerance, and is what POST .../advance checks against.
+public nonisolated struct JourneyGeofence: Codable, Sendable, Equatable {
+    public let stepId: String
+    public let sequence: Int
+    public let lat: Double
+    public let lng: Double
+    public let radiusMeters: Double
+
+    public init(stepId: String, sequence: Int, lat: Double, lng: Double, radiusMeters: Double) {
+        self.stepId = stepId
+        self.sequence = sequence
+        self.lat = lat
+        self.lng = lng
+        self.radiusMeters = radiusMeters
+    }
+
+    public var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: lat, longitude: lng)
     }
 }
 
@@ -323,6 +348,74 @@ public nonisolated struct StartJourneyRequest: Codable, Sendable {
 
 nonisolated struct StartJourneyResponse: Codable {
     let journeyAttempt: JourneyAttempt
+    let steps: [JourneyAttemptStep]
+    let geofences: [JourneyGeofence]
+}
+
+/// Result of POST /private/journey/go: the created attempt, its ordered quest steps,
+/// and the geofences the client should register a CLCircularRegion for.
+public nonisolated struct JourneyGoResult: Sendable, Equatable {
+    public let journeyAttempt: JourneyAttempt
+    public let steps: [JourneyAttemptStep]
+    public let geofences: [JourneyGeofence]
+
+    public init(journeyAttempt: JourneyAttempt, steps: [JourneyAttemptStep], geofences: [JourneyGeofence]) {
+        self.journeyAttempt = journeyAttempt
+        self.steps = steps
+        self.geofences = geofences
+    }
+}
+
+public nonisolated struct AdvanceJourneyRequest: Codable, Sendable {
+    public let stepId: String
+    public let lat: Double
+    public let lng: Double
+
+    public init(stepId: String, lat: Double, lng: Double) {
+        self.stepId = stepId
+        self.lat = lat
+        self.lng = lng
+    }
+}
+
+nonisolated struct AdvanceJourneyResponse: Codable {
+    let journeyAttempt: JourneyAttempt
+    let steps: [JourneyAttemptStep]
+}
+
+/// Result of POST /private/journey/{id}/advance: the (possibly unchanged) attempt and its steps.
+public nonisolated struct JourneyAdvanceResult: Sendable, Equatable {
+    public let journeyAttempt: JourneyAttempt
+    public let steps: [JourneyAttemptStep]
+
+    public init(journeyAttempt: JourneyAttempt, steps: [JourneyAttemptStep]) {
+        self.journeyAttempt = journeyAttempt
+        self.steps = steps
+    }
+}
+
+nonisolated struct CancelJourneyResponse: Codable {
+    let journeyAttempt: JourneyAttempt
+}
+
+/// The 409 body POST /private/journey/go returns when the caller already has a
+/// `status: "started"` attempt — for this quest or another one.
+nonisolated struct JourneyConflictInfo: Codable {
+    let error: String
+    let activeJourneyAttemptId: String?
+}
+
+/// Thrown by `JourneyService.startJourney` in place of the generic `TransiumAPIError.conflict`
+/// when the 409 body could be parsed, so callers can offer to resume or cancel the
+/// existing attempt instead of just showing an error.
+public nonisolated struct JourneyStartConflictError: Error, Sendable, Equatable {
+    public let message: String
+    public let activeJourneyAttemptId: String?
+
+    public init(message: String, activeJourneyAttemptId: String?) {
+        self.message = message
+        self.activeJourneyAttemptId = activeJourneyAttemptId
+    }
 }
 
 nonisolated struct JourneyAttemptListResponse: Codable {
