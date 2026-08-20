@@ -86,6 +86,128 @@ struct TransiumPrimaryButton: View {
     }
 }
 
+enum TransiumSecondaryButtonIconPosition {
+    case leading
+    case trailing
+}
+
+/// Tombol sekunder — capsule flat (tanpa glossy highlight & shadow solid seperti Primary),
+/// warna font & background bisa diatur bebas, ikon opsional (SF Symbol).
+struct TransiumSecondaryButton: View {
+    let title: String
+    let backgroundColor: Color
+    let foregroundColor: Color
+    let icon: String?
+    let iconPosition: TransiumSecondaryButtonIconPosition
+    let height: CGFloat
+    let fillWidth: Bool
+    let font: Font
+    let borderColor: Color?
+    let action: () -> Void
+
+    init(
+        title: String,
+        backgroundColor: Color = .white,
+        foregroundColor: Color = .black,
+        icon: String? = nil,
+        iconPosition: TransiumSecondaryButtonIconPosition = .leading,
+        height: CGFloat = 58,
+        fillWidth: Bool = true,
+        font: Font = TransiumFont.body(16, weight: .semibold),
+        borderColor: Color? = nil,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.backgroundColor = backgroundColor
+        self.foregroundColor = foregroundColor
+        self.icon = icon
+        self.iconPosition = iconPosition
+        self.height = height
+        self.fillWidth = fillWidth
+        self.font = font
+        self.borderColor = borderColor
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                if let icon, iconPosition == .leading {
+                    iconView(icon)
+                }
+
+                Text(title)
+                    .font(font)
+                    .foregroundStyle(foregroundColor)
+
+                if let icon, iconPosition == .trailing {
+                    iconView(icon)
+                }
+            }
+            .padding(.horizontal, height * 0.45)
+            .frame(maxWidth: fillWidth ? .infinity : nil)
+            .frame(height: height)
+            .background(backgroundColor)
+            .clipShape(.capsule)
+            .overlay {
+                if let borderColor {
+                    Capsule()
+                        .strokeBorder(borderColor, lineWidth: 1.5)
+                }
+            }
+        }
+        .buttonStyle(.transiumNoOpacity)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private func iconView(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: height * 0.32, weight: .semibold))
+            .foregroundStyle(foregroundColor)
+    }
+}
+
+#Preview {
+    ZStack {
+        TransiumColor.primaryBlue
+            .ignoresSafeArea()
+
+        VStack(spacing: 16) {
+            // Tanpa icon
+            TransiumSecondaryButton(title: "Skip") {}
+
+            // Dengan icon di kiri
+            TransiumSecondaryButton(
+                title: "Share your experience",
+                icon: "square.and.arrow.up"
+            ) {}
+
+            // Dengan icon di kanan
+            TransiumSecondaryButton(
+                title: "Go to the Next Trip!",
+                icon: "arrow.right",
+                iconPosition: .trailing
+            ) {}
+
+            // Warna custom + border
+            TransiumSecondaryButton(
+                title: "Cancel",
+                backgroundColor: .black,
+                foregroundColor: .white,
+            ) {}
+
+            // Warna gelap
+            TransiumSecondaryButton(
+                title: "Learn More",
+                backgroundColor: .black.opacity(0.15),
+                foregroundColor: .white,
+                icon: "info.circle"
+            ) {}
+        }
+        .padding()
+    }
+}
+
 /// Sumber gambar icon untuk `TransiumIconButton` — SF Symbol atau custom asset image.
 enum TransiumIconSource {
     case system(String)
@@ -183,14 +305,6 @@ struct TransiumIconButton: View {
     var buttonSurface: some View {
         Circle()
             .fill(backgroundColor)
-            .overlay(alignment: .top) {
-                Circle()
-                    .fill(.white.opacity(0.18))
-                    .frame(height: max(size * 0.3, 8))
-                    .padding(.horizontal, size * 0.18)
-                    .padding(.top, size * 0.06)
-                    .mask(Circle())
-            }
     }
 
     @ViewBuilder
@@ -291,6 +405,50 @@ extension ButtonStyle where Self == TransiumNoOpacityButtonStyle {
         .padding()
     }
 }
+
+
+private let strokeWidth: CGFloat = 1.5
+private var strokeOffsets: [CGSize] {
+    let d = strokeWidth
+    return [
+        CGSize(width: -d, height: -d), CGSize(width: 0, height: -d), CGSize(width: d, height: -d),
+        CGSize(width: -d, height: 0),                                 CGSize(width: d, height: 0),
+        CGSize(width: -d, height: d),  CGSize(width: 0, height: d),  CGSize(width: d, height: d)
+    ]
+}
+
+struct OutlinedText: View {
+    let text: String
+    let font: Font
+    let fillColor: Color
+    let strokeColor: Color
+    var strokeWidth: CGFloat = 1.5
+
+    var body: some View {
+        ZStack {
+            ForEach(offsets, id: \.self) { offset in
+                Text(text)
+                    .font(font)
+                    .foregroundStyle(strokeColor)
+                    .offset(x: offset.width, y: offset.height)
+            }
+
+            Text(text)
+                .font(font)
+                .foregroundStyle(fillColor)
+        }
+    }
+
+    private var offsets: [CGSize] {
+        let d = strokeWidth
+        return [
+            CGSize(width: -d, height: -d), CGSize(width: 0, height: -d), CGSize(width: d, height: -d),
+            CGSize(width: -d, height: 0),                                 CGSize(width: d, height: 0),
+            CGSize(width: -d, height: d),  CGSize(width: 0, height: d),  CGSize(width: d, height: d)
+        ]
+    }
+}
+
 
 extension Color {
     var transiumDarkerShadow: Color {

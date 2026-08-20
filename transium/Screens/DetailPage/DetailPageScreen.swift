@@ -69,17 +69,8 @@ struct DetailPlaceScreen: View {
             }
         }
         
-        /// Solid pastel background (accent blended 10% into white).
-        /// Deliberately NOT `accent.opacity(0.10)` — a true-alpha color lets
-        /// whatever sits behind it (map, images, other cards) show through.
-        /// Blending into an opaque color keeps the same pastel look everywhere
-        /// this theme is used, regardless of what's underneath.
         var background: Color {
-            switch self {
-            case .blue: return Color(red: 0.92, green: 0.942, blue: 0.995)
-            case .red: return Color(red: 0.992, green: 0.942, blue: 0.938)
-            case .green: return Color(red: 0.93, green: 0.968, blue: 0.942)
-            }
+            accent.opacity(0.10)
         }
     }
     
@@ -149,7 +140,6 @@ struct DetailPlaceScreen: View {
     }
     
     // MARK: - Image Carousel
-    
     private var imageCarousel: some View {
         ZStack(alignment: .bottom) {
             if isLoadingQuests && headerImageUrls.isEmpty {
