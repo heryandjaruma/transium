@@ -1,7 +1,11 @@
 {
   "images" : [
     {
+<<<<<<<< HEAD:transium/Assets.xcassets/Illustrations/Onboarding/onboard3photo3.imageset/Contents.json
       "filename" : "badges3.png",
+========
+      "filename" : "drag.png",
+>>>>>>>> origin/noia_punya:transium/Assets.xcassets/Symbol/drag.imageset/Contents.json
       "idiom" : "universal",
       "scale" : "1x"
     },

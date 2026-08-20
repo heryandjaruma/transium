@@ -349,19 +349,92 @@ struct RecommendedQuestCard: View {
     }
 }
 
-#Preview {
+// MARK: - Previews
+
+#Preview("QuestRow & RecommendedQuestCard") {
     ZStack {
         Color(.systemGray6).ignoresSafeArea()
-        RecommendedQuestCard()
-            .padding(20)
+
+        VStack(spacing: 16) {
+            RecommendedQuestCard()
+
+            QuestRow(
+                quest: DetailPlaceScreen.Quest(
+                    id: "preview-sanoored",
+                    imageName: "sanoored",
+                    title: "Sanoored",
+                    description: "Enjoy the vibe along the shore of Sanur",
+                    points: 10,
+                    theme: .blue
+                )
+            )
+
+            QuestRow(
+                quest: DetailPlaceScreen.Quest(
+                    id: "preview-gela-tour",
+                    imageName: "traveling",
+                    title: "Gela-tour",
+                    description: "Gelato + Sanur weather = perfect summer",
+                    points: 10,
+                    theme: .red
+                )
+            )
+
+            QuestRow(
+                quest: DetailPlaceScreen.Quest(
+                    id: "preview-little-stalls",
+                    imageName: "gwk",
+                    title: "Little Stalls",
+                    description: "Go local by enjoying snacks from small businesses",
+                    points: 10,
+                    theme: .green
+                )
+            )
+        }
+        .padding(20)
     }
 }
 
-#Preview {
-    PaymentMethod()
+#Preview("PaymentMethodRow") {
+    ZStack {
+        TransiumColor.darkBlue.ignoresSafeArea()
+
+        VStack(spacing: 12) {
+            PaymentMethodRow(
+                icon: "creditcard.fill",
+                title: "Visa •••• 4242",
+                subtitle: "Default payment method"
+            )
+
+            PaymentMethodRow(
+                iconImage: "gopay-logo",
+                title: "GoPay",
+                subtitle: "Balance: Rp. 120.000"
+            )
+        }
+        .padding(20)
+    }
 }
 
-#Preview {
-    Permission()
-}
+#Preview("PermissionRow") {
+    ZStack {
+        Color(.systemGray6).ignoresSafeArea()
 
+        VStack(spacing: 12) {
+            PermissionRow(
+                icon: "bell.fill",
+                title: "Promotional Notifications",
+                subtitle: "Get trip updates, reminders, and important alerts.",
+                isOn: .constant(true)
+            )
+
+            PermissionRow(
+                icon: "heart.fill",
+                title: "Health & Fitness",
+                subtitle: "Track your steps and activity during your journey.",
+                isOn: .constant(false)
+            )
+        }
+        .padding(20)
+    }
+}

@@ -24,13 +24,16 @@ struct HomeScreen: View {
     @State private var isSearchPresented = false
     @State private var isProfilePresented = false
     @State private var isDetailPresented = false
+    @State private var isSettingsPresented = false
+    @State private var isSavedQuestPresented = false
+    @State private var isMenuExpanded = false
     @State private var sheetState: SearchSheetState = .searching
     @State private var sheetDetent: PresentationDetent = .large
     @State private var searchText = ""
     
     // MARK: - Kelurahan Quests State
     @State private var kelurahanGroups: [KelurahanQuestsGroup] = []
-    @State private var selectedKelurahan: Kelurahan = Kelurahan(id: "20447626", kelurahanName: "Ubud", kecamatanName: "Ubud")
+    @State private var selectedKelurahan: Kelurahan = Kelurahan(id: "7760985", kelurahanName: "Benoa", kecamatanName: "Kuta Selatan")
     
     init(previewLocation: CLLocation? = nil) {
         self.previewLocation = previewLocation
@@ -46,24 +49,31 @@ struct HomeScreen: View {
             )
             .ignoresSafeArea()
             
+            if isMenuExpanded {
+                Color.clear
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isMenuExpanded = false
+                        }
+                    }
+            }
+            
             if let journey = activeJourney, showNavigationSheet {
                 // MARK: - Navigation Mode
                 VStack {
-                    // Top Bar (Back, Bookmark, Share, Locate)
+                    // Top Bar (Back, Bookmark, Share, Locate, Profile)
                     HStack {
-                        Button(action: {
+                        TransiumIconButton(
+                            systemName: "arrow.left",
+                            accessibilityLabel: "Back",
+                            size: 44
+                        ) {
                             withAnimation(.spring()) {
                                 activeJourney = nil
                                 showNavigationSheet = false
                             }
-                        }) {
-                            Image(systemName: "arrow.left")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.black)
-                                .frame(width: 44, height: 44)
-                                .background(.white)
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                         }
                         
                         Spacer()
@@ -71,7 +81,8 @@ struct HomeScreen: View {
                         HStack(spacing: 12) {
                             TransiumIconButton(
                                 systemName: "bookmark",
-                                accessibilityLabel: "Save route"
+                                accessibilityLabel: "Save route",
+                                size: 44
                             ) {
                                 AppToastCenter.shared.showSuccess(title: "Saved", message: "Route bookmarked.")
                             }
@@ -79,7 +90,8 @@ struct HomeScreen: View {
                             
                             TransiumIconButton(
                                 systemName: "square.and.arrow.up",
-                                accessibilityLabel: "Share route"
+                                accessibilityLabel: "Share route",
+                                size: 44
                             ) {
                                 AppToastCenter.shared.showSuccess(title: "Shared", message: "Route link copied.")
                             }
@@ -87,7 +99,8 @@ struct HomeScreen: View {
                             
                             TransiumIconButton(
                                 systemName: "location.fill",
-                                accessibilityLabel: "Center on route"
+                                accessibilityLabel: "Center on route",
+                                size: 44
                             ) {
                                 mapCenterRequestID += 1
                             }
@@ -151,13 +164,16 @@ struct HomeScreen: View {
             } else {
                 // MARK: - Explore Mode
                 VStack(spacing: 0) {
-                    // Top Search Bar, Locate & Profile Controls
+                    // Top Search Bar, Locate, Quick Menu & Profile Controls
                     HStack(spacing: 10) {
                         searchBarTrigger
                         
+                        quickMenu
+                        
                         TransiumIconButton(
                             systemName: "location.fill",
-                            accessibilityLabel: "Center map on your location"
+                            accessibilityLabel: "Center map on your location",
+                            size: 44
                         ) {
                             mapCenterRequestID += 1
                         }
@@ -181,8 +197,10 @@ struct HomeScreen: View {
                     
                     Spacer()
                     
-                    bottomMapContent
-                        .ignoresSafeArea(edges: .bottom)
+                    if !isSearchPresented {
+                        bottomMapContent
+                            .ignoresSafeArea(edges: .bottom)
+                    }
                 }
                 
                 // Pinning mode overlay controls
@@ -233,6 +251,52 @@ struct HomeScreen: View {
         .sheet(isPresented: $isProfilePresented) {
             ProfileScreen()
         }
+        .sheet(isPresented: $isSettingsPresented) {
+            SettingsScreen()
+        }
+        .sheet(isPresented: $isSavedQuestPresented) {
+            SavedQuestScreen()
+        }
+    }
+    
+    // MARK: - Quick Menu
+    private var quickMenu: some View {
+        VStack(spacing: 8) {
+            TransiumIconButton(
+                systemName: isMenuExpanded ? "xmark" : "ellipsis",
+                accessibilityLabel: "Menu",
+                size: 44
+            ) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    isMenuExpanded.toggle()
+                }
+            }
+            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+            
+            if isMenuExpanded {
+                TransiumIconButton(
+                    systemName: "bookmark.fill",
+                    accessibilityLabel: "Saved quests",
+                    size: 44
+                ) {
+                    withAnimation { isMenuExpanded = false }
+                    isSavedQuestPresented = true
+                }
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                .transition(.scale.combined(with: .opacity))
+                
+                TransiumIconButton(
+                    systemName: "gearshape.fill",
+                    accessibilityLabel: "Settings",
+                    size: 44
+                ) {
+                    withAnimation { isMenuExpanded = false }
+                    isSettingsPresented = true
+                }
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
     }
     
     private func fetchKelurahanGroups() async {
@@ -271,7 +335,7 @@ struct HomeScreen: View {
                     .foregroundColor(.gray)
                     .font(.system(size: 16, weight: .medium))
                 
-                Text(searchText.isEmpty ? "Where do you want to go?" : searchText)
+                Text(searchText.isEmpty ? "Where to?" : searchText)
                     .font(TransiumFont.body(15))
                     .foregroundColor(searchText.isEmpty ? .gray : .black)
                     .lineLimit(1)

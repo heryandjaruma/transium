@@ -1,7 +1,11 @@
 {
   "images" : [
     {
+<<<<<<<< HEAD:transium/Assets.xcassets/Illustrations/Onboarding/onboard3photo1.imageset/Contents.json
       "filename" : "Primatrip.png",
+========
+      "filename" : "2-Stars.png",
+>>>>>>>> origin/noia_punya:transium/Assets.xcassets/Illustrations/Summary/2-Stars.imageset/Contents.json
       "idiom" : "universal",
       "scale" : "1x"
     },

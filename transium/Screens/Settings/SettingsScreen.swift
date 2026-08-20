@@ -19,6 +19,8 @@ struct SettingsScreen: View {
     @State private var promotionalNotifications: Bool = true
     @State private var healthAndFitness: Bool = true
 
+    @State private var showLogoutConfirmation: Bool = false
+
     enum Language {
         case indonesia, english
     }
@@ -36,6 +38,7 @@ struct SettingsScreen: View {
                     voiceCard
                     musicCard
                     permissionCard
+                    logoutCard
 
                     Spacer(minLength: 20)
                 }
@@ -44,13 +47,25 @@ struct SettingsScreen: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        .confirmationDialog(
+            "Keluar dari akun?",
+            isPresented: $showLogoutConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Logout", role: .destructive) {
+                handleLogout()
+            }
+            Button("Batal", role: .cancel) {}
+        } message: {
+            Text("Kamu perlu login lagi untuk melanjutkan perjalananmu.")
+        }
     }
 
     // MARK: - Header
     private var header: some View {
         ZStack {
             Text("Settings")
-                .font(TransiumFont.display(24, weight: .bold))
+                .font(TransiumFont.display(36, weight: .bold))
                 .foregroundColor(.white)
 
             HStack {
@@ -172,6 +187,34 @@ struct SettingsScreen: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+    }
+
+    // MARK: - Logout Card
+    private var logoutCard: some View {
+        SettingsCard {
+            Button {
+                showLogoutConfirmation = true
+            } label: {
+                HStack {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .foregroundColor(.red)
+                        .font(.system(size: 20, weight: .semibold))
+
+                    Text("Logout")
+                        .font(TransiumFont.body(17, weight: .semibold))
+                        .foregroundColor(.red)
+
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    // MARK: - Actions
+    private func handleLogout() {
+        // TODO: sambungkan ke AuthManager / SessionManager yang dipakai di project,
+        // misalnya: AuthManager.shared.logout()
+        // lalu arahkan user balik ke halaman login (root navigation reset).
     }
 }
 

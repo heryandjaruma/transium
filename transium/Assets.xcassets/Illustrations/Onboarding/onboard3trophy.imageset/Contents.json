@@ -1,7 +1,11 @@
 {
   "images" : [
     {
+<<<<<<<< HEAD:transium/Assets.xcassets/Illustrations/Onboarding/onboard3trophy.imageset/Contents.json
       "filename" : "trophy & confetti.png",
+========
+      "filename" : "RedPoint.png",
+>>>>>>>> origin/noia_punya:transium/Assets.xcassets/Illustrations/Summary/RedPoint.imageset/Contents.json
       "idiom" : "universal",
       "scale" : "1x"
     },

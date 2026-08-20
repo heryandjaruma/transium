@@ -49,7 +49,7 @@ struct AuthScreen: View {
                     VStack {
                         HStack {
                             TransiumIconButton(
-                                systemName: "arrow.left",
+                                icon: .system("arrow.left"),
                                 accessibilityLabel: "Back to onboarding",
                                 action: onBackToOnboarding
                             )

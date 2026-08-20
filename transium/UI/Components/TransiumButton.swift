@@ -69,7 +69,7 @@ struct TransiumPrimaryButton: View {
         .accessibilityAddTraits(.isButton)
     }
  
-    private var buttonSurface: some View {
+    var buttonSurface: some View {
         Capsule()
             .fill(backgroundColor)
             .overlay(alignment: .top) {
@@ -81,27 +81,135 @@ struct TransiumPrimaryButton: View {
             }
     }
  
-    private var resolvedShadowColor: Color {
+    var resolvedShadowColor: Color {
         shadowColor ?? backgroundColor.transiumDarkerShadow
     }
 }
 
+/// Sumber gambar icon untuk `TransiumIconButton` — SF Symbol atau custom asset image.
+enum TransiumIconSource {
+    case system(String)
+    case asset(String)
+}
+
+/// Bulat, dengan glossy highlight di atas + shadow solid di bawah,
+/// selaras dengan gaya `TransiumPrimaryButton`. Ukuran & warna bisa diatur.
 struct TransiumIconButton: View {
-    let systemName: String
+    let icon: TransiumIconSource
+    let label: String?
     let accessibilityLabel: String
+    let backgroundColor: Color
+    let foregroundColor: Color
+    let shadowColor: Color?
+    let size: CGFloat
+    let iconSize: CGFloat?
+    let font: Font?
     let action: () -> Void
+
+    init(
+        icon: TransiumIconSource,
+        label: String? = nil,
+        accessibilityLabel: String,
+        backgroundColor: Color = .white,
+        foregroundColor: Color = .black,
+        shadowColor: Color? = nil,
+        size: CGFloat = 40,
+        iconSize: CGFloat? = nil,
+        font: Font? = nil,
+        action: @escaping () -> Void
+    ) {
+        self.icon = icon
+        self.label = label
+        self.accessibilityLabel = accessibilityLabel
+        self.backgroundColor = backgroundColor
+        self.foregroundColor = foregroundColor
+        self.shadowColor = shadowColor
+        self.size = size
+        self.iconSize = iconSize
+        self.font = font
+        self.action = action
+    }
+
+    init(
+        systemName: String,
+        label: String? = nil,
+        accessibilityLabel: String,
+        backgroundColor: Color = .white,
+        foregroundColor: Color = .black,
+        shadowColor: Color? = nil,
+        size: CGFloat = 40,
+        iconSize: CGFloat? = nil,
+        font: Font? = nil,
+        action: @escaping () -> Void
+    ) {
+        self.init(
+            icon: .system(systemName),
+            label: label,
+            accessibilityLabel: accessibilityLabel,
+            backgroundColor: backgroundColor,
+            foregroundColor: foregroundColor,
+            shadowColor: shadowColor,
+            size: size,
+            iconSize: iconSize,
+            font: font,
+            action: action
+        )
+    }
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(.black)
-                .frame(width: 40, height: 40)
-                .background(.white)
-                .clipShape(.circle)
+            VStack(spacing: size * 0.04) {
+                iconView
+                    .frame(width: iconSize ?? size * (label == nil ? 0.45 : 0.32),
+                           height: iconSize ?? size * (label == nil ? 0.45 : 0.32))
+
+                if let label {
+                    Text(label)
+                        .font(font ?? TransiumFont.body(size * 0.2, weight: .semibold))
+                        .foregroundStyle(foregroundColor)
+                }
+            }
+            .frame(width: size, height: size)
+            .background(buttonSurface)
+            .compositingGroup()
+            .clipShape(.circle)
+            .shadow(color: resolvedShadowColor, radius: 0, y: size * 0.08)
         }
-        .accessibilityLabel(accessibilityLabel)
         .buttonStyle(.transiumNoOpacity)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    var buttonSurface: some View {
+        Circle()
+            .fill(backgroundColor)
+            .overlay(alignment: .top) {
+                Circle()
+                    .fill(.white.opacity(0.18))
+                    .frame(height: max(size * 0.3, 8))
+                    .padding(.horizontal, size * 0.18)
+                    .padding(.top, size * 0.06)
+                    .mask(Circle())
+            }
+    }
+
+    @ViewBuilder
+    var iconView: some View {
+        switch icon {
+        case .system(let systemName):
+            Image(systemName: systemName)
+                .font(.system(size: iconSize ?? size * (label == nil ? 0.45 : 0.32), weight: .medium))
+                .foregroundStyle(foregroundColor)
+        case .asset(let assetImageName):
+            Image(assetImageName)
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(foregroundColor)
+        }
+    }
+
+    var resolvedShadowColor: Color {
+        shadowColor ?? backgroundColor.transiumDarkerShadow
     }
 }
 
@@ -142,7 +250,36 @@ extension ButtonStyle where Self == TransiumNoOpacityButtonStyle {
             .ignoresSafeArea()
 
         VStack(spacing: 24) {
-            TransiumIconButton(systemName: "arrow.left", accessibilityLabel: "Back") {}
+            HStack(spacing: 16) {
+                TransiumIconButton(
+                    icon: .system("xmark"),
+                    label: "END",
+                    accessibilityLabel: "End",
+                    backgroundColor: TransiumColor.lightRed,
+                    foregroundColor: .white,
+                    size: 64
+                ) {}
+
+                TransiumIconButton(
+                    icon: .system("location.fill"),
+                    accessibilityLabel: "Locate me",
+                    size: 56
+                ) {}
+
+                TransiumIconButton(
+                    icon: .system("speaker.wave.2.fill"),
+                    accessibilityLabel: "Toggle sound",
+                    size: 56
+                ) {}
+
+                // Contoh pakai custom asset (bukan SF Symbol), mis. "focus"
+                TransiumIconButton(
+                    icon: .asset("focus"),
+                    accessibilityLabel: "Recenter",
+                    size: 44
+                ) {}
+            }
+
             TransiumCapsuleTextButton(title: "Skip") {}
             TransiumPrimaryButton(title: "Next") {}
             TransiumPrimaryButton(
@@ -171,6 +308,10 @@ extension Color {
 
         if self == TransiumColor.primaryBlue {
             return Color(red: 0.12, green: 0.28, blue: 0.64)
+        }
+
+        if self == TransiumColor.lightRed {
+            return Color(red: 0.75, green: 0.25, blue: 0.22)
         }
 
         return Color.black.opacity(0.22)
