@@ -46,7 +46,7 @@ struct GoTripDetailsPanel: View {
         }
 
         let candidates: [(step: JourneyAttemptStep, location: CLLocation)] = steps.compactMap { step in
-            guard step.name.localizedCaseInsensitiveContains("picture"),
+            guard step.isPhotoCheckpoint,
                   let lat = step.lat, let lng = step.lng else { return nil }
             let location = CLLocation(latitude: lat, longitude: lng)
             guard !missionLocations.contains(where: { $0.distance(from: location) <= 50 }) else { return nil }

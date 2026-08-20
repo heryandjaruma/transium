@@ -43,6 +43,13 @@ struct HomeScreen: View {
     /// started that way — nil when it was entered via `resumeOngoingTrip()` instead, since that
     /// path never hits /go. Backs GoTripDetailsPanel's debug "show /go response" button.
     @State private var goStartDebugResult: JourneyGoResult? = nil
+    /// Set the instant a geofence fires for a `takePicture` checkpoint (see `handleGeofenceEntered`)
+    /// — drives `CameraScreen`'s `.fullScreenCover(item:)` so the camera pops up immediately,
+    /// including while the app was backgrounded when the region trigger came in (UIKit defers
+    /// the presentation itself until the app is foreground again). `advanceJourney` still fires
+    /// independently of this, since these steps are optional and don't require a photo to
+    /// count as done.
+    @State private var pendingPhotoStep: JourneyAttemptStep? = nil
     
     // MARK: - Search & Profile State
     @State private var isSearchPresented = false
@@ -284,6 +291,11 @@ struct HomeScreen: View {
             Button("Not Now", role: .cancel) { journeyConflict = nil }
         } message: { conflict in
             Text(conflict.message)
+        }
+        .fullScreenCover(item: $pendingPhotoStep) { step in
+            CameraScreen(onCaptured: { image in
+                await handlePhotoCaptured(image: image, step: step)
+            })
         }
         .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
             SearchSheetView(
@@ -804,6 +816,7 @@ struct HomeScreen: View {
     private func endGoMode(cancelAttempt: Bool = false) {
         geofenceMonitor.stopMonitoring()
         geofenceMonitor.onRegionEntered = nil
+        pendingPhotoStep = nil
 
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             showGoMode = false
@@ -852,6 +865,15 @@ struct HomeScreen: View {
     private func handleGeofenceEntered(stepId: String, attemptId: String) {
         guard let coordinate = locationStore.currentLocation?.coordinate ?? resolvedCurrentLocation?.coordinate else { return }
 
+        // Pop the camera immediately, before the network round-trip below — a "takePicture"
+        // checkpoint is a moment-in-time prompt, not something that should wait on `advance`.
+        // Skip it if this step is already done (a re-firing region, or a previous catch-up
+        // advance already covered it) so the user isn't nagged for the same spot twice.
+        if let step = goJourneySteps.first(where: { $0.id == stepId }),
+           step.isPhotoCheckpoint, step.status != .done {
+            pendingPhotoStep = step
+        }
+
         Task {
             guard let result = try? await journeyService.advanceJourney(
                 attemptId: attemptId,
@@ -869,6 +891,40 @@ struct HomeScreen: View {
                         message: "You've finished every step of this journey."
                     )
                 }
+            }
+        }
+    }
+
+    /// `CameraScreen`'s `onCaptured` for a `takePicture` checkpoint — uploads via POST
+    /// /private/journey/media and closes the whole camera flow (`pendingPhotoStep = nil` tears
+    /// down `CameraScreen` and its nested `PhotoPreviewScreen` cover together). On failure the
+    /// flow is left open so the user can retry from the still-visible preview.
+    private func handlePhotoCaptured(image: UIImage, step: JourneyAttemptStep) async {
+        guard let data = image.jpegData(compressionQuality: 0.85) else {
+            AppToastCenter.shared.showError(title: "Upload Failed", message: "Couldn't process that photo. Please try again.")
+            return
+        }
+
+        do {
+            _ = try await journeyService.uploadStepMedia(
+                stepId: step.id,
+                imageData: data,
+                filename: "\(step.id).jpg",
+                mimeType: "image/jpeg"
+            )
+            await MainActor.run {
+                pendingPhotoStep = nil
+                AppToastCenter.shared.showSuccess(
+                    title: "Photo Saved",
+                    message: "Added to your journey keepsakes."
+                )
+            }
+        } catch {
+            await MainActor.run {
+                AppToastCenter.shared.showError(
+                    title: "Upload Failed",
+                    message: (error as? TransiumAPIError)?.errorDescription ?? "Please try again."
+                )
             }
         }
     }

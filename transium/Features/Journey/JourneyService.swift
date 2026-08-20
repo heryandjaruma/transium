@@ -178,7 +178,7 @@ public final class JourneyService: JourneyServiceProtocol, Sendable {
         mimeType: String = "image/jpeg"
     ) async throws -> MediaAsset {
         var multipart = MultipartFormData()
-        multipart.appendField(name: "journeyAttemptStepId", value: stepId)
+        multipart.appendField(name: "journeyStepId", value: stepId)
         multipart.appendFile(
             fieldName: "file",
             fileName: filename,

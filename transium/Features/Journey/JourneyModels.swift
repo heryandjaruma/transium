@@ -424,6 +424,12 @@ public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, E
         self.radiusMeters = radiusMeters
         self.status = status
     }
+
+    /// True for the artificial `type: "optional"` steps POST /private/journey/go interleaves
+    /// into the route (1-3 per journey) so the user is prompted to document the trip — `name`
+    /// is the literal string `"takePicture"` for these, per the API's own documented contract,
+    /// never a fuzzy label to pattern-match against.
+    public var isPhotoCheckpoint: Bool { name == "takePicture" }
 }
 
 /// A location the client should register a `CLCircularRegion` (or equivalent) for.
