@@ -545,8 +545,8 @@ struct HomeScreen: View {
                         VStack(alignment: .leading, spacing: 0) {
                             if isRecommended {
                                 recommendedBadge
-                                    .padding(.leading, 12)
-                                    .padding(.bottom, -1)
+                                    .padding(.leading, 10)
+                                    .padding(.bottom, -8)
                                     .zIndex(1)
                             }
                             
