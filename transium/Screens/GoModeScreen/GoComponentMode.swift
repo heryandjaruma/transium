@@ -117,6 +117,19 @@ struct GoComponentMode: View {
         currentSegment?.type == "bus" ? currentSegment : upcomingBusSegment
     }
 
+    /// Segment index passed to `GoTripDetailsPanel` for its active/done highlighting. Mirrors
+    /// `currentSegmentIndex`, except once `variant` has already switched the floating card to
+    /// the ride card (live position shows we boarded) it jumps ahead to that bus leg too —
+    /// otherwise the panel would keep showing "Walk to <stop>" as active and the bus leg as
+    /// not-yet-started until a manual tap-to-advance, which walking legs into a bus stop don't
+    /// offer (see `onAdvanceSegment`).
+    private var effectiveSegmentIndex: Int {
+        guard case .commuteOnGoing = variant, upcomingBusSegment != nil else {
+            return currentSegmentIndex
+        }
+        return currentSegmentIndex + 1
+    }
+
     var body: some View {
         VStack {
             GoTopBar(
@@ -155,7 +168,7 @@ struct GoComponentMode: View {
             // its own content is padded internally instead.
             GoTripDetailsPanel(
                 journey: journey,
-                currentSegmentIndex: currentSegmentIndex,
+                currentSegmentIndex: effectiveSegmentIndex,
                 steps: steps,
                 currentLocation: currentLocation,
                 isExpanded: $isTripDetailsExpanded

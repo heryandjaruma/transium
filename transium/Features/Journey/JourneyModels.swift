@@ -242,7 +242,7 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
     /// (nearest-vertex distance over the resolved road-following polyline — good enough to
     /// tell "on this road" from "nowhere near it" without true point-to-segment projection).
     /// Geometry points are `[lng, lat]` (see `RoadGeometryResolver`).
-    public func isAligned(with location: CLLocationCoordinate2D?, toleranceMeters: Double = 80) -> Bool {
+    public func isAligned(with location: CLLocationCoordinate2D?, toleranceMeters: Double = 100) -> Bool {
         guard let location, geometry.count > 1 else { return false }
         let point = CLLocation(latitude: location.latitude, longitude: location.longitude)
         let nearestDistance = geometry.compactMap { coordinate -> Double? in
