@@ -170,9 +170,7 @@ struct GoTripDetailsPanel: View {
         HStack(alignment: .center, spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
-                    // Mission steps aren't a travel mode — they don't get a chip here, only
-                    // their own card further down in the timeline.
-                    ForEach(Array(journey.steps.filter { !$0.isMission }.enumerated()), id: \.offset) { index, step in
+                    ForEach(Array(journey.steps.enumerated()), id: \.offset) { index, step in
                         if index > 0 {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 8, weight: .bold))
@@ -187,6 +185,12 @@ struct GoTripDetailsPanel: View {
                                     .font(TransiumFont.body(11, weight: .medium))
                             }
                             .foregroundColor(.gray)
+                        } else if step.isMission {
+                            // No duration to show, just a marker that a mission sits here in
+                            // the itinerary — its own card further down has the instructions.
+                            Image(systemName: "questionmark.app.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(TransiumColor.primaryYellow)
                         } else {
                             HStack(spacing: 4) {
                                 Image(systemName: "bus.fill")
@@ -489,7 +493,7 @@ struct GoTripDetailsPanel: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle().fill(isDone ? Self.doneAccent : TransiumColor.primaryYellow).frame(width: 36, height: 36)
-                Image(systemName: isDone ? "checkmark" : "flag.checkered")
+                Image(systemName: isDone ? "checkmark" : "questionmark.app.fill")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundColor(.white)
             }
