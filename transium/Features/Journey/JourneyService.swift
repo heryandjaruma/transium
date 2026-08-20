@@ -26,6 +26,10 @@ public protocol JourneyServiceProtocol: Sendable {
     /// Report a geofence trigger (or a manual arrival check) for a step on an in-progress attempt.
     func advanceJourney(attemptId: String, stepId: String, lat: Double, lng: Double) async throws -> JourneyAdvanceResult
 
+    /// Look up the caller's currently in-progress journey attempt, if any. A user can only
+    /// ever have one such attempt at a time, so this is a lookup rather than a list.
+    func getCurrentJourney() async throws -> JourneyCurrentResponse
+
     /// Cancel an in-progress journey attempt, freeing the caller to start a new one.
     func cancelJourney(attemptId: String) async throws -> JourneyAttempt
 
@@ -123,6 +127,16 @@ public final class JourneyService: JourneyServiceProtocol, Sendable {
             requiresAuth: true
         )
         return JourneyAdvanceResult(journeyAttempt: response.journeyAttempt, steps: response.steps)
+    }
+
+    public func getCurrentJourney() async throws -> JourneyCurrentResponse {
+        try await apiClient.request(
+            path: "/private/journey/current",
+            method: .get,
+            queryItems: nil,
+            body: nil,
+            requiresAuth: true
+        )
     }
 
     public func cancelJourney(attemptId: String) async throws -> JourneyAttempt {

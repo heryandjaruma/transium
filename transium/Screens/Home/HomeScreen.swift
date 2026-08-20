@@ -11,15 +11,22 @@ struct HomeScreen: View {
     @StateObject private var locationStore = LocationStore()
     @State private var visibleTicketPage: Int? = 0
     @State private var mapCenterRequestID = 0
+    @Environment(\.scenePhase) private var scenePhase
     private let previewLocation: CLLocation?
     private let baliFallbackLocation = CLLocation(latitude: -8.73704, longitude: 115.17570)
-    
+
     // MARK: - Journey State
     @State private var activeJourney: JourneyResult? = nil
     @State private var activeQuestId: String? = nil
     @State private var isFetchingJourney = false
     @State private var showNavigationSheet = false
     private let journeyService = JourneyService.shared
+
+    // MARK: - Ongoing Trip State
+    @State private var ongoingJourneyAttempt: JourneyAttempt? = nil
+    @State private var ongoingJourneySteps: [JourneyAttemptStep] = []
+    @State private var showOngoingTripCard = false
+    @State private var isResumingOngoingTrip = false
 
     // MARK: - Go Mode State
     @StateObject private var geofenceMonitor = JourneyGeofenceMonitor()
@@ -100,10 +107,7 @@ struct HomeScreen: View {
                             accessibilityLabel: "Back",
                             size: 44
                         ) {
-                            withAnimation(.spring()) {
-                                activeJourney = nil
-                                showNavigationSheet = false
-                            }
+                            exitToExploreMode()
                         }
                         
                         Spacer()
@@ -181,10 +185,7 @@ struct HomeScreen: View {
                     }
                     
                     NavigationBottomSheet(journey: journey, onBack: {
-                        withAnimation(.spring()) {
-                            activeJourney = nil
-                            showNavigationSheet = false
-                        }
+                        exitToExploreMode()
                     })
                 }
                 .ignoresSafeArea(edges: .bottom)
@@ -199,7 +200,19 @@ struct HomeScreen: View {
                     }
                     .padding(.top, 6)
                     .padding(.horizontal, 20)
-                    
+
+                    if showOngoingTripCard, let attempt = ongoingJourneyAttempt {
+                        HStack {
+                            OngoingTripCard(questName: attempt.questName ?? "Ongoing Trip") {
+                                resumeOngoingTrip()
+                            }
+                            Spacer()
+                        }
+                        .padding(.top, 14)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                        .disabled(isResumingOngoingTrip)
+                    }
+
                     Spacer()
                     
                     if !isSearchPresented {
@@ -235,7 +248,7 @@ struct HomeScreen: View {
                 .zIndex(100)
             }
 
-            if isStartingGoMode || isFetchingJourney {
+            if isStartingGoMode || isFetchingJourney || isResumingOngoingTrip {
                 LoadingScreen()
                     .transition(.opacity)
                     .zIndex(300)
@@ -244,6 +257,11 @@ struct HomeScreen: View {
         .task {
             locationStore.requestCurrentLocation()
             await fetchKelurahanGroups()
+            await checkOngoingJourney()
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            guard newPhase == .active, oldPhase == .background else { return }
+            Task { await checkOngoingJourney() }
         }
         .preferredColorScheme(.light)
         .alert(
@@ -561,6 +579,113 @@ struct HomeScreen: View {
                     AppToastCenter.shared.showError(
                         title: "Route Calculation Failed",
                         message: "Could not plan a journey to this destination."
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Ongoing Trip
+
+    /// Leaves Navigation Mode back to Explore Mode (the actual home screen), then re-checks
+    /// for an ongoing trip so the tab is showing again if one is still active — e.g. after
+    /// backing all the way out from Go Mode's own "Back" (which only steps out to Navigation
+    /// Mode, not Explore) without ending the trip.
+    private func exitToExploreMode() {
+        withAnimation(.spring()) {
+            activeJourney = nil
+            showNavigationSheet = false
+        }
+        Task { await checkOngoingJourney() }
+    }
+
+    /// Looks up GET /private/journey/current and shows/hides the ongoing-trip tab accordingly.
+    /// Called on cold launch (via `.task`), whenever the app returns from the background
+    /// (via `.onChange(of: scenePhase)`), and whenever the user navigates back to Explore Mode
+    /// (via `exitToExploreMode`), so a trip started elsewhere (or left running in the
+    /// background) is always picked back up. Skipped while already inside Go Mode or
+    /// mid-resume, since in both cases the caller already knows about the active attempt.
+    private func checkOngoingJourney() async {
+        guard !showGoMode, !isResumingOngoingTrip else { return }
+
+        do {
+            let current = try await journeyService.getCurrentJourney()
+            await MainActor.run {
+                guard let attempt = current.journeyAttempt, attempt.status == "started" else {
+                    ongoingJourneyAttempt = nil
+                    ongoingJourneySteps = []
+                    if showOngoingTripCard {
+                        withAnimation(.easeInOut(duration: 0.2)) { showOngoingTripCard = false }
+                    }
+                    return
+                }
+
+                ongoingJourneyAttempt = attempt
+                ongoingJourneySteps = current.steps
+                if !showOngoingTripCard {
+                    // Spring the tab in from off-screen left — the motion itself is the cue
+                    // that the fetch just resolved and found something worth surfacing.
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.78)) {
+                        showOngoingTripCard = true
+                    }
+                }
+            }
+        } catch {
+            print("Failed to check current journey: \(error)")
+        }
+    }
+
+    /// Resumes the trip surfaced by the ongoing-trip tab straight into Go Mode: replans the
+    /// real path from the user's current position to the quest's destination, then re-registers
+    /// geofences for whichever steps are still outstanding (built from the steps' own
+    /// lat/lng/radius, since GET /current only returns steps, not the /go geofence list).
+    private func resumeOngoingTrip() {
+        guard !isResumingOngoingTrip, let attempt = ongoingJourneyAttempt, let questId = attempt.questId else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            isResumingOngoingTrip = true
+        }
+
+        Task {
+            do {
+                let originCoordinate = resolvedCurrentLocation?.coordinate ?? CLLocationCoordinate2D(latitude: -8.702105, longitude: 115.176189)
+                let response = try await journeyService.fetchRealJourney(questId: questId, origin: originCoordinate)
+                let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(response.best)
+
+                let geofences: [JourneyGeofence] = ongoingJourneySteps.compactMap { step in
+                    guard step.status == .waiting, let lat = step.lat, let lng = step.lng, let radius = step.radiusMeters else { return nil }
+                    return JourneyGeofence(stepId: step.id, sequence: step.sequence, lat: lat, lng: lng, radiusMeters: radius)
+                }
+
+                await MainActor.run {
+                    geofenceMonitor.onRegionEntered = { [attemptId = attempt.id] stepId in
+                        handleGeofenceEntered(stepId: stepId, attemptId: attemptId)
+                    }
+                    geofenceMonitor.startMonitoring(geofences: geofences)
+
+                    activeJourney = resolvedJourney
+                    activeQuestId = questId
+                    goJourneyAttempt = attempt
+                    goJourneySteps = ongoingJourneySteps
+                    goGeofences = geofences
+                    goCurrentSegmentIndex = 0
+                    showOngoingTripCard = false
+
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        showGoMode = true
+                        showNavigationSheet = false
+                        isResumingOngoingTrip = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        isResumingOngoingTrip = false
+                    }
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    AppToastCenter.shared.showError(
+                        title: "Couldn't Resume Trip",
+                        message: (error as? TransiumAPIError)?.errorDescription ?? "Please try again."
                     )
                 }
             }

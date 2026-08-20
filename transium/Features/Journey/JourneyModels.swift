@@ -472,6 +472,19 @@ nonisolated struct JourneyAttemptListResponse: Codable {
     let journeyAttempts: [JourneyAttempt]
 }
 
+/// Response of GET /private/journey/current: the caller's single in-progress attempt
+/// (`status: "started"`), if any — `journeyAttempt` is `nil` (with empty `steps`) when
+/// nothing is active. A user can only ever have one such attempt at a time.
+public nonisolated struct JourneyCurrentResponse: Codable, Sendable, Equatable {
+    public let journeyAttempt: JourneyAttempt?
+    public let steps: [JourneyAttemptStep]
+
+    public init(journeyAttempt: JourneyAttempt?, steps: [JourneyAttemptStep]) {
+        self.journeyAttempt = journeyAttempt
+        self.steps = steps
+    }
+}
+
 public nonisolated struct JourneyAttemptDetailResponse: Codable, Sendable, Equatable {
     public let journeyAttempt: JourneyAttempt
     public let journeyAttemptSteps: [JourneyAttemptStep]
