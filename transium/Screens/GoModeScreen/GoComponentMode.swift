@@ -147,8 +147,12 @@ struct GoComponentMode: View {
         VStack(alignment: .leading, spacing: 10) {
             if !isTripDetailsExpanded {
                 currentStepCard
+                    .padding(.horizontal, 16)
             }
 
+            // No horizontal padding here — the sheet's white surface should span the full
+            // screen width edge-to-edge, matching NavigationBottomSheet in the overview;
+            // its own content is padded internally instead.
             GoTripDetailsPanel(
                 journey: journey,
                 currentSegmentIndex: currentSegmentIndex,
@@ -157,7 +161,6 @@ struct GoComponentMode: View {
                 isExpanded: $isTripDetailsExpanded
             )
         }
-        .padding(.horizontal, 16)
         .padding(.bottom, 8)
     }
 
