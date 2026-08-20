@@ -152,51 +152,85 @@ struct DetailPlaceScreen: View {
     
     private var imageCarousel: some View {
         ZStack(alignment: .bottom) {
-            TabView(selection: $selectedImageIndex) {
-                if !headerImageUrls.isEmpty {
-                    ForEach(Array(headerImageUrls.enumerated()), id: \.offset) { index, urlString in
-                        let fullUrl = urlString.hasPrefix("http") ? urlString : "https://transium-api.heryandjaruma.workers.dev\(urlString)"
+            if isLoadingQuests && headerImageUrls.isEmpty {
+                // Header Carousel Skeleton Placeholder
+                ZStack {
+                    LinearGradient(
+                        colors: [TransiumColor.darkBlue.opacity(0.8), TransiumColor.primaryBlue.opacity(0.85)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    
+                    VStack(spacing: 8) {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.system(size: 38, weight: .light))
+                            .foregroundStyle(.white.opacity(0.4))
                         
-                        GeometryReader { proxy in
-                            AsyncImage(url: URL(string: fullUrl)) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
+                        Text("Loading Gallery...")
+                            .font(TransiumFont.body(13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
+                }
+                .frame(height: 340)
+                .transiumShimmer(
+                    baseColor: Color.white.opacity(0.08),
+                    highlightColor: Color.white.opacity(0.28)
+                )
+            } else {
+                TabView(selection: $selectedImageIndex) {
+                    if !headerImageUrls.isEmpty {
+                        ForEach(Array(headerImageUrls.enumerated()), id: \.offset) { index, urlString in
+                            let fullUrl = urlString.hasPrefix("http") ? urlString : "https://transium-api.heryandjaruma.workers.dev\(urlString)"
+                            
+                            GeometryReader { proxy in
+                                AsyncImage(url: URL(string: fullUrl)) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: proxy.size.width, height: proxy.size.height)
+                                            .clipped()
+                                    case .empty:
+                                        ZStack {
+                                            Color(.systemGray5)
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: TransiumColor.primaryBlue))
+                                        }
                                         .frame(width: proxy.size.width, height: proxy.size.height)
-                                        .clipped()
-                                default:
-                                    Image("kintamani")
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: proxy.size.width, height: proxy.size.height)
-                                        .clipped()
+                                    default:
+                                        Image("kintamani")
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: proxy.size.width, height: proxy.size.height)
+                                            .clipped()
+                                    }
                                 }
                             }
+                            .tag(index)
                         }
-                        .tag(index)
+                    } else {
+                        GeometryReader { proxy in
+                            Image("kintamani")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: proxy.size.width, height: proxy.size.height)
+                                .clipped()
+                        }
+                        .tag(0)
                     }
-                } else {
-                    GeometryReader { proxy in
-                        Image("kintamani")
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: proxy.size.width, height: proxy.size.height)
-                            .clipped()
-                    }
-                    .tag(0)
                 }
-            }
-            .frame(height: 340)
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            
-            if headerImageUrls.count > 1 {
-                PageIndicator(currentPage: selectedImageIndex, totalPages: headerImageUrls.count)
-                    .padding(.bottom, 60)
+                .frame(height: 340)
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                
+                if headerImageUrls.count > 1 {
+                    PageIndicator(currentPage: selectedImageIndex, totalPages: headerImageUrls.count)
+                        .padding(.bottom, 60)
+                }
             }
         }
         .frame(height: 340)
+        .animation(.easeInOut(duration: 0.35), value: isLoadingQuests)
     }
     
     // MARK: - Content
@@ -207,26 +241,41 @@ struct DetailPlaceScreen: View {
 
             titleSection
             
-            if let firstQuest = quests.first {
-                RecommendedQuestCard(
-                    title: firstQuest.title,
-                    subtitle: firstQuest.description,
-                    imageUrl: firstQuest.imageUrl,
-                    fallbackImageName: firstQuest.fallbackImageName,
-                    points: firstQuest.points
-                ) {
-                    dismissScreen()
-                    onStartQuest?(firstQuest.id)
-                }
-            }
-            
-            VStack(spacing: 14) {
-                ForEach(quests) { quest in
-                    QuestRow(quest: quest) {
-                        dismissScreen()
-                        onStartQuest?(quest.id)
+            if isLoadingQuests && quests.isEmpty {
+                // Skeleton loading state for quests
+                VStack(spacing: 16) {
+                    RecommendedQuestCardSkeleton()
+                    
+                    VStack(spacing: 14) {
+                        QuestRowSkeleton(theme: .blue)
+                        QuestRowSkeleton(theme: .red)
+                        QuestRowSkeleton(theme: .green)
                     }
                 }
+                .transition(.opacity)
+            } else {
+                if let firstQuest = quests.first {
+                    RecommendedQuestCard(
+                        title: firstQuest.title,
+                        subtitle: firstQuest.description,
+                        imageUrl: firstQuest.imageUrl,
+                        fallbackImageName: firstQuest.fallbackImageName,
+                        points: firstQuest.points
+                    ) {
+                        dismissScreen()
+                        onStartQuest?(firstQuest.id)
+                    }
+                }
+                
+                VStack(spacing: 14) {
+                    ForEach(quests) { quest in
+                        QuestRow(quest: quest) {
+                            dismissScreen()
+                            onStartQuest?(quest.id)
+                        }
+                    }
+                }
+                .transition(.opacity)
             }
         }
         .padding(.horizontal, 20)
@@ -236,6 +285,7 @@ struct DetailPlaceScreen: View {
                 .clipShape(RoundedCorner(radius: 28, corners: [.topLeft, .topRight]))
         )
         .offset(y: -44)
+        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: isLoadingQuests)
     }
 
     private var dragHandle: some View {

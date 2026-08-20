@@ -520,6 +520,95 @@ private struct TransiumTicketShape: Shape {
     }
 }
 
+// MARK: - Skeleton Loading Ticket Card
+
+struct TransiumTicketSkeletonCard: View {
+    let variant: TransiumTicketVariant
+
+    init(variant: TransiumTicketVariant = .blue) {
+        self.variant = variant
+    }
+
+    public var body: some View {
+        HStack(spacing: 14) {
+            // Postage stamp skeleton with tilted frame
+            TransiumStampCard(size: 104, tilt: .degrees(-4), variant: .classic) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.white.opacity(0.15))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transiumShimmer(
+                        baseColor: Color.white.opacity(0.12),
+                        highlightColor: Color.white.opacity(0.35)
+                    )
+            }
+            .frame(width: 106)
+
+            TransiumTicketDivider(color: variant.dividerColor)
+                .frame(width: 1, height: 150)
+
+            VStack(alignment: .leading, spacing: 10) {
+                // Title skeleton
+                TransiumSkeletonBlock(
+                    width: 140,
+                    height: 22,
+                    cornerRadius: 6,
+                    color: Color.white.opacity(0.25),
+                    shimmerHighlight: Color.white.opacity(0.55)
+                )
+
+                // Subtitle skeleton (2 lines)
+                VStack(alignment: .leading, spacing: 6) {
+                    TransiumSkeletonBlock(
+                        width: 165,
+                        height: 11,
+                        cornerRadius: 4,
+                        color: Color.white.opacity(0.18),
+                        shimmerHighlight: Color.white.opacity(0.42)
+                    )
+                    TransiumSkeletonBlock(
+                        width: 115,
+                        height: 11,
+                        cornerRadius: 4,
+                        color: Color.white.opacity(0.18),
+                        shimmerHighlight: Color.white.opacity(0.42)
+                    )
+                }
+
+                Spacer(minLength: 0)
+
+                // Footer badge pills skeleton
+                HStack(spacing: 8) {
+                    TransiumSkeletonBlock(
+                        width: 68,
+                        height: 28,
+                        cornerRadius: 14,
+                        color: Color.white.opacity(0.22),
+                        shimmerHighlight: Color.white.opacity(0.48)
+                    )
+                    TransiumSkeletonBlock(
+                        width: 78,
+                        height: 28,
+                        cornerRadius: 14,
+                        color: Color.white.opacity(0.22),
+                        shimmerHighlight: Color.white.opacity(0.48)
+                    )
+                }
+            }
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 20)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, minHeight: 158, maxHeight: 158, alignment: .leading)
+        .background {
+            TransiumTicketShape()
+                .fill(variant.backgroundColor)
+        }
+        .clipShape(TransiumTicketShape())
+    }
+}
+
 #Preview {
     ZStack {
         TransiumColor.ticketInk

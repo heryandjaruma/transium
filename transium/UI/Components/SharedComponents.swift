@@ -349,6 +349,165 @@ struct RecommendedQuestCard: View {
     }
 }
 
+// MARK: - Skeletons for Quests
+
+struct RecommendedQuestCardSkeleton: View {
+    init() {}
+
+    var body: some View {
+        let accent = Color(red: 0.20, green: 0.42, blue: 0.95)
+
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
+                // "RECOMMENDED" badge skeleton
+                TransiumSkeletonBlock(
+                    width: 90,
+                    height: 20,
+                    cornerRadius: 10,
+                    color: Color.white.opacity(0.2),
+                    shimmerHighlight: Color.white.opacity(0.45)
+                )
+
+                // Title skeleton
+                TransiumSkeletonBlock(
+                    width: 140,
+                    height: 22,
+                    cornerRadius: 6,
+                    color: Color.white.opacity(0.3),
+                    shimmerHighlight: Color.white.opacity(0.6)
+                )
+
+                // Subtitle skeleton lines
+                VStack(alignment: .leading, spacing: 4) {
+                    TransiumSkeletonBlock(
+                        width: 160,
+                        height: 12,
+                        cornerRadius: 4,
+                        color: Color.white.opacity(0.2),
+                        shimmerHighlight: Color.white.opacity(0.45)
+                    )
+                    TransiumSkeletonBlock(
+                        width: 110,
+                        height: 12,
+                        cornerRadius: 4,
+                        color: Color.white.opacity(0.2),
+                        shimmerHighlight: Color.white.opacity(0.45)
+                    )
+                }
+
+                // Points badge skeleton
+                TransiumSkeletonBlock(
+                    width: 76,
+                    height: 24,
+                    cornerRadius: 12,
+                    color: Color.white.opacity(0.22),
+                    shimmerHighlight: Color.white.opacity(0.5)
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Right postage column skeleton
+            ZStack(alignment: .bottom) {
+                TransiumStampCard(
+                    size: 96,
+                    tilt: .degrees(0),
+                    variant: .green
+                ) {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.white.opacity(0.18))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transiumShimmer(
+                            baseColor: Color.white.opacity(0.15),
+                            highlightColor: Color.white.opacity(0.4)
+                        )
+                }
+                .padding(.bottom, 16)
+
+                // "Start Quest" button skeleton
+                TransiumSkeletonBlock(
+                    width: 108,
+                    height: 36,
+                    cornerRadius: 18,
+                    color: Color.white.opacity(0.35),
+                    shimmerHighlight: Color.white.opacity(0.65)
+                )
+            }
+            .frame(width: 120)
+        }
+        .padding(18)
+        .background(
+            LinearGradient(
+                colors: [accent, accent.opacity(0.85)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+    }
+}
+
+struct QuestRowSkeleton: View {
+    var theme: DetailPlaceScreen.QuestTheme = .blue
+
+    init(theme: DetailPlaceScreen.QuestTheme = .blue) {
+        self.theme = theme
+    }
+
+    var body: some View {
+        let stampVariant: TransiumStampVariant = {
+            switch theme {
+            case .blue: return .blue
+            case .red: return .warm
+            case .green: return .green
+            }
+        }()
+
+        HStack(alignment: .center, spacing: 14) {
+            TransiumStampCard(size: 58, tilt: .degrees(0), variant: stampVariant) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.black.opacity(0.06))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transiumShimmer(
+                        baseColor: Color.black.opacity(0.04),
+                        highlightColor: Color.white.opacity(0.65)
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                TransiumSkeletonBlock(
+                    width: 120,
+                    height: 16,
+                    cornerRadius: 5,
+                    color: Color.black.opacity(0.12),
+                    shimmerHighlight: Color.white.opacity(0.7)
+                )
+
+                TransiumSkeletonBlock(
+                    width: 170,
+                    height: 11,
+                    cornerRadius: 4,
+                    color: Color.black.opacity(0.08),
+                    shimmerHighlight: Color.white.opacity(0.6)
+                )
+            }
+
+            Spacer(minLength: 8)
+
+            TransiumSkeletonBlock(
+                width: 58,
+                height: 24,
+                cornerRadius: 12,
+                color: theme.accent.opacity(0.18),
+                shimmerHighlight: Color.white.opacity(0.6)
+            )
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(theme.background)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+    }
+}
+
 // MARK: - Previews
 
 #Preview("QuestRow & RecommendedQuestCard") {

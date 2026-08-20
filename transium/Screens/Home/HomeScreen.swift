@@ -571,22 +571,17 @@ struct HomeScreen: View {
                         .id(index)
                     }
                 } else {
-                    // Placeholder shimmer tickets while fetching from live API
-                    ForEach(0..<2, id: \.self) { placeholderIndex in
-                        TransiumTicketCard(
-                            title: placeholderIndex == 0 ? "Loading Places..." : "Loading...",
-                            subtitle: "Fetching places with quests in Bali...",
-                            distance: "-- km",
-                            price: "Rp. 4,4k",
-                            imageName: TransiumAsset.Illustration.onboardingExplore,
-                            variant: placeholderIndex == 0 ? .blue : .mint
-                        )
+                    // Fluid animated skeleton cards while fetching places from live API
+                    TransiumTicketSkeletonCard(variant: .blue)
                         .frame(width: 336)
-                        .id(placeholderIndex)
-                        .redacted(reason: .placeholder)
-                    }
+                        .id(0)
+
+                    TransiumTicketSkeletonCard(variant: .mint)
+                        .frame(width: 336)
+                        .id(1)
                 }
             }
+            .animation(.easeInOut(duration: 0.35), value: kelurahanGroups.isEmpty)
             .scrollTargetLayout()
             .padding(.horizontal, 20)
         }
