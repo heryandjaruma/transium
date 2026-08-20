@@ -2,13 +2,18 @@
 //  GoTripDetailsPanel.swift
 //  transium
 //
-//  The expanded state of Go Mode's bottom panel — a docked white sheet (styled after
-//  NavigationBottomSheet, the pre-Go overview's own bottom sheet) rather than a modal
-//  .sheet(), so expanding it never covers the map or top bar. The current leg is
-//  highlighted as a blue "active" card; the quest's own photo-checkpoint steps (from
-//  POST /private/journey/go, unrelated in the API to the route's segments) are matched
-//  onto the nearest segment by straight-line distance to its destination, best-effort —
-//  there's no server-side link between the two.
+//  Go Mode's bottom sheet — one persistent white docked surface (styled after
+//  NavigationBottomSheet, the pre-Go overview's own bottom sheet), not a modal .sheet().
+//  Collapsed, it's just the drag handle + "Trip Details" label peeking up; dragging it up
+//  (or tapping the handle) expands the SAME sheet into the full itinerary, exactly like
+//  NavigationBottomSheet's isCollapsed toggle — so it never covers the map/top bar the way
+//  a system sheet would, and the handle/label are always part of a real sheet surface
+//  rather than floating bare on the map.
+//
+//  The current leg is highlighted as a blue "active" card; the quest's own photo-checkpoint
+//  steps (from POST /private/journey/go, unrelated in the API to the route's segments) are
+//  matched onto the nearest segment by straight-line distance to its destination, best-effort
+//  — there's no server-side link between the two.
 
 import CoreLocation
 import SwiftUI
@@ -17,7 +22,7 @@ struct GoTripDetailsPanel: View {
     let journey: JourneyResult
     let currentSegmentIndex: Int
     let steps: [JourneyAttemptStep]
-    let onCollapse: () -> Void
+    @Binding var isExpanded: Bool
 
     private var matchedSteps: [String: JourneyAttemptStep] {
         let candidates: [(step: JourneyAttemptStep, location: CLLocation)] = steps.compactMap { step in
@@ -50,7 +55,7 @@ struct GoTripDetailsPanel: View {
                 .frame(width: 38, height: 5)
                 .padding(.vertical, 10)
                 .contentShape(Rectangle())
-                .onTapGesture { onCollapse() }
+                .onTapGesture { toggle() }
 
             HStack {
                 Text("Trip Details")
@@ -59,39 +64,45 @@ struct GoTripDetailsPanel: View {
                 Spacer()
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 10)
+            .padding(.bottom, isExpanded ? 10 : 16)
 
-            modeChipsRow
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
-
-            leaveArriveBar
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
-
-            ScrollView(.vertical, showsIndicators: false) {
-                timeline
+            if isExpanded {
+                modeChipsRow
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
-            }
-            .frame(maxHeight: 380)
-            .mask(
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: .black, location: 0.0),
-                        .init(color: .black, location: 0.9),
-                        .init(color: .clear, location: 1.0)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
+                    .padding(.bottom, 12)
+
+                leaveArriveBar
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    timeline
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 28)
+                }
+                .frame(maxHeight: 380)
+                .mask(
+                    LinearGradient(
+                        gradient: Gradient(stops: [
+                            .init(color: .black, location: 0.0),
+                            .init(color: .black, location: 0.9),
+                            .init(color: .clear, location: 1.0)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                 )
-            )
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
         }
         .gesture(
             DragGesture()
                 .onEnded { value in
-                    if value.translation.height > 35 {
-                        onCollapse()
+                    let dy = value.translation.height
+                    if dy > 35 {
+                        setExpanded(false)
+                    } else if dy < -35 {
+                        setExpanded(true)
                     }
                 }
         )
@@ -103,6 +114,16 @@ struct GoTripDetailsPanel: View {
             Color.white
                 .frame(height: 120)
                 .offset(y: 120)
+        }
+    }
+
+    private func toggle() {
+        setExpanded(!isExpanded)
+    }
+
+    private func setExpanded(_ expanded: Bool) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            isExpanded = expanded
         }
     }
 

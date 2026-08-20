@@ -9,10 +9,12 @@
 //  to be overlaid directly on top of HomeScreen's existing LocalBaliMapView, the same way
 //  the pre-Go "Navigation Mode" overlay works.
 //
-//  The bottom panel is a collapsed/expanded toggle, not a modal sheet: collapsed shows the
-//  current step as a floating card (no background, matching the map behind it); expanded
-//  shows GoTripDetailsPanel, a docked white sheet like NavigationBottomSheet's — so it never
-//  fully covers the map/top bar the way a system .sheet() would.
+//  The bottom panel is: a floating current-step card (no background, matching the map
+//  behind it) sitting above GoTripDetailsPanel, an always-present docked white sheet
+//  (like NavigationBottomSheet's) that toggles between a collapsed "Trip Details" peek and
+//  the full itinerary — dragging or tapping its handle never covers the map/top bar the way
+//  a modal .sheet() would. The floating card hides while the sheet is expanded, since the
+//  expanded itinerary already shows the current leg as its own highlighted card.
 
 import SwiftUI
 
@@ -64,62 +66,49 @@ struct GoComponentMode: View {
         }
     }
 
-    @ViewBuilder
     private var bottomPanel: some View {
-        if isTripDetailsExpanded {
+        VStack(alignment: .leading, spacing: 10) {
+            if !isTripDetailsExpanded {
+                currentStepCard
+            }
+
             GoTripDetailsPanel(
                 journey: journey,
                 currentSegmentIndex: currentSegmentIndex,
                 steps: steps,
-                onCollapse: collapseTripDetails
+                isExpanded: $isTripDetailsExpanded
             )
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        } else if let segment = currentSegment {
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+
+    @ViewBuilder
+    private var currentStepCard: some View {
+        if let segment = currentSegment {
             switch variant {
             case .walking:
-                GoBottomPanel(
-                    livePill: nil,
-                    card: AnyView(walkCard(segment)),
-                    onTripDetails: expandTripDetails
-                )
+                walkCard(segment)
 
             case .commute, .commuteOnGoing:
-                GoBottomPanel(
-                    livePill: (
+                VStack(alignment: .leading, spacing: 10) {
+                    GoBusLivePill(
                         title: "Check Bus Live Location",
                         subtitle: "Open \(segment.routeName ?? "Transit App")",
                         action: {}
-                    ),
-                    card: AnyView(
-                        GoBusAppCard(
-                            providerCode: segment.routeRef ?? "BUS",
-                            promptText: "Check bus live location on",
-                            appName: segment.routeName ?? "Transit App",
-                            downloadLabel: "Download App",
-                            onDownload: {}
-                        )
-                    ),
-                    onTripDetails: expandTripDetails
-                )
+                    )
+
+                    GoBusAppCard(
+                        providerCode: segment.routeRef ?? "BUS",
+                        promptText: "Check bus live location on",
+                        appName: segment.routeName ?? "Transit App",
+                        downloadLabel: "Download App",
+                        onDownload: {}
+                    )
+                }
             }
         } else {
-            GoBottomPanel(
-                livePill: nil,
-                card: AnyView(arrivedCard),
-                onTripDetails: expandTripDetails
-            )
-        }
-    }
-
-    private func expandTripDetails() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-            isTripDetailsExpanded = true
-        }
-    }
-
-    private func collapseTripDetails() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-            isTripDetailsExpanded = false
+            arrivedCard
         }
     }
 
