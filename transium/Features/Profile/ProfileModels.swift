@@ -42,13 +42,31 @@ public nonisolated struct Profile: Codable, Identifiable, Sendable, Equatable {
 }
 
 // MARK: - Update Profile Request
-public nonisolated struct UpdateProfileRequest: Codable, Sendable {
+/// `firstName` is omitted from the request when nil (leave unchanged); `lastName`
+/// is always sent, as an explicit JSON `null` when nil, matching the API's
+/// "omit to keep, null to clear" contract for that field.
+public nonisolated struct UpdateProfileRequest: Encodable, Sendable {
     public let firstName: String?
     public let lastName: String?
 
     public init(firstName: String? = nil, lastName: String? = nil) {
         self.firstName = firstName
         self.lastName = lastName
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case firstName, lastName
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(firstName, forKey: .firstName)
+
+        if let lastName {
+            try container.encode(lastName, forKey: .lastName)
+        } else {
+            try container.encodeNil(forKey: .lastName)
+        }
     }
 }
 

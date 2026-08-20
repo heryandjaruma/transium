@@ -46,12 +46,14 @@ struct ProfileScreen: View {
 
     // Name editing
     @State private var userName: String = ""
-    @State private var isEditingName: Bool = false
-    @State private var editedName: String = ""
 
     // Account editing
     @State private var email: String = ""
     @State private var isEditingAccount: Bool = false
+    @State private var editedFirstName: String = ""
+    @State private var editedLastName: String = ""
+    @State private var isSavingAccount: Bool = false
+    @State private var accountSaveError: String?
     @State private var showDeleteAccountConfirmation: Bool = false
 
     // Gallery
@@ -122,16 +124,6 @@ struct ProfileScreen: View {
         .task {
             await loadProfile()
         }
-        .alert("Edit Name", isPresented: $isEditingName) {
-            TextField("Name", text: $editedName)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") {
-                let trimmed = editedName.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !trimmed.isEmpty {
-                    userName = trimmed
-                }
-            }
-        }
         .sheet(isPresented: $isEditingAccount) {
             editAccountSheet
         }
@@ -182,6 +174,42 @@ struct ProfileScreen: View {
             return URL(string: raw)
         }
         return APIConfiguration.origin.appending(path: raw.hasPrefix("/") ? String(raw.dropFirst()) : raw)
+    }
+
+    private func presentEditAccount() {
+        editedFirstName = profile?.firstName ?? ""
+        editedLastName = profile?.lastName ?? ""
+        accountSaveError = nil
+        isEditingAccount = true
+    }
+
+    private func saveAccountChanges() async {
+        guard let userId = session.profile?.id else { return }
+
+        let trimmedFirstName = editedFirstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedFirstName.isEmpty else {
+            accountSaveError = "First name can't be empty."
+            return
+        }
+
+        let trimmedLastName = editedLastName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        isSavingAccount = true
+        accountSaveError = nil
+        defer { isSavingAccount = false }
+
+        do {
+            let updated = try await ProfileService.shared.updateProfile(
+                userId: userId,
+                firstName: trimmedFirstName,
+                lastName: trimmedLastName.isEmpty ? nil : trimmedLastName
+            )
+            profile = updated
+            userName = updated.fullName
+            isEditingAccount = false
+        } catch {
+            accountSaveError = "Couldn't save your changes. Please try again."
+        }
     }
 
     // MARK: - Header
@@ -263,15 +291,6 @@ struct ProfileScreen: View {
                     Text(userName)
                         .font(TransiumFont.body(20, weight: .semibold))
                         .foregroundColor(.white)
-
-                    Button {
-                        editedName = userName
-                        isEditingName = true
-                    } label: {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
                 }
 
                 Label("Explorer", systemImage: "star.fill")
@@ -334,7 +353,7 @@ struct ProfileScreen: View {
 
     private var editAccountButton: some View {
         Button {
-            isEditingAccount = true
+            presentEditAccount()
         } label: {
             Text("Edit Account")
                 .font(TransiumFont.body(16, weight: .semibold))
@@ -485,6 +504,22 @@ struct ProfileScreen: View {
     private var editAccountSheet: some View {
         NavigationStack {
             Form {
+                Section("Name") {
+                    TextField("First name", text: $editedFirstName)
+                        .textInputAutocapitalization(.words)
+                        .disableAutocorrection(true)
+
+                    TextField("Last name", text: $editedLastName)
+                        .textInputAutocapitalization(.words)
+                        .disableAutocorrection(true)
+
+                    if let accountSaveError {
+                        Text(accountSaveError)
+                            .font(TransiumFont.body(12))
+                            .foregroundColor(.red)
+                    }
+                }
+
                 Section("Email") {
                     Text(email)
                         .foregroundColor(.gray)
@@ -509,6 +544,21 @@ struct ProfileScreen: View {
                     Button("Close") {
                         isEditingAccount = false
                     }
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task {
+                            await saveAccountChanges()
+                        }
+                    } label: {
+                        if isSavingAccount {
+                            ProgressView()
+                        } else {
+                            Text("Save")
+                        }
+                    }
+                    .disabled(isSavingAccount || editedFirstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
             .confirmationDialog(
