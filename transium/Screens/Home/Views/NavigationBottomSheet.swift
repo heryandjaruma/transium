@@ -186,9 +186,6 @@ struct StepTimelineView: View {
                         walkCard(segment, index: index)
                     }
                 }
-
-                // Final Destination Mission Card
-                destinationMissionCard
             }
         }
     }
@@ -219,23 +216,6 @@ struct StepTimelineView: View {
                         .font(TransiumFont.body(14, weight: .bold))
                         .foregroundColor(.black)
                 }
-            }
-            
-            if let steps = segment.steps, !steps.isEmpty {
-                Divider()
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(steps.prefix(2), id: \.instructions) { step in
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.turn.down.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.gray)
-                            Text(step.instructions)
-                                .font(TransiumFont.body(13))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                .padding(.leading, 8)
             }
         }
         .padding(14)
@@ -393,84 +373,4 @@ struct StepTimelineView: View {
         )
     }
 
-    // MARK: - Destination Mission Card
-    private var destinationMissionCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color(red: 0.94, green: 0.27, blue: 0.27))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "flag.fill")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(journey.destinationName)
-                        .font(TransiumFont.body(15, weight: .bold))
-                        .foregroundColor(.black)
-                    Text("Destination Reached")
-                        .font(TransiumFont.body(12))
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                Text(arrivalTime)
-                    .font(TransiumFont.body(14, weight: .bold))
-                    .foregroundColor(.black)
-            }
-            
-            Divider()
-            
-            // Action bar: Star (Bookmark), Share, Copy
-            HStack(spacing: 24) {
-                Button(action: {
-                    AppToastCenter.shared.showSuccess(title: "Saved", message: "Destination saved.")
-                }) {
-                    Image(systemName: "star")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
-                }
-                
-                Button(action: {
-                    AppToastCenter.shared.showSuccess(title: "Shared", message: "Destination link copied.")
-                }) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
-                }
-                
-                Button(action: {
-                    UIPasteboard.general.string = journey.destinationName
-                    AppToastCenter.shared.showSuccess(title: "Copied", message: "Name copied to clipboard.")
-                }) {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
-                }
-                
-                Spacer()
-            }
-            .padding(.top, 2)
-            .padding(.leading, 8)
-        }
-        .padding(14)
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(.systemGray5), lineWidth: 1)
-        )
-    }
-    
-    private var arrivalTime: String {
-        let totalSecs = journey.segments.compactMap { $0.durationSeconds }.reduce(0, +)
-        let arrivalDate = Date().addingTimeInterval(totalSecs > 0 ? totalSecs : 1200)
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter.string(from: arrivalDate)
-    }
 }

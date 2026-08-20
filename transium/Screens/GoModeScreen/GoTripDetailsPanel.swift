@@ -297,8 +297,6 @@ struct GoTripDetailsPanel: View {
                         inactiveWalkCard(segment, index: index, isDone: index < currentSegmentIndex)
                     }
                 }
-
-                finishCard
             }
         }
     }
@@ -692,84 +690,11 @@ struct GoTripDetailsPanel: View {
     }
     #endif
 
-    // MARK: - Finish Card
-
-    private var finishCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle().fill(Color.white.opacity(0.2)).frame(width: 36, height: 36)
-                    Image(systemName: "flag.fill")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.white)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(journey.destinationName)
-                        .font(TransiumFont.body(15, weight: .bold))
-                        .foregroundColor(.white)
-                    Text("Finish the quest to get your badge")
-                        .font(TransiumFont.body(12))
-                        .foregroundColor(.white.opacity(0.85))
-                }
-
-                Spacer()
-
-                Text(arrivalTime)
-                    .font(TransiumFont.body(14, weight: .bold))
-                    .foregroundColor(.white)
-            }
-
-            Divider().overlay(Color.white.opacity(0.3))
-
-            HStack(spacing: 24) {
-                Button(action: {
-                    AppToastCenter.shared.showSuccess(title: "Saved", message: "Destination saved.")
-                }) {
-                    Image(systemName: "star")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.white)
-                }
-
-                Button(action: {
-                    AppToastCenter.shared.showSuccess(title: "Shared", message: "Destination link copied.")
-                }) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.white)
-                }
-
-                Button(action: {
-                    UIPasteboard.general.string = journey.destinationName
-                    AppToastCenter.shared.showSuccess(title: "Copied", message: "Name copied to clipboard.")
-                }) {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.white)
-                }
-
-                Spacer()
-            }
-            .padding(.top, 2)
-            .padding(.leading, 8)
-        }
-        .padding(14)
-        .background(TransiumColor.primaryBlue)
-        .cornerRadius(16)
-    }
-
     // MARK: - Timing
 
     private var totalSeconds: Double {
         let sum = journey.segments.compactMap { $0.durationSeconds }.reduce(0, +)
         return sum > 0 ? sum : Double(journey.summary.walkingDurationSeconds) + (journey.summary.transitDistanceMeters / 5.5)
-    }
-
-    private var arrivalTime: String {
-        let arrivalDate = Date().addingTimeInterval(totalSeconds)
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter.string(from: arrivalDate)
     }
 }
 
