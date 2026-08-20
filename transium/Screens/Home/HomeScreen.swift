@@ -59,6 +59,9 @@ struct HomeScreen: View {
     /// — every step reaching "done" is detected from each /advance response, which can fire
     /// more than once in a row (e.g. two geofences resolving close together).
     @State private var hasSubmittedJourneyCompletion = false
+    /// Set once POST /private/journey/{id}/complete succeeds — drives
+    /// JourneyCompletionSummaryScreen's `.fullScreenCover(item:)`.
+    @State private var journeyCompletionResult: JourneyCompleteResult? = nil
 
     // MARK: - Search & Profile State
     @State private var isSearchPresented = false
@@ -311,6 +314,12 @@ struct HomeScreen: View {
         .fullScreenCover(item: $pendingPhotoStep) { step in
             CameraScreen(onCaptured: { image in
                 await handlePhotoCaptured(image: image, step: step)
+            })
+        }
+        .fullScreenCover(item: $journeyCompletionResult) { result in
+            JourneyCompletionSummaryScreen(result: result, onDismiss: {
+                journeyCompletionResult = nil
+                endGoMode()
             })
         }
         .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
@@ -969,13 +978,7 @@ struct HomeScreen: View {
                 await MainActor.run {
                     goJourneyAttempt = result.journeyAttempt
                     geofenceMonitor.stopMonitoring()
-
-                    let badgeCount = result.badgesAwarded.count
-                    let badgeText = badgeCount == 0 ? "" : " and earned \(badgeCount) badge\(badgeCount == 1 ? "" : "s")"
-                    AppToastCenter.shared.showSuccess(
-                        title: "Quest Complete!",
-                        message: "You gained \(result.xpAwarded) XP\(badgeText)."
-                    )
+                    journeyCompletionResult = result
                 }
             } catch {
                 await MainActor.run {

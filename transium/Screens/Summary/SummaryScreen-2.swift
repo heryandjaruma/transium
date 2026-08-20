@@ -10,10 +10,12 @@ import SwiftUI
 struct SummaryCelebrationScreen: View {
 
     let cards: [StatCardData]
-    let origin: String = "Jimbaran"
-    let destination: String = "Sanur Beach"
-    let tripTitle: String = "Sanoored Trip"
-    let photoName: String = "sanoored"
+    var origin: String = "Jimbaran"
+    var destination: String = "Sanur Beach"
+    var tripTitle: String = "Sanoored"
+    var badgeImageUrl: String? = nil
+    var onShare: () -> Void = {}
+    var onNext: () -> Void = {}
 
     private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
@@ -49,11 +51,10 @@ struct SummaryCelebrationScreen: View {
                         
                     }
                     ZStack{
-                        
-                        Image("SampleBadge")
-                            .resizable()
+
+                        BadgeArtworkImage(urlString: badgeImageUrl)
                             .frame(width: 150, height: 150)
-                        
+
                     }
                 }
 
@@ -65,15 +66,15 @@ struct SummaryCelebrationScreen: View {
                                 .resizable()
                                 .frame(width: 12, height: 12)
                             
-                            Text("Jimbaran")
-                            
+                            Text(origin)
+
                             Image(systemName: "arrow.right")
-                            
+
                             Image("GreenPoint")
                                 .resizable()
                                 .frame(width: 12, height: 12)
-                            
-                            Text("Sanur Beach")
+
+                            Text(destination)
                             
                         }
                         .padding(.top, 20)
@@ -104,7 +105,7 @@ struct SummaryCelebrationScreen: View {
                     
                     ZStack{
                         OutlinedText(
-                            text: "Sanoored",
+                            text: tripTitle,
                             font: TransiumFont.display(43),
                             fillColor: .white,
                             strokeColor: .primaryBlue,
@@ -129,16 +130,18 @@ struct SummaryCelebrationScreen: View {
                         backgroundColor: .black,
                         foregroundColor: .white,
                         icon: "square.and.arrow.up",
-                        iconPosition: .trailing
-                    ) {}
+                        iconPosition: .trailing,
+                        action: onShare
+                    )
 
                     TransiumSecondaryButton(
                         title: "Go to the Next Trip!",
                         backgroundColor: .white,
                         foregroundColor: .blue,
                         icon: "arrow.right",
-                        iconPosition: .trailing
-                    ) {}
+                        iconPosition: .trailing,
+                        action: onNext
+                    )
                     .accessibilityLabel("Go to the Next Trip")
                 }
                 .padding(.horizontal)

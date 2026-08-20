@@ -688,7 +688,9 @@ nonisolated struct CompleteJourneyResponse: Codable {
 /// XP/badges, and the caller's updated profile. Idempotent — calling this again on an
 /// already-completed attempt returns it unchanged with `xpAwarded: 0`, `badgesAwarded: []`,
 /// and `summary: nil` (no JourneySummary row exists for that path).
-public nonisolated struct JourneyCompleteResult: Sendable, Equatable {
+public nonisolated struct JourneyCompleteResult: Identifiable, Sendable, Equatable {
+    public var id: String { journeyAttempt.id }
+
     public let journeyAttempt: JourneyAttempt
     public let steps: [JourneyAttemptStep]
     public let summary: JourneySummary?
