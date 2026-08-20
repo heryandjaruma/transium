@@ -81,10 +81,12 @@ enum GoTravelMode {
         }
     }
 
+    /// Line name for the badge under the icon, truncated at the first "-" (e.g. "K5B-0" → "K5B") —
+    /// the suffix after the dash is an internal variant/direction marker, not part of the line name.
     fileprivate var badgeCode: String? {
         switch self {
         case .walking: nil
-        case .bus(let providerCode): providerCode
+        case .bus(let providerCode): providerCode.split(separator: "-").first.map(String.init) ?? providerCode
         }
     }
 }
@@ -96,15 +98,23 @@ private struct GoStepIcon: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: size * 0.35, style: .continuous)
-                .fill(.white)
-                .frame(width: size, height: size)
-                .overlay {
-                    Image(systemName: mode.symbolName)
-                        .font(.system(size: size * 0.60, weight: .semibold))
-                        .foregroundStyle(TransiumColor.primaryBlue)
-                }
-//                .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+            switch mode {
+            case .walking:
+                RoundedRectangle(cornerRadius: size * 0.35, style: .continuous)
+                    .fill(.white)
+                    .frame(width: size, height: size)
+                    .overlay {
+                        Image(systemName: mode.symbolName)
+                            .font(.system(size: size * 0.60, weight: .semibold))
+                            .foregroundStyle(TransiumColor.primaryBlue)
+                    }
+
+            case .bus:
+                Image("LineIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+            }
 
             if let badgeCode = mode.badgeCode {
                 Text(badgeCode)

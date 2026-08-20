@@ -45,12 +45,39 @@ struct GoComponentMode: View {
 
     @State private var isTripDetailsExpanded = false
 
+    private static let busStopProximityMeters: Double = 69
+
     private var currentSegment: JourneySegment? {
         journey.segments.indices.contains(currentSegmentIndex) ? journey.segments[currentSegmentIndex] : nil
     }
 
+    /// The upcoming bus leg, when the current segment is the walk leading straight to its stop.
+    private var upcomingBusSegment: JourneySegment? {
+        guard let segment = currentSegment, segment.type != "bus",
+              journey.segments.indices.contains(currentSegmentIndex + 1) else { return nil }
+        let next = journey.segments[currentSegmentIndex + 1]
+        return next.type == "bus" ? next : nil
+    }
+
+    /// True once the live distance to the current walking leg's destination (the bus stop)
+    /// drops within `busStopProximityMeters` — switches the card over to "check bus live
+    /// location" early, before the segment index itself advances.
+    private var isNearUpcomingBusStop: Bool {
+        guard upcomingBusSegment != nil, let segment = currentSegment,
+              let distance = segment.liveRemaining(from: currentLocation).distanceMeters else { return false }
+        return distance <= Self.busStopProximityMeters
+    }
+
     private var variant: Variant {
-        currentSegment?.type == "bus" ? .commute : .walking
+        if currentSegment?.type == "bus" { return .commute }
+        if isNearUpcomingBusStop { return .commute }
+        return .walking
+    }
+
+    /// The segment whose route info (name, ref, color) the commute card should show —
+    /// either the current bus leg itself, or the upcoming one when near its stop on the walk in.
+    private var busInfoSegment: JourneySegment? {
+        currentSegment?.type == "bus" ? currentSegment : upcomingBusSegment
     }
 
     var body: some View {
@@ -96,25 +123,39 @@ struct GoComponentMode: View {
                 walkCard(segment)
 
             case .commute, .commuteOnGoing:
-                VStack(alignment: .leading, spacing: 10) {
-                    GoBusLivePill(
-                        title: "Check Bus Live Location",
-                        subtitle: "Open \(segment.routeName ?? "Transit App")",
-                        action: {}
-                    )
+                if let busSegment = busInfoSegment {
+                    VStack(alignment: .leading, spacing: 10) {
+                        GoBusLivePill(
+                            title: "Check Bus Live Location",
+                            subtitle: "Open \(busSegment.routeName ?? "Transit App")",
+                            action: openTMDApp
+                        )
 
-                    GoBusAppCard(
-                        providerCode: segment.routeRef ?? "BUS",
-                        promptText: "Check bus live location on",
-                        appName: segment.routeName ?? "Transit App",
-                        downloadLabel: "Download App",
-                        onDownload: {}
-                    )
+                        GoBusAppCard(
+                            providerCode: busSegment.routeRef ?? "BUS",
+                            promptText: "Check bus live location on",
+                            appName: busSegment.routeName ?? "Transit App",
+                            downloadLabel: "Download App",
+                            onDownload: openTMDAppStorePage
+                        )
+                    }
                 }
             }
         } else {
             arrivedCard
         }
+    }
+
+    /// The TMD app has no known custom URL scheme registered in this project yet, so both
+    /// "Open" and "Download" currently just send the user to its App Store page.
+    private static let tmdAppStoreURL = URL(string: "https://apps.apple.com/id/app/trans-metro-dewata/id6744358191")!
+
+    private func openTMDApp() {
+        UIApplication.shared.open(Self.tmdAppStoreURL)
+    }
+
+    private func openTMDAppStorePage() {
+        UIApplication.shared.open(Self.tmdAppStoreURL)
     }
 
     private func walkCard(_ segment: JourneySegment) -> some View {
