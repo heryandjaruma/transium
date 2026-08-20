@@ -167,12 +167,7 @@ struct HomeScreen: View {
                     // Top Search Bar, Locate, Quick Menu & Profile Controls
                     HStack(spacing: 10) {
 //                        searchBarTrigger
-                        
                         quickMenu
-                        
-                        
-                        
-                        
                     }
                     .padding(.top, 6)
                     .padding(.horizontal, 20)

@@ -125,6 +125,7 @@ final class SessionController {
 
         if let token = SessionTokenStore.read() {
             // Local sign-out should still succeed if the server request fails.
+            await PushNotificationManager.shared.unregisterCurrentDevice()
             try? await backend.signOut(accessToken: token)
         }
 
