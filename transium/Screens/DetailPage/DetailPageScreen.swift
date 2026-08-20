@@ -64,17 +64,9 @@ struct DetailPlaceScreen: View {
     
     @Environment(\.dismiss) private var dismiss
     @State private var selectedImageIndex: Int = 0
+    @State private var headerImageUrls: [String] = []
     @State private var quests: [Quest] = []
     @State private var isLoadingQuests: Bool = false
-    
-    private var galleryImages: [String] {
-        if isBenoa {
-            return ["kintamani", "traveling", "gwk"]
-        } else if isUbud {
-            return ["kintamani", "traveling", "gwk"]
-        }
-        return ["gallery-1", "gallery-2", "gallery-3"]
-    }
     
     private var isBenoa: Bool {
         kelurahan.kelurahanName.localizedCaseInsensitiveContains("benoa")
@@ -133,19 +125,48 @@ struct DetailPlaceScreen: View {
     private var imageCarousel: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $selectedImageIndex) {
-                ForEach(Array(galleryImages.enumerated()), id: \.offset) { index, imageName in
-                    Image(imageName)
-                        .resizable()
-                        .scaledToFill()
+                if !headerImageUrls.isEmpty {
+                    ForEach(Array(headerImageUrls.enumerated()), id: \.offset) { index, urlString in
+                        let fullUrl = urlString.hasPrefix("http") ? urlString : "https://transium-api.heryandjaruma.workers.dev\(urlString)"
+                        
+                        GeometryReader { proxy in
+                            AsyncImage(url: URL(string: fullUrl)) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: proxy.size.width, height: proxy.size.height)
+                                        .clipped()
+                                default:
+                                    Image("kintamani")
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: proxy.size.width, height: proxy.size.height)
+                                        .clipped()
+                                }
+                            }
+                        }
                         .tag(index)
-                        .clipped()
+                    }
+                } else {
+                    GeometryReader { proxy in
+                        Image("kintamani")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: proxy.size.width, height: proxy.size.height)
+                            .clipped()
+                    }
+                    .tag(0)
                 }
             }
             .frame(height: 340)
             .tabViewStyle(.page(indexDisplayMode: .never))
             
-            PageIndicator(currentPage: selectedImageIndex, totalPages: galleryImages.count)
-                .padding(.bottom, 60)
+            if headerImageUrls.count > 1 {
+                PageIndicator(currentPage: selectedImageIndex, totalPages: headerImageUrls.count)
+                    .padding(.bottom, 60)
+            }
         }
         .frame(height: 340)
     }
@@ -242,6 +263,7 @@ struct DetailPlaceScreen: View {
     private func loadQuests() async {
         if !initialQuests.isEmpty {
             quests = initialQuests
+            headerImageUrls = initialQuests.compactMap { $0.imageUrl }
             return
         }
         
@@ -251,6 +273,10 @@ struct DetailPlaceScreen: View {
         do {
             let detail = try await QuestService.shared.getKelurahanQuests(id: kelurahan.id)
             if !detail.quests.isEmpty {
+                // Collect header carousel thumbnails from all quests in this kelurahan
+                let allThumbUrls = detail.quests.flatMap { $0.thumbnails.map { $0.url } }
+                headerImageUrls = allThumbUrls
+                
                 var loaded: [Quest] = []
                 for (index, q) in detail.quests.enumerated() {
                     let theme: QuestTheme = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .red : .green)

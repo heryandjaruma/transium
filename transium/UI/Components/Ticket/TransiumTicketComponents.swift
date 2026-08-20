@@ -31,6 +31,13 @@ struct TransiumStampVariant: Equatable {
         shadowColor: Color(red: 0.55, green: 0.32, blue: 0.08).opacity(0.2),
         imageBackground: TransiumColor.primaryYellow
     )
+
+    static let green = TransiumStampVariant(
+        frameColor: Color(red: 0.84, green: 0.95, blue: 0.88),
+        paperColor: Color(red: 0.93, green: 0.98, blue: 0.95),
+        shadowColor: Color(red: 0.12, green: 0.45, blue: 0.22).opacity(0.18),
+        imageBackground: Color(red: 0.75, green: 0.92, blue: 0.82)
+    )
 }
 
 struct TransiumBadgeVariant: Equatable {
@@ -314,6 +321,58 @@ extension TransiumTicketCard where Stamp == TransiumStampCard<Image>, BodyConten
     ) {
         self.init(variant: variant) {
             TransiumStampCard(imageName: imageName, size: 104)
+        } bodyContent: {
+            TransiumTicketCopy(title: title, subtitle: subtitle, variant: variant)
+        } footer: {
+            TransiumTicketFooter(distance: distance, price: price, variant: variant)
+        }
+    }
+}
+
+extension TransiumTicketCard where Stamp == TransiumStampCard<AnyView>, BodyContent == TransiumTicketCopy, Footer == TransiumTicketFooter {
+    init(
+        title: String,
+        subtitle: String,
+        distance: String,
+        price: String,
+        imageUrl: String?,
+        fallbackImageName: String = "kintamani",
+        variant: TransiumTicketVariant = .blue
+    ) {
+        let stampVariant: TransiumStampVariant = {
+            switch variant {
+            case .blue: return .blue
+            case .mint: return .green
+            case .coral: return .warm
+            default: return .classic
+            }
+        }()
+        
+        self.init(variant: variant) {
+            TransiumStampCard(size: 104, tilt: .degrees(-4), variant: stampVariant) {
+                AnyView(
+                    Group {
+                        if let imageUrl, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let img):
+                                    img
+                                        .resizable()
+                                        .scaledToFill()
+                                default:
+                                    Image(fallbackImageName)
+                                        .resizable()
+                                        .scaledToFill()
+                                }
+                            }
+                        } else {
+                            Image(fallbackImageName)
+                                .resizable()
+                                .scaledToFill()
+                        }
+                    }
+                )
+            }
         } bodyContent: {
             TransiumTicketCopy(title: title, subtitle: subtitle, variant: variant)
         } footer: {

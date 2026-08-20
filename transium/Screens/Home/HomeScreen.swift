@@ -238,9 +238,10 @@ struct HomeScreen: View {
     private func fetchKelurahanGroups() async {
         do {
             let groups = try await QuestService.shared.listKelurahanQuests()
-            if !groups.isEmpty {
-                kelurahanGroups = groups
-                if let first = groups.first {
+            let validGroups = groups.filter { !$0.quests.isEmpty }
+            if !validGroups.isEmpty {
+                kelurahanGroups = validGroups
+                if let first = validGroups.first {
                     selectedKelurahan = first.kelurahan
                 }
             }
@@ -490,7 +491,8 @@ struct HomeScreen: View {
                                 subtitle: group.quests.first?.description ?? "\(group.kelurahan.kecamatanName), Bali",
                                 distance: "11 km",
                                 price: "Rp. 4,4k",
-                                imageName: isRecommended ? TransiumAsset.Illustration.onboardingExplore : TransiumAsset.Illustration.onboardingAdventure,
+                                imageUrl: group.quests.first?.thumbnails.first?.url,
+                                fallbackImageName: isRecommended ? "kintamani" : "Beach",
                                 variant: variant
                             )
                             .contentShape(Rectangle())

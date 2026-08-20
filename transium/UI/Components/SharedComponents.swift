@@ -164,18 +164,23 @@ struct QuestRow: View {
     var onStart: (() -> Void)? = nil
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack(alignment: .center) {
-                Image("Wow")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 86, height: 86)
-                
-                thumbnailView
-                    .frame(width: 58, height: 58)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+        let stampVariant: TransiumStampVariant = {
+            switch quest.theme {
+            case .blue: return .blue
+            case .red: return .warm
+            case .green: return .green
             }
-            .frame(width: 80, height: 80)
+        }()
+
+        HStack(spacing: 14) {
+            TransiumStampCard(
+                size: 74,
+                tilt: .degrees(0),
+                variant: stampVariant
+            ) {
+                thumbnailView
+            }
+            .frame(width: 74, height: 74)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(quest.title)
@@ -266,7 +271,7 @@ struct RecommendedQuestCard: View {
                     .clipShape(Capsule())
  
                 Text(title)
-                    .font(TransiumFont.body(19, weight: .bold))
+                    .font(TransiumFont.body(20, weight: .bold))
                     .foregroundColor(.white)
  
                 Text(subtitle)
@@ -291,12 +296,11 @@ struct RecommendedQuestCard: View {
  
             // Right postage column
             ZStack(alignment: .bottom) {
-                ZStack(alignment: .center) {
-                    Image("Wow")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 140, height: 110)
-                    
+                TransiumStampCard(
+                    size: 96,
+                    tilt: .degrees(0),
+                    variant: .green
+                ) {
                     if let imageUrl, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
                         AsyncImage(url: url) { phase in
                             switch phase {
@@ -310,17 +314,13 @@ struct RecommendedQuestCard: View {
                                     .scaledToFill()
                             }
                         }
-                        .frame(width: 78, height: 78)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
                     } else {
                         Image(fallbackImageName)
                             .resizable()
                             .scaledToFill()
-                            .frame(width: 78, height: 78)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                 }
-                .offset(y: -14)
+                .padding(.bottom, 16)
  
                 TransiumPrimaryButton(
                     title: "Start Quest",
