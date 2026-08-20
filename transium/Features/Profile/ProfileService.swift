@@ -12,8 +12,8 @@ public protocol ProfileServiceProtocol: Sendable {
     /// Update the caller's profile name.
     func updateProfile(userId: String, firstName: String?, lastName: String?) async throws -> Profile
     
-    /// Upload the caller's avatar photo.
-    func uploadAvatar(imageData: Data, filename: String, mimeType: String) async throws -> Profile
+    /// Upload the caller's avatar photo. Returns the new avatar image URL.
+    func uploadAvatar(imageData: Data, filename: String, mimeType: String) async throws -> String
     
     /// Remove the caller's avatar photo.
     func deleteAvatar() async throws
@@ -51,7 +51,7 @@ public final class ProfileService: ProfileServiceProtocol, Sendable {
         return response.profile
     }
 
-    public func uploadAvatar(imageData: Data, filename: String = "avatar.jpg", mimeType: String = "image/jpeg") async throws -> Profile {
+    public func uploadAvatar(imageData: Data, filename: String = "avatar.jpg", mimeType: String = "image/jpeg") async throws -> String {
         var multipart = MultipartFormData()
         multipart.appendFile(
             fieldName: "file",
@@ -59,12 +59,12 @@ public final class ProfileService: ProfileServiceProtocol, Sendable {
             mimeType: mimeType,
             fileData: imageData
         )
-        let response: ProfileResponse = try await apiClient.upload(
+        let response: AvatarUploadResponse = try await apiClient.upload(
             path: "/private/profile/media",
             multipart: multipart,
             requiresAuth: true
         )
-        return response.profile
+        return response.image
     }
 
     public func deleteAvatar() async throws {

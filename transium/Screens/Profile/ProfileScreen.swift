@@ -75,6 +75,7 @@ struct ProfileScreen: View {
     @State private var showPhotoSourceDialog = false
     @State private var activePickerSource: UIImagePickerController.SourceType?
     @State private var avatarImage: UIImage? = nil
+    @State private var isUploadingAvatar: Bool = false
     @State private var isSettingsPresented: Bool = false
 
     // Badges
@@ -212,6 +213,136 @@ struct ProfileScreen: View {
         }
     }
 
+    // MARK: - Avatar
+
+    private var hasAvatar: Bool {
+        avatarImage != nil || profile?.image != nil
+    }
+
+    @ViewBuilder
+    private var avatarView: some View {
+        if let avatarImage {
+            Image(uiImage: avatarImage)
+                .resizable()
+                .scaledToFill()
+        } else if let imageURL = profile?.image.flatMap(resolvedImageURL) {
+            AsyncImage(url: imageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    avatarPlaceholder
+                }
+            }
+        } else {
+            avatarPlaceholder
+        }
+    }
+
+    private var avatarPlaceholder: some View {
+        ZStack {
+            Color.white.opacity(0.25)
+            Image(systemName: "person.fill")
+                .font(.system(size: 64, weight: .medium))
+                .foregroundColor(.white)
+        }
+    }
+
+    private func uploadAvatar(_ image: UIImage) async {
+        guard let imageData = await Task.detached(priority: .userInitiated, operation: {
+            Self.compressedAvatarData(from: image)
+        }).value else {
+            AppToastCenter.shared.showError(
+                title: "Couldn't update photo",
+                message: "That image couldn't be processed."
+            )
+            return
+        }
+
+        // Show the picked photo immediately; only revert if the upload fails.
+        avatarImage = image
+        isUploadingAvatar = true
+        defer { isUploadingAvatar = false }
+
+        do {
+            let imagePath = try await ProfileService.shared.uploadAvatar(
+                imageData: imageData,
+                filename: "avatar.jpg",
+                mimeType: "image/jpeg"
+            )
+            profile = updatingImage(on: profile, to: imagePath)
+        } catch {
+            avatarImage = nil
+            AppToastCenter.shared.showError(
+                title: "Couldn't update photo",
+                message: "Please try again in a moment."
+            )
+        }
+    }
+
+    private func removeAvatar() async {
+        isUploadingAvatar = true
+        defer { isUploadingAvatar = false }
+
+        do {
+            try await ProfileService.shared.deleteAvatar()
+            avatarImage = nil
+            profile = updatingImage(on: profile, to: nil)
+        } catch {
+            AppToastCenter.shared.showError(
+                title: "Couldn't remove photo",
+                message: "Please try again in a moment."
+            )
+        }
+    }
+
+    private func updatingImage(on profile: Profile?, to image: String?) -> Profile? {
+        guard let profile else { return nil }
+        return Profile(
+            id: profile.id,
+            userId: profile.userId,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            level: profile.level,
+            image: image,
+            email: profile.email
+        )
+    }
+
+    /// Re-encodes (and, if needed, downscales) the image until it fits under
+    /// `maxBytes`. Runs off the main actor since repeated JPEG encoding of a
+    /// full-resolution photo can take a noticeable amount of CPU time.
+    private static func compressedAvatarData(from image: UIImage, maxBytes: Int = 1_000_000) -> Data? {
+        var candidate = image
+        var quality: CGFloat = 0.9
+
+        for _ in 0..<6 {
+            var data = candidate.jpegData(compressionQuality: quality)
+
+            while let currentData = data, currentData.count > maxBytes, quality > 0.1 {
+                quality -= 0.15
+                data = candidate.jpegData(compressionQuality: quality)
+            }
+
+            if let data, data.count <= maxBytes {
+                return data
+            }
+
+            // Still too big even at low quality; shrink the dimensions and try again.
+            let smallerSize = CGSize(width: candidate.size.width * 0.7, height: candidate.size.height * 0.7)
+            guard smallerSize.width > 50, smallerSize.height > 50, let resized = candidate.resized(to: smallerSize) else {
+                return data
+            }
+
+            candidate = resized
+            quality = 0.8
+        }
+
+        return candidate.jpegData(compressionQuality: 0.3)
+    }
+
     // MARK: - Header
     private var header: some View {
         VStack(spacing: 16) {
@@ -238,40 +369,29 @@ struct ProfileScreen: View {
             .padding(.top, 8)
 
             ZStack(alignment: .bottomTrailing) {
-                Group {
-                    if let avatarImage {
-                        Image(uiImage: avatarImage)
-                            .resizable()
-                    } else if let imageURL = profile?.image.flatMap(resolvedImageURL) {
-                        AsyncImage(url: imageURL) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image.resizable()
-                            default:
-                                Image("profile_avatar")
-                                    .resizable()
-                            }
-                        }
-                    } else {
-                        Image("profile_avatar")
-                            .resizable()
-                    }
-                }
-                .scaledToFill()
-                .frame(width: 160, height: 160)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Color.white, lineWidth: 6))
+                avatarView
+                    .frame(width: 160, height: 160)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.white, lineWidth: 6))
 
                 Button {
                     showPhotoSourceDialog = true
                 } label: {
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 21, weight: .semibold))
-                        .foregroundColor(.black)
-                        .frame(width: 44, height: 44)
-                        .background(Color.white)
-                        .clipShape(Circle())
+                    Group {
+                        if isUploadingAvatar {
+                            ProgressView()
+                                .tint(.black)
+                        } else {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 21, weight: .semibold))
+                                .foregroundColor(.black)
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                    .background(Color.white)
+                    .clipShape(Circle())
                 }
+                .disabled(isUploadingAvatar)
                 .offset(x: -4, y: -4)
                 .confirmationDialog("Change profile photo", isPresented: $showPhotoSourceDialog, titleVisibility: .visible) {
                     if UIImagePickerController.isSourceTypeAvailable(.camera) {
@@ -281,6 +401,13 @@ struct ProfileScreen: View {
                     }
                     Button("Choose from Library") {
                         activePickerSource = .photoLibrary
+                    }
+                    if hasAvatar {
+                        Button("Remove Photo", role: .destructive) {
+                            Task {
+                                await removeAvatar()
+                            }
+                        }
                     }
                     Button("Cancel", role: .cancel) {}
                 }
@@ -304,7 +431,9 @@ struct ProfileScreen: View {
             .padding(.bottom, 20)
             .sheet(item: $activePickerSource) { source in
                 ImagePicker(sourceType: source) { image in
-                    avatarImage = image
+                    Task {
+                        await uploadAvatar(image)
+                    }
                 }
                 .ignoresSafeArea()
             }
@@ -656,6 +785,17 @@ final class ImageSaver: NSObject {
         contextInfo: UnsafeRawPointer
     ) {
         completion(error == nil, error)
+    }
+}
+
+// MARK: - Image Resize Helper
+
+extension UIImage {
+    func resized(to targetSize: CGSize) -> UIImage? {
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        return renderer.image { _ in
+            draw(in: CGRect(origin: .zero, size: targetSize))
+        }
     }
 }
 

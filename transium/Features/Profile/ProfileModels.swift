@@ -78,3 +78,12 @@ public nonisolated struct ProfileResponse: Codable, Sendable {
         self.profile = profile
     }
 }
+
+/// `POST /private/profile/media` returns just the new avatar URL, not a full `Profile`.
+public nonisolated struct AvatarUploadResponse: Codable, Sendable {
+    public let image: String
+
+    public init(image: String) {
+        self.image = image
+    }
+}
