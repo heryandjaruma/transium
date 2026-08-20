@@ -10,6 +10,7 @@ enum RoutePointType {
     case intermediate   // User passes on bus ("Pass")
     case alighting      // User exits bus ("Exit")
     case destination
+    case checkpoint     // A geofenced quest/photo step the app is actively watching for arrival
 }
 
 final class RoutePointAnnotation: NSObject, MLNAnnotation {
@@ -41,7 +42,11 @@ struct LocalBaliMapView: UIViewRepresentable {
     let markerHeading: CLLocationDirection
     let centerRequestID: Int
     let activeJourney: JourneyResult?
-    
+    /// The geofences POST /private/journey/go registered for this attempt (real quest-action
+    /// steps and the synthetic "takePicture" ones alike) — shown as subtle checkpoint markers
+    /// so the user can see where the app is actively watching for arrival. Empty outside Go Mode.
+    var checkpoints: [JourneyGeofence] = []
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
@@ -95,6 +100,7 @@ struct LocalBaliMapView: UIViewRepresentable {
         context.coordinator.syncRouteOverlays(
             on: mapView,
             activeJourney: activeJourney,
+            checkpoints: checkpoints,
             displayLocation: displayLocation,
             context: context
         )
@@ -170,11 +176,13 @@ struct LocalBaliMapView: UIViewRepresentable {
         func syncRouteOverlays(
             on mapView: MLNMapView,
             activeJourney: JourneyResult?,
+            checkpoints: [JourneyGeofence],
             displayLocation: CLLocation?,
             context: LocalBaliMapView.Context
         ) {
-            // Compute identity for current journey
-            let currentId = activeJourney.map { "\($0.origin.lat),\($0.origin.lng)-\($0.destination.lat),\($0.destination.lng)-\($0.segments.count)" }
+            // Compute identity for current journey — checkpoints included since they can arrive
+            // (or clear, on cancel) independently of the route/segment shape itself.
+            let currentId = activeJourney.map { "\($0.origin.lat),\($0.origin.lng)-\($0.destination.lat),\($0.destination.lng)-\($0.segments.count)-\(checkpoints.count)" }
             
             // Skip if nothing changed
             if currentId == lastSyncedJourneyId { return }
@@ -217,7 +225,13 @@ struct LocalBaliMapView: UIViewRepresentable {
             // 2. Add Destination point annotation
             let destCoord = CLLocationCoordinate2D(latitude: activeJourney.destination.lat, longitude: activeJourney.destination.lng)
             mapView.addAnnotation(RoutePointAnnotation(coordinate: destCoord, type: .destination, title: "Destination"))
-            
+
+            // 2.5. Add subtle checkpoint markers for every geofence the app is actively
+            // watching for arrival (real quest-action steps and "takePicture" ones alike).
+            for geofence in checkpoints {
+                mapView.addAnnotation(RoutePointAnnotation(coordinate: geofence.coordinate, type: .checkpoint, title: "Checkpoint"))
+            }
+
             var addedStopCoords = Set<String>()
             
             // 3. Add segment route lines and compact stop annotations
@@ -669,10 +683,36 @@ struct LocalBaliMapView: UIViewRepresentable {
                     
                     pinContainer.layer.addSublayer(pointerShape)
                     pinContainer.addSubview(pinHead)
-                    
+
                     view.addSubview(pinContainer)
+
+                case .checkpoint:
+                    // Deliberately smaller/muted than the route's own points (bus stops, pins)
+                    // — this just marks "the app is watching here," not a leg of the trip.
+                    view.frame = CGRect(x: 0, y: 0, width: 10, height: 10)
+                    view.centerOffset = CGVector(dx: 0, dy: 0)
+                    view.alpha = 0.85
+
+                    let checkpointColor = UIColor(TransiumColor.primaryYellow)
+
+                    let ring = UIView(frame: CGRect(x: 0, y: 0, width: 10, height: 10))
+                    ring.layer.cornerRadius = 5
+                    ring.backgroundColor = .white
+                    ring.layer.borderWidth = 1.5
+                    ring.layer.borderColor = checkpointColor.cgColor
+                    ring.layer.shadowColor = UIColor.black.cgColor
+                    ring.layer.shadowOpacity = 0.15
+                    ring.layer.shadowRadius = 1.5
+                    ring.layer.shadowOffset = CGSize(width: 0, height: 1)
+
+                    let dot = UIView(frame: CGRect(x: 3, y: 3, width: 4, height: 4))
+                    dot.layer.cornerRadius = 2
+                    dot.backgroundColor = checkpointColor
+                    ring.addSubview(dot)
+
+                    view.addSubview(ring)
                 }
-                
+
                 return view
             }
             
