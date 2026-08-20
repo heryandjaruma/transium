@@ -259,19 +259,19 @@ struct GoTripDetailsPanel: View {
         }
     }
 
-    private var leaveArriveBar: some View {
-        HStack {
-            Text("Leave within **1 min**")
-            Spacer()
-            Text("Arrive **\(arrivalTime)**")
-        }
-        .font(TransiumFont.body(14))
-        .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.22))
-        .padding(.horizontal, 16)
-        .frame(height: 46)
-        .background(Color(red: 0.86, green: 0.97, blue: 0.89))
-        .cornerRadius(12)
-    }
+//    private var leaveArriveBar: some View {
+//        HStack {
+//            Text("Leave within **1 min**")
+//            Spacer()
+//            Text("Arrive **\(arrivalTime)**")
+//        }
+//        .font(TransiumFont.body(14))
+//        .foregroundColor(Color(red: 0.05, green: 0.45, blue: 0.22))
+//        .padding(.horizontal, 16)
+//        .frame(height: 46)
+//        .background(Color(red: 0.86, green: 0.97, blue: 0.89))
+//        .cornerRadius(12)
+//    }
 
     // MARK: - Timeline
 

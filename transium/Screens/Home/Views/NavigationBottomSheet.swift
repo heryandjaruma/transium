@@ -79,24 +79,24 @@ struct NavigationBottomSheet: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 12)
             
-            // Leave sub-header card
-            HStack {
+//             Leave sub-header card
+//            HStack {
 //                Text("Leave within **1 min**")
 //                    .font(TransiumFont.body(14))
 //                    .foregroundColor(.black)
-                
-                Spacer()
-                
-                Text("Arrive **\(arrivalTime)**")
-                    .font(TransiumFont.body(14))
-                    .foregroundColor(.black)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 46)
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-            .padding(.horizontal, 20)
-            .padding(.bottom, isCollapsed ? 12 : 16)
+//                
+//                Spacer()
+//                
+//                Text("Arrive **\(arrivalTime)**")
+//                    .font(TransiumFont.body(14))
+//                    .foregroundColor(.black)
+//            }
+//            .padding(.horizontal, 16)
+//            .frame(height: 46)
+//            .background(Color(.systemGray6))
+//            .cornerRadius(12)
+//            .padding(.horizontal, 20)
+//            .padding(.bottom, isCollapsed ? 12 : 16)
             
             // Scrollable detailed steps timeline (collapsible)
             if !isCollapsed {
@@ -178,13 +178,15 @@ struct StepTimelineView: View {
             
             VStack(spacing: 12) {
                 ForEach(Array(journey.segments.enumerated()), id: \.offset) { index, segment in
-                    if segment.type == "bus" {
+                    if segment.isMission {
+                        missionCard(segment)
+                    } else if segment.type == "bus" {
                         busRideCard(segment, index: index)
                     } else {
                         walkCard(segment, index: index)
                     }
                 }
-                
+
                 // Final Destination Mission Card
                 destinationMissionCard
             }
@@ -353,6 +355,44 @@ struct StepTimelineView: View {
         )
     }
     
+    // MARK: - Mission Card
+
+    /// A quest step the user must actually do there — GET /journey/real's `mission`-typed
+    /// segments, shown as their own card (never as an empty-looking "Walk to destination")
+    /// right after the leg that reaches it. Mirrors GoTripDetailsPanel's missionCard, styled
+    /// to match this screen's cards.
+    private func missionCard(_ mission: JourneySegment) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(TransiumColor.primaryYellow)
+                    .frame(width: 36, height: 36)
+                Image(systemName: "questionmark.app.fill")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Mission")
+                    .font(TransiumFont.body(11, weight: .bold))
+                    .foregroundColor(.secondary)
+                Text(mission.instructions ?? "Complete the mission")
+                    .font(TransiumFont.body(15, weight: .bold))
+                    .foregroundColor(.black)
+            }
+
+            Spacer()
+        }
+        .padding(14)
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(TransiumColor.primaryYellow.opacity(0.5), lineWidth: 1)
+        )
+    }
+
     // MARK: - Destination Mission Card
     private var destinationMissionCard: some View {
         VStack(alignment: .leading, spacing: 10) {
