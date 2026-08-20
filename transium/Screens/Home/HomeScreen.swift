@@ -98,25 +98,13 @@ struct HomeScreen: View {
                             .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                             
                             TransiumIconButton(
-                                systemName: "location.fill",
-                                accessibilityLabel: "Center on route",
+                                icon: .asset("focus"),
+                                accessibilityLabel: "Center map on route",
                                 size: 44
                             ) {
                                 mapCenterRequestID += 1
                             }
                             .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                            
-                            Button(action: {
-                                isProfilePresented = true
-                            }) {
-                                Image(systemName: "person.crop.circle.fill")
-                                    .font(.system(size: 24, weight: .medium))
-                                    .foregroundColor(TransiumColor.primaryBlue)
-                                    .frame(width: 44, height: 44)
-                                    .background(.white)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                            }
                         }
                     }
                     .padding(.top, 6)
