@@ -75,6 +75,14 @@ final class JourneyGeofenceMonitor: NSObject, ObservableObject {
         }
     }
 
+    /// Stops watching just one region by identifier, leaving any others registered — for
+    /// callers managing a handful of independent one-shot triggers rather than one atomic set.
+    func stopMonitoring(identifier: String) {
+        pendingGeofences?.removeAll { $0.stepId == identifier }
+        guard let region = locationManager.monitoredRegions.first(where: { $0.identifier == identifier }) else { return }
+        locationManager.stopMonitoring(for: region)
+    }
+
     private func registerRegions(for geofences: [JourneyGeofence]) {
         let toMonitor = geofences.sorted { $0.sequence < $1.sequence }.prefix(20)
         for geofence in toMonitor {

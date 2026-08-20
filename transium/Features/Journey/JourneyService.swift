@@ -47,6 +47,11 @@ public protocol JourneyServiceProtocol: Sendable {
 
     /// Upload a photo for a journey step.
     func uploadStepMedia(stepId: String, imageData: Data, filename: String, mimeType: String) async throws -> MediaAsset
+
+    /// Upload a photo for the attempt itself, not tied to any one step — e.g. a spontaneous
+    /// "document your journey" keepsake, since POST /private/journey/go no longer creates a
+    /// dedicated step for that.
+    func uploadAttemptMedia(attemptId: String, imageData: Data, filename: String, mimeType: String) async throws -> MediaAsset
 }
 
 public final class JourneyService: JourneyServiceProtocol, Sendable {
@@ -211,6 +216,29 @@ public final class JourneyService: JourneyServiceProtocol, Sendable {
     ) async throws -> MediaAsset {
         var multipart = MultipartFormData()
         multipart.appendField(name: "journeyStepId", value: stepId)
+        multipart.appendFile(
+            fieldName: "file",
+            fileName: filename,
+            mimeType: mimeType,
+            fileData: imageData
+        )
+
+        let response: JourneyMediaResponse = try await apiClient.upload(
+            path: "/private/journey/media",
+            multipart: multipart,
+            requiresAuth: true
+        )
+        return response.media
+    }
+
+    public func uploadAttemptMedia(
+        attemptId: String,
+        imageData: Data,
+        filename: String = "keepsake.jpg",
+        mimeType: String = "image/jpeg"
+    ) async throws -> MediaAsset {
+        var multipart = MultipartFormData()
+        multipart.appendField(name: "journeyAttemptId", value: attemptId)
         multipart.appendFile(
             fieldName: "file",
             fileName: filename,

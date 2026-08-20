@@ -62,6 +62,11 @@ struct HomeScreen: View {
     /// Set once POST /private/journey/{id}/complete succeeds — drives
     /// JourneyCompletionSummaryScreen's `.fullScreenCover(item:)`.
     @State private var journeyCompletionResult: JourneyCompleteResult? = nil
+    /// A second, independent geofence layer for `RandomPhotoOpPlanner`'s spontaneous keepsake
+    /// points — deliberately separate from `geofenceMonitor` so this purely-cosmetic feature
+    /// can never call `advanceJourney` or otherwise touch real quest-step progress.
+    @StateObject private var randomPhotoOpMonitor = JourneyGeofenceMonitor()
+    @State private var isRandomPhotoOpPresented = false
 
     // MARK: - Search & Profile State
     @State private var isSearchPresented = false
@@ -314,6 +319,11 @@ struct HomeScreen: View {
         .fullScreenCover(item: $pendingPhotoStep) { step in
             CameraScreen(onCaptured: { image in
                 await handlePhotoCaptured(image: image, step: step)
+            })
+        }
+        .fullScreenCover(isPresented: $isRandomPhotoOpPresented) {
+            CameraScreen(onCaptured: { image in
+                await handleRandomPhotoOpCaptured(image: image)
             })
         }
         .fullScreenCover(item: $journeyCompletionResult) { result in
@@ -715,6 +725,7 @@ struct HomeScreen: View {
                         handleGeofenceEntered(stepId: stepId, attemptId: attemptId)
                     }
                     geofenceMonitor.startMonitoring(geofences: geofences)
+                    setupRandomPhotoOps(for: resolvedJourney)
 
                     activeJourney = resolvedJourney
                     activeQuestId = questId
@@ -790,6 +801,12 @@ struct HomeScreen: View {
                     goStartDebugResult = result
                     goPathBreadcrumb = []
                     hasSubmittedJourneyCompletion = false
+                    // Whichever journey ended up in `activeJourney` — the fresh re-fetch above,
+                    // or the original pre-/go preview if that failed — has valid route
+                    // geometry either way, which is all this needs.
+                    if let activeJourney {
+                        setupRandomPhotoOps(for: activeJourney)
+                    }
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         showGoMode = true
                         showNavigationSheet = false
@@ -872,6 +889,9 @@ struct HomeScreen: View {
         geofenceMonitor.stopMonitoring()
         geofenceMonitor.onRegionEntered = nil
         pendingPhotoStep = nil
+        randomPhotoOpMonitor.stopMonitoring()
+        randomPhotoOpMonitor.onRegionEntered = nil
+        isRandomPhotoOpPresented = false
 
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             showGoMode = false
@@ -1030,6 +1050,82 @@ struct HomeScreen: View {
             )
             await MainActor.run {
                 pendingPhotoStep = nil
+                AppToastCenter.shared.showSuccess(
+                    title: "Photo Saved",
+                    message: "Added to your journey keepsakes."
+                )
+            }
+        } catch {
+            await MainActor.run {
+                AppToastCenter.shared.showError(
+                    title: "Upload Failed",
+                    message: (error as? TransiumAPIError)?.errorDescription ?? "Please try again."
+                )
+            }
+        }
+    }
+
+    /// Registers `RandomPhotoOpPlanner`'s 0-2 spontaneous keepsake points on the dedicated
+    /// `randomPhotoOpMonitor` — separate from the real quest geofences so this can never touch
+    /// step progress. Called once per fresh/replanned Go Mode session (`startGoMode`,
+    /// `resumeOngoingTrip`); a short trip yields no points, which is a no-op here.
+    private func setupRandomPhotoOps(for journey: JourneyResult) {
+        let points = RandomPhotoOpPlanner.planPoints(for: journey)
+        guard !points.isEmpty else {
+            randomPhotoOpMonitor.stopMonitoring()
+            return
+        }
+
+        let geofences = points.map { point in
+            JourneyGeofence(
+                stepId: "random-photo-\(UUID().uuidString)",
+                sequence: 0,
+                lat: point.latitude,
+                lng: point.longitude,
+                radiusMeters: RandomPhotoOpPlanner.radiusMeters
+            )
+        }
+
+        randomPhotoOpMonitor.onRegionEntered = { markerId in
+            handleRandomPhotoOpEntered(markerId: markerId)
+        }
+        randomPhotoOpMonitor.startMonitoring(geofences: geofences)
+    }
+
+    private func handleRandomPhotoOpEntered(markerId: String) {
+        // A real quest-action photo prompt always wins — never stack a spontaneous keepsake
+        // prompt on top of one, and don't present a second keepsake prompt over itself if the
+        // other point (if any) fires again before this one's flow finishes.
+        guard pendingPhotoStep == nil, !isRandomPhotoOpPresented else { return }
+
+        // Stop watching just this point so it can't nag again if the user lingers/backtracks
+        // nearby — the other point (if any) stays independently active.
+        randomPhotoOpMonitor.stopMonitoring(identifier: markerId)
+        isRandomPhotoOpPresented = true
+    }
+
+    /// `CameraScreen`'s `onCaptured` for a spontaneous keepsake photo — uploads attached to the
+    /// attempt itself (not any one step, since it isn't tied to a quest action) and never calls
+    /// `advanceJourney`, unlike `handlePhotoCaptured`.
+    private func handleRandomPhotoOpCaptured(image: UIImage) async {
+        guard let attemptId = goJourneyAttempt?.id else {
+            await MainActor.run { isRandomPhotoOpPresented = false }
+            return
+        }
+        guard let data = image.jpegData(compressionQuality: 0.85) else {
+            AppToastCenter.shared.showError(title: "Upload Failed", message: "Couldn't process that photo. Please try again.")
+            return
+        }
+
+        do {
+            _ = try await journeyService.uploadAttemptMedia(
+                attemptId: attemptId,
+                imageData: data,
+                filename: "keepsake-\(UUID().uuidString).jpg",
+                mimeType: "image/jpeg"
+            )
+            await MainActor.run {
+                isRandomPhotoOpPresented = false
                 AppToastCenter.shared.showSuccess(
                     title: "Photo Saved",
                     message: "Added to your journey keepsakes."
