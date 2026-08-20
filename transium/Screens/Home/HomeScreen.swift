@@ -91,9 +91,9 @@ struct HomeScreen: View {
                     onEnd: { endGoMode(cancelAttempt: true) },
                     onLocate: { mapCenterRequestID += 1 },
                     onAdvanceSegment: {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            goCurrentSegmentIndex = min(goCurrentSegmentIndex + 1, journey.segments.count)
-                        }
+//                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+//                            goCurrentSegmentIndex = min(goCurrentSegmentIndex + 1, journey.segments.count)
+//                        }
                     }
                 )
                 .transition(.opacity)

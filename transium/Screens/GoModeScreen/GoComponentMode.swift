@@ -164,6 +164,7 @@ struct GoComponentMode: View {
         .padding(.bottom, 8)
     }
 
+    // Blue Card showing current step going on in a trip
     @ViewBuilder
     private var currentStepCard: some View {
         if let segment = currentSegment {
