@@ -222,11 +222,16 @@ struct LocalBaliMapView: UIViewRepresentable {
             
             // 3. Add segment route lines and compact stop annotations
             for (index, segment) in activeJourney.segments.enumerated() {
+                // Mission entries are a quest step, not a travel leg — no from/to/geometry to
+                // draw a route line for, so they're skipped on the map (they still get their
+                // own card in the trip details panel).
+                guard let from = segment.from, let to = segment.to else { continue }
+
                 let sourceId = "route-source-\(index)"
                 let busColor = resolveRouteColor(routeColor: segment.routeColor, routeRef: segment.routeRef)
-                let fromCoord = CLLocationCoordinate2D(latitude: segment.from.lat, longitude: segment.from.lng)
-                let toCoord = CLLocationCoordinate2D(latitude: segment.to.lat, longitude: segment.to.lng)
-                
+                let fromCoord = CLLocationCoordinate2D(latitude: from.lat, longitude: from.lng)
+                let toCoord = CLLocationCoordinate2D(latitude: to.lat, longitude: to.lng)
+
                 if segment.type == "bus" {
                     // Add compact stop annotations for boarding, intermediate, alighting stops
                     if let stops = segment.stops, !stops.isEmpty {
@@ -240,19 +245,19 @@ struct LocalBaliMapView: UIViewRepresentable {
                             }
                         }
                     } else {
-                        let boardKey = String(format: "%.5f,%.5f", segment.from.lat, segment.from.lng)
+                        let boardKey = String(format: "%.5f,%.5f", from.lat, from.lng)
                         if !addedStopCoords.contains(boardKey) {
                             addedStopCoords.insert(boardKey)
-                            mapView.addAnnotation(RoutePointAnnotation(coordinate: fromCoord, type: .boarding, title: segment.from.name, subtitle: segment.routeRef, routeColor: busColor))
+                            mapView.addAnnotation(RoutePointAnnotation(coordinate: fromCoord, type: .boarding, title: from.name, subtitle: segment.routeRef, routeColor: busColor))
                         }
-                        let alightKey = String(format: "%.5f,%.5f", segment.to.lat, segment.to.lng)
+                        let alightKey = String(format: "%.5f,%.5f", to.lat, to.lng)
                         if !addedStopCoords.contains(alightKey) {
                             addedStopCoords.insert(alightKey)
-                            mapView.addAnnotation(RoutePointAnnotation(coordinate: toCoord, type: .alighting, title: segment.to.name, subtitle: segment.routeRef, routeColor: busColor))
+                            mapView.addAnnotation(RoutePointAnnotation(coordinate: toCoord, type: .alighting, title: to.name, subtitle: segment.routeRef, routeColor: busColor))
                         }
                     }
                 }
-                
+
                 // Get road-following polyline coordinates
                 let cacheKey = "\(segment.type)-\(segment.id)"
                 var coords: [CLLocationCoordinate2D] = []

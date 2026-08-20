@@ -28,18 +28,20 @@ struct NavigationBottomSheet: View {
                 // Horizontal timeline chips
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 4) {
-                        ForEach(Array(journey.steps.enumerated()), id: \.offset) { index, step in
+                        // Mission steps aren't a travel mode — GET /journey/overview never
+                        // sends them anyway, but skip defensively since they share this model.
+                        ForEach(Array(journey.steps.filter { !$0.isMission }.enumerated()), id: \.offset) { index, step in
                             if index > 0 {
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 8, weight: .bold))
                                     .foregroundColor(.gray.opacity(0.5))
                             }
-                            
+
                             if step.type == "walk" {
                                 HStack(spacing: 3) {
                                     Image(systemName: "figure.walk")
                                         .font(.system(size: 13))
-                                    Text("\(Int(step.durationMinutes)) m")
+                                    Text("\(Int(step.durationMinutes ?? 0)) m")
                                         .font(TransiumFont.body(11, weight: .medium))
                                 }
                                 .foregroundColor(.gray)
@@ -204,7 +206,7 @@ struct StepTimelineView: View {
                         .foregroundColor(.white)
                 }
                 
-                Text(index == 0 ? "Walk to **\(segment.to.name)**" : "Walk to **destination**")
+                Text(index == 0 ? "Walk to **\(segment.to?.name ?? "destination")**" : "Walk to **destination**")
                     .font(TransiumFont.body(15, weight: .bold))
                     .foregroundColor(.black)
                 
@@ -263,7 +265,7 @@ struct StepTimelineView: View {
                     .background(routeColor)
                     .cornerRadius(8)
                 
-                Text("Get off at **\(segment.to.name)**")
+                Text("Get off at **\(segment.to?.name ?? "destination")**")
                     .font(TransiumFont.body(15, weight: .bold))
                     .foregroundColor(.black)
                     .lineLimit(1)
@@ -297,7 +299,7 @@ struct StepTimelineView: View {
                 .padding(.top, 3)
                 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(segment.from.name)
+                    Text(segment.from?.name ?? "")
                         .font(TransiumFont.body(13, weight: .semibold))
                         .foregroundColor(.black)
                     
@@ -332,7 +334,7 @@ struct StepTimelineView: View {
                         }
                     }
                     
-                    Text(segment.to.name)
+                    Text(segment.to?.name ?? "")
                         .font(TransiumFont.body(13, weight: .semibold))
                         .foregroundColor(.black)
                 }
@@ -365,7 +367,7 @@ struct StepTimelineView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(journey.segments.last?.to.name ?? "Destination")
+                    Text(journey.destinationName)
                         .font(TransiumFont.body(15, weight: .bold))
                         .foregroundColor(.black)
                     Text("Destination Reached")
@@ -401,7 +403,7 @@ struct StepTimelineView: View {
                 }
                 
                 Button(action: {
-                    UIPasteboard.general.string = journey.segments.last?.to.name ?? "Destination"
+                    UIPasteboard.general.string = journey.destinationName
                     AppToastCenter.shared.showSuccess(title: "Copied", message: "Name copied to clipboard.")
                 }) {
                     Image(systemName: "doc.on.doc")

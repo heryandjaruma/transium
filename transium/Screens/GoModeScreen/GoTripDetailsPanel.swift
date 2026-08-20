@@ -46,7 +46,10 @@ struct GoTripDetailsPanel: View {
         var usedStepIds = Set<String>()
 
         for segment in journey.segments {
-            let destination = CLLocation(latitude: segment.to.lat, longitude: segment.to.lng)
+            // Mission segments have no `to` to match a photo-checkpoint against — only travel
+            // legs (walk/bus/transfer) do.
+            guard let to = segment.to else { continue }
+            let destination = CLLocation(latitude: to.lat, longitude: to.lng)
             let nearest = candidates
                 .filter { !usedStepIds.contains($0.step.id) }
                 .min { $0.location.distance(from: destination) < $1.location.distance(from: destination) }
@@ -167,7 +170,9 @@ struct GoTripDetailsPanel: View {
         HStack(alignment: .center, spacing: 0) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
-                    ForEach(Array(journey.steps.enumerated()), id: \.offset) { index, step in
+                    // Mission steps aren't a travel mode — they don't get a chip here, only
+                    // their own card further down in the timeline.
+                    ForEach(Array(journey.steps.filter { !$0.isMission }.enumerated()), id: \.offset) { index, step in
                         if index > 0 {
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 8, weight: .bold))
@@ -178,7 +183,7 @@ struct GoTripDetailsPanel: View {
                             HStack(spacing: 3) {
                                 Image(systemName: "figure.walk")
                                     .font(.system(size: 13))
-                                Text("\(Int(step.durationMinutes)) m")
+                                Text("\(Int(step.durationMinutes ?? 0)) m")
                                     .font(TransiumFont.body(11, weight: .medium))
                             }
                             .foregroundColor(.gray)
@@ -234,7 +239,11 @@ struct GoTripDetailsPanel: View {
 
             VStack(spacing: 12) {
                 ForEach(Array(journey.segments.enumerated()), id: \.offset) { index, segment in
-                    if index == currentSegmentIndex {
+                    if segment.isMission {
+                        // Already in the right place — the API emits mission entries right
+                        // after the travel leg (if any) that reaches them, in step-sequence order.
+                        missionCard(segment, isDone: index < currentSegmentIndex)
+                    } else if index == currentSegmentIndex {
                         activeCard(segment, index: index)
                     } else if segment.type == "bus" {
                         inactiveBusCard(segment, isDone: index < currentSegmentIndex)
@@ -266,7 +275,7 @@ struct GoTripDetailsPanel: View {
                         .foregroundColor(.white)
                 }
 
-                Text(segment.type == "bus" ? "Ride to \(segment.to.name)" : "Walk to \(segment.to.name)")
+                Text(segment.type == "bus" ? "Ride to \(segment.to?.name ?? "destination")" : "Walk to \(segment.to?.name ?? "destination")")
                     .font(TransiumFont.body(15, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
@@ -289,7 +298,7 @@ struct GoTripDetailsPanel: View {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.turn.down.right")
                             .font(.system(size: 11, weight: .semibold))
-                        Text("Wait for \(boardingSegment.routeRef ?? "the bus") towards \(boardingSegment.to.name)")
+                        Text("Wait for \(boardingSegment.routeRef ?? "the bus") towards \(boardingSegment.to?.name ?? "destination")")
                             .font(TransiumFont.body(13))
                     }
                     HStack(spacing: 8) {
@@ -335,7 +344,7 @@ struct GoTripDetailsPanel: View {
             .padding(.top, 3)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(segment.from.name)
+                Text(segment.from?.name ?? "")
                     .font(TransiumFont.body(13, weight: .semibold))
                     .foregroundColor(textColor)
 
@@ -371,7 +380,7 @@ struct GoTripDetailsPanel: View {
                     }
                 }
 
-                Text(segment.to.name)
+                Text(segment.to?.name ?? "")
                     .font(TransiumFont.body(13, weight: .semibold))
                     .foregroundColor(textColor)
             }
@@ -393,7 +402,7 @@ struct GoTripDetailsPanel: View {
                         .foregroundColor(.white)
                 }
 
-                Text(index == 0 ? "Walk to **\(segment.to.name)**" : "Walk to **destination**")
+                Text(index == 0 ? "Walk to **\(segment.to?.name ?? "destination")**" : "Walk to **destination**")
                     .font(TransiumFont.body(15, weight: .bold))
                     .foregroundColor(.black)
 
@@ -441,7 +450,7 @@ struct GoTripDetailsPanel: View {
                         .cornerRadius(8)
                 }
 
-                Text("Get off at **\(segment.to.name)**")
+                Text("Get off at **\(segment.to?.name ?? "destination")**")
                     .font(TransiumFont.body(15, weight: .bold))
                     .foregroundColor(.black)
                     .lineLimit(1)
@@ -469,6 +478,38 @@ struct GoTripDetailsPanel: View {
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(isDone ? Self.doneAccent.opacity(0.4) : Color(.systemGray5), lineWidth: 1))
+    }
+
+    // MARK: - Mission Card
+
+    /// A quest step the user must actually do there — GET /journey/real's `mission`-typed
+    /// segments, shown as their own card (never merged into a travel-leg card) right after
+    /// the leg that reaches it.
+    private func missionCard(_ mission: JourneySegment, isDone: Bool) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle().fill(isDone ? Self.doneAccent : TransiumColor.primaryYellow).frame(width: 36, height: 36)
+                Image(systemName: isDone ? "checkmark" : "flag.checkered")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Mission")
+                    .font(TransiumFont.body(11, weight: .bold))
+                    .foregroundColor(.secondary)
+                Text(mission.instructions ?? "Complete the mission")
+                    .font(TransiumFont.body(15, weight: .bold))
+                    .foregroundColor(.black)
+            }
+
+            Spacer()
+        }
+        .padding(14)
+        .background(isDone ? Self.doneBackground : Color.white)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(isDone ? Self.doneAccent.opacity(0.4) : TransiumColor.primaryYellow.opacity(0.5), lineWidth: 1))
     }
 
     private func questActionRow(_ step: JourneyAttemptStep, tint: Color) -> some View {
@@ -575,7 +616,7 @@ struct GoTripDetailsPanel: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(journey.segments.last?.to.name ?? "Destination")
+                    Text(journey.destinationName)
                         .font(TransiumFont.body(15, weight: .bold))
                         .foregroundColor(.white)
                     Text("Finish the quest to get your badge")
@@ -610,7 +651,7 @@ struct GoTripDetailsPanel: View {
                 }
 
                 Button(action: {
-                    UIPasteboard.general.string = journey.segments.last?.to.name ?? "Destination"
+                    UIPasteboard.general.string = journey.destinationName
                     AppToastCenter.shared.showSuccess(title: "Copied", message: "Name copied to clipboard.")
                 }) {
                     Image(systemName: "doc.on.doc")

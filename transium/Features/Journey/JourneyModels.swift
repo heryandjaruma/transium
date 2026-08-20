@@ -55,6 +55,18 @@ public nonisolated struct JourneyResult: Codable, Equatable, Sendable {
         self.segments = segments
         self.steps = steps
     }
+
+    /// The journey's true final destination name. When the journey ends in a mission (the
+    /// common case for GET /journey/real quests with a badge action at the destination — its
+    /// segment has no `to`, only `instructions`), that instruction is the destination-facing
+    /// name; otherwise it's the last travel leg's arrival point.
+    public var destinationName: String {
+        guard let lastSegment = segments.last else { return "Destination" }
+        if lastSegment.isMission {
+            return lastSegment.instructions ?? "Destination"
+        }
+        return lastSegment.to?.name ?? "Destination"
+    }
 }
 
 public nonisolated struct JourneyOverviewSummary: Codable, Equatable, Sendable {
@@ -84,25 +96,42 @@ public nonisolated struct JourneyOverviewSummary: Codable, Equatable, Sendable {
 
 public nonisolated struct JourneyStep: Codable, Equatable, Sendable, Identifiable {
     public var id: String {
-        "\(type)-\(durationMinutes)-\(routeRef ?? "")-\(routeName ?? "")"
+        "\(type)-\(durationMinutes ?? 0)-\(routeRef ?? "")-\(routeName ?? "")-\(instructions ?? "")"
     }
 
-    public let type: String // "walk" or "ride"
-    public let durationMinutes: Double
+    public let type: String // "walk", "ride", or "mission" (mission: /journey/real only)
+    public let durationMinutes: Double? // absent on "mission" entries
     public let routeRef: String?
     public let routeName: String?
 
+    /// A quest step the user must actually do — only present when `type == "mission"`, and
+    /// only ever emitted by GET /journey/real (never /journey/overview). Appears right after
+    /// the travel leg (if any) that reaches it, mirroring the `mission` entries in
+    /// `JourneyResult.segments`.
+    public let instructions: String?
+    /// Present only when the mission's BadgeAction carries coordinates.
+    public let lat: Double?
+    public let lng: Double?
+
     public init(
         type: String,
-        durationMinutes: Double,
+        durationMinutes: Double? = nil,
         routeRef: String? = nil,
-        routeName: String? = nil
+        routeName: String? = nil,
+        instructions: String? = nil,
+        lat: Double? = nil,
+        lng: Double? = nil
     ) {
         self.type = type
         self.durationMinutes = durationMinutes
         self.routeRef = routeRef
         self.routeName = routeName
+        self.instructions = instructions
+        self.lat = lat
+        self.lng = lng
     }
+
+    public var isMission: Bool { type == "mission" }
 }
 
 public nonisolated struct JourneyLocationRef: Codable, Equatable, Sendable {
@@ -149,12 +178,18 @@ public nonisolated struct JourneyWalkStep: Codable, Equatable, Sendable {
 
 public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifiable {
     public var id: String {
-        "\(type)-\(from.name)-\(to.name)-\(routeId ?? "")-\(distanceMeters ?? 0)"
+        if isMission {
+            return "mission-\(instructions ?? "")-\(lat ?? 0)-\(lng ?? 0)"
+        }
+        return "\(type)-\(from?.name ?? "")-\(to?.name ?? "")-\(routeId ?? "")-\(distanceMeters ?? 0)"
     }
 
-    public let type: String // "walk", "transfer", "bus"
-    public let from: JourneyLocationRef
-    public let to: JourneyLocationRef
+    public let type: String // "walk", "transfer", "bus", or "mission" (mission: /journey/real only)
+
+    // Absent on "mission" segments — a mission is a quest step the user must do, not a travel
+    // leg, so it carries none of the travel fields below (see `instructions`/`lat`/`lng` instead).
+    public let from: JourneyLocationRef?
+    public let to: JourneyLocationRef?
     public let distanceMeters: Double?
     public let durationSeconds: Double?
     public let geometry: [[Double]]
@@ -167,10 +202,20 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
     public let routeColor: String?
     public let stops: [JourneyLocationRef]?
 
+    // Mission-specific fields (GET /journey/real only). Appears right after the travel leg (if
+    // any) that reaches it, in the same badge-attachment/step-sequence order GET /quest/{id} and
+    // POST /private/journey/go use.
+    /// The BadgeAction's own instruction, or its ActionDefinition's name if unset.
+    public let instructions: String?
+    /// Present only when the BadgeAction carries coordinates. When absent, no travel leg is
+    /// routed to this mission.
+    public let lat: Double?
+    public let lng: Double?
+
     public init(
         type: String,
-        from: JourneyLocationRef,
-        to: JourneyLocationRef,
+        from: JourneyLocationRef? = nil,
+        to: JourneyLocationRef? = nil,
         distanceMeters: Double? = nil,
         durationSeconds: Double? = nil,
         geometry: [[Double]] = [],
@@ -179,7 +224,10 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
         routeRef: String? = nil,
         routeName: String? = nil,
         routeColor: String? = nil,
-        stops: [JourneyLocationRef]? = nil
+        stops: [JourneyLocationRef]? = nil,
+        instructions: String? = nil,
+        lat: Double? = nil,
+        lng: Double? = nil
     ) {
         self.type = type
         self.from = from
@@ -193,6 +241,44 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
         self.routeName = routeName
         self.routeColor = routeColor
         self.stops = stops
+        self.instructions = instructions
+        self.lat = lat
+        self.lng = lng
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type, from, to, distanceMeters, durationSeconds, geometry, steps
+        case routeId, routeRef, routeName, routeColor, stops
+        case instructions, lat, lng
+    }
+
+    // Custom decode so a "mission" entry — which the API sends with only `type`, `instructions`,
+    // and optionally `lat`/`lng` — doesn't fail decoding the shared `segments` array just because
+    // it omits every travel field (`from`/`to`/`geometry`/...) a walk/bus/transfer segment has.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decode(String.self, forKey: .type)
+        from = try container.decodeIfPresent(JourneyLocationRef.self, forKey: .from)
+        to = try container.decodeIfPresent(JourneyLocationRef.self, forKey: .to)
+        distanceMeters = try container.decodeIfPresent(Double.self, forKey: .distanceMeters)
+        durationSeconds = try container.decodeIfPresent(Double.self, forKey: .durationSeconds)
+        geometry = try container.decodeIfPresent([[Double]].self, forKey: .geometry) ?? []
+        steps = try container.decodeIfPresent([JourneyWalkStep].self, forKey: .steps)
+        routeId = try container.decodeIfPresent(String.self, forKey: .routeId)
+        routeRef = try container.decodeIfPresent(String.self, forKey: .routeRef)
+        routeName = try container.decodeIfPresent(String.self, forKey: .routeName)
+        routeColor = try container.decodeIfPresent(String.self, forKey: .routeColor)
+        stops = try container.decodeIfPresent([JourneyLocationRef].self, forKey: .stops)
+        instructions = try container.decodeIfPresent(String.self, forKey: .instructions)
+        lat = try container.decodeIfPresent(Double.self, forKey: .lat)
+        lng = try container.decodeIfPresent(Double.self, forKey: .lng)
+    }
+
+    public var isMission: Bool { type == "mission" }
+
+    public var coordinate: CLLocationCoordinate2D? {
+        guard let lat, let lng else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lng)
     }
 
     public func withGeometry(_ newGeometry: [[Double]]) -> JourneySegment {
@@ -208,7 +294,10 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
             routeRef: routeRef,
             routeName: routeName,
             routeColor: routeColor,
-            stops: stops
+            stops: stops,
+            instructions: instructions,
+            lat: lat,
+            lng: lng
         )
     }
 
@@ -219,9 +308,10 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
     /// actually gets closer, rather than showing the route's precomputed estimate for its
     /// whole length regardless of progress. Falls back to the segment's own precomputed
     /// values when no live position is available. Only meaningful for non-"bus" segments
-    /// (walk/transfer) — there's no live vehicle position to track a bus leg against.
+    /// (walk/transfer) — there's no live vehicle position to track a bus leg against. Missions
+    /// have no `to` to walk toward, so they fall back the same way "no live position" does.
     public func liveRemaining(from currentLocation: CLLocationCoordinate2D?) -> (distanceMeters: Double?, durationSeconds: Double?) {
-        guard let currentLocation else {
+        guard let currentLocation, let to else {
             return (distanceMeters, durationSeconds)
         }
 

@@ -81,9 +81,9 @@ struct GoComponentMode: View {
     /// Defaults to true (still waiting) with no live position yet, so we don't jump to
     /// "riding" without real GPS evidence.
     private var isNearBoardingStop: Bool {
-        guard let segment = currentSegment, segment.type == "bus", let currentLocation else { return true }
+        guard let segment = currentSegment, segment.type == "bus", let currentLocation, let from = segment.from else { return true }
         let distance = CLLocation(latitude: currentLocation.latitude, longitude: currentLocation.longitude)
-            .distance(from: CLLocation(latitude: segment.from.lat, longitude: segment.from.lng))
+            .distance(from: CLLocation(latitude: from.lat, longitude: from.lng))
         return distance <= Self.busStopProximityMeters
     }
 
@@ -239,7 +239,7 @@ struct GoComponentMode: View {
             GoStepCard(
                 mode: .walking,
                 verb: "Walk to",
-                destination: segment.to.name,
+                destination: segment.to?.name ?? "your destination",
                 metrics: metrics(for: segment)
             )
         }
@@ -253,7 +253,7 @@ struct GoComponentMode: View {
         GoStepCard(
             mode: .bus(providerCode: segment.routeRef ?? "BUS"),
             verb: "Ride to",
-            destination: segment.to.name,
+            destination: segment.to?.name ?? "your destination",
             metrics: metrics(for: segment)
         )
     }
@@ -262,7 +262,7 @@ struct GoComponentMode: View {
         GoStepCard(
             mode: .walking,
             verb: "You've arrived at",
-            destination: journey.segments.last?.to.name ?? "your destination",
+            destination: journey.destinationName,
             metricValue: "0",
             metricUnit: "min"
         )
@@ -338,7 +338,8 @@ private extension JourneyResult {
             ),
             segments: [
                 JourneySegment(type: "walk", from: origin, to: stop, distanceMeters: 1200, durationSeconds: 900),
-                JourneySegment(type: "bus", from: stop, to: destination, distanceMeters: 4000, durationSeconds: 900, routeId: "kib-1", routeRef: "KIB", routeName: "Trans Metro Dewata")
+                JourneySegment(type: "bus", from: stop, to: destination, distanceMeters: 4000, durationSeconds: 900, routeId: "kib-1", routeRef: "KIB", routeName: "Trans Metro Dewata"),
+                JourneySegment(type: "mission", instructions: "Find two beach lights", lat: destination.lat, lng: destination.lng)
             ],
             steps: []
         )
