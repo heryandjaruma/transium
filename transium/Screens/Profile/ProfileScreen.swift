@@ -166,17 +166,6 @@ struct ProfileScreen: View {
                             .clipShape(Circle())
                     }
                     Spacer()
-
-                    Button {
-                        isSettingsPresented = true
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .foregroundColor(TransiumColor.primaryBlue)
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(width: 44, height: 44)
-                            .background(Color.white)
-                            .clipShape(Circle())
-                    }
                 }
             }
             .padding(.horizontal, 20)

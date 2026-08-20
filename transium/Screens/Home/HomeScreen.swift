@@ -166,31 +166,13 @@ struct HomeScreen: View {
                 VStack(spacing: 0) {
                     // Top Search Bar, Locate, Quick Menu & Profile Controls
                     HStack(spacing: 10) {
-                        searchBarTrigger
+//                        searchBarTrigger
                         
                         quickMenu
                         
-                        TransiumIconButton(
-                            systemName: "location.fill",
-                            accessibilityLabel: "Center map on your location",
-                            size: 44
-                        ) {
-                            mapCenterRequestID += 1
-                        }
-                        .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                         
-                        Button(action: {
-                            isProfilePresented = true
-                        }) {
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.system(size: 24, weight: .medium))
-                                .foregroundStyle(TransiumColor.primaryBlue)
-                                .frame(width: 44, height: 44)
-                                .background(.white)
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                        }
-                        .accessibilityLabel("Profile")
+                        
+                        
                     }
                     .padding(.top, 6)
                     .padding(.horizontal, 20)
@@ -259,9 +241,10 @@ struct HomeScreen: View {
         }
     }
     
-    // MARK: - Quick Menu
+    // MARK: - Three Dots
+    
     private var quickMenu: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .trailing, spacing: 8) {
             TransiumIconButton(
                 systemName: isMenuExpanded ? "xmark" : "ellipsis",
                 accessibilityLabel: "Menu",
@@ -275,17 +258,6 @@ struct HomeScreen: View {
             
             if isMenuExpanded {
                 TransiumIconButton(
-                    systemName: "bookmark.fill",
-                    accessibilityLabel: "Saved quests",
-                    size: 44
-                ) {
-                    withAnimation { isMenuExpanded = false }
-                    isSavedQuestPresented = true
-                }
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                .transition(.scale.combined(with: .opacity))
-                
-                TransiumIconButton(
                     systemName: "gearshape.fill",
                     accessibilityLabel: "Settings",
                     size: 44
@@ -295,8 +267,37 @@ struct HomeScreen: View {
                 }
                 .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                 .transition(.scale.combined(with: .opacity))
+                
+                TransiumIconButton(
+                    systemName: "person.crop.circle.fill",
+                    accessibilityLabel: "Profile Button",
+                    size: 44
+                ) {
+                    isProfilePresented = true
+                }
+                
+                TransiumIconButton(
+                    systemName: "bookmark.fill",
+                    accessibilityLabel: "Saved quests",
+                    size: 44
+                ) {
+                    withAnimation { isMenuExpanded = false }
+                    isSavedQuestPresented = true
+                }
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                .transition(.scale.combined(with: .opacity))
             }
+            
+            TransiumIconButton(
+                icon: .asset("focus"),
+                accessibilityLabel: "Center map on your location",
+                size: 44
+            ) {
+                mapCenterRequestID += 1
+            }
+            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
     
     private func fetchKelurahanGroups() async {
@@ -326,30 +327,30 @@ struct HomeScreen: View {
     
     // MARK: - Search Trigger
     
-    private var searchBarTrigger: some View {
-        Button(action: {
-            presentSearchSheet(in: .searching)
-        }) {
-            HStack(spacing: 12) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.gray)
-                    .font(.system(size: 16, weight: .medium))
-                
-                Text(searchText.isEmpty ? "Where to?" : searchText)
-                    .font(TransiumFont.body(15))
-                    .foregroundColor(searchText.isEmpty ? .gray : .black)
-                    .lineLimit(1)
-                
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 48)
-            .background(Color.white)
-            .cornerRadius(24)
-            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-        }
-        .accessibilityLabel("Search destinations")
-    }
+//    private var searchBarTrigger: some View {
+//        Button(action: {
+//            presentSearchSheet(in: .searching)
+//        }) {
+//            HStack(spacing: 12) {
+//                Image(systemName: "magnifyingglass")
+//                    .foregroundColor(.gray)
+//                    .font(.system(size: 16, weight: .medium))
+//                
+//                Text(searchText.isEmpty ? "Where to?" : searchText)
+//                    .font(TransiumFont.body(15))
+//                    .foregroundColor(searchText.isEmpty ? .gray : .black)
+//                    .lineLimit(1)
+//                
+//                Spacer()
+//            }
+//            .padding(.horizontal, 16)
+//            .frame(height: 48)
+//            .background(Color.white)
+//            .cornerRadius(24)
+//            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+//        }
+//        .accessibilityLabel("Search destinations")
+//    }
     
     // MARK: - Pinning Overlay
     
