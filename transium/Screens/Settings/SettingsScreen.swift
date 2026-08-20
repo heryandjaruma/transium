@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SettingsScreen: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(SessionController.self) private var session
 
     @State private var selectedLanguage: Language = .indonesia
     @State private var voiceVolume: Double = 0.6
@@ -48,16 +49,16 @@ struct SettingsScreen: View {
         }
         .navigationBarBackButtonHidden(true)
         .confirmationDialog(
-            "Keluar dari akun?",
+            "Sign out?",
             isPresented: $showLogoutConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Logout", role: .destructive) {
+            Button("Sign Out", role: .destructive) {
                 handleLogout()
             }
-            Button("Batal", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Kamu perlu login lagi untuk melanjutkan perjalananmu.")
+            Text("You will need to login again later.")
         }
     }
 
@@ -93,7 +94,7 @@ struct SettingsScreen: View {
             HStack(spacing: 8) {
                 LanguageOptionButton(
                     flag: "🇮🇩",
-                    title: "Indonesia",
+                    title: "Bahasa Indonesia",
                     isSelected: selectedLanguage == .indonesia
                 ) {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -196,25 +197,33 @@ struct SettingsScreen: View {
                 showLogoutConfirmation = true
             } label: {
                 HStack {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .foregroundColor(.red)
-                        .font(.system(size: 20, weight: .semibold))
+                    if session.isBusy {
+                        ProgressView()
+                            .tint(.red)
+                            .frame(width: 20, height: 20)
+                    } else {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                            .foregroundColor(.red)
+                            .font(.system(size: 20, weight: .semibold))
+                    }
 
-                    Text("Logout")
+                    Text(session.isBusy ? "Logging out..." : "Logout")
                         .font(TransiumFont.body(17, weight: .semibold))
                         .foregroundColor(.red)
 
                     Spacer()
                 }
+                .opacity(session.isBusy ? 0.6 : 1)
             }
+            .disabled(session.isBusy)
         }
     }
 
     // MARK: - Actions
     private func handleLogout() {
-        // TODO: sambungkan ke AuthManager / SessionManager yang dipakai di project,
-        // misalnya: AuthManager.shared.logout()
-        // lalu arahkan user balik ke halaman login (root navigation reset).
+        Task {
+            await session.signOut()
+        }
     }
 }
 
@@ -259,4 +268,5 @@ private struct VolumeSlider: View {
 
 #Preview {
     SettingsScreen()
+        .environment(SessionController())
 }

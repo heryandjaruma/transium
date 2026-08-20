@@ -13,7 +13,6 @@ protocol AuthBackend: Sendable {
     func fetchPrivateProfile(accessToken: String) async throws -> BackendProfile
     func upsertPrivateProfile(_ profile: BackendProfile, accessToken: String) async throws -> BackendProfile
     func signOut(accessToken: String) async throws
-    func deleteAccount(accessToken: String) async throws
 }
 
 nonisolated struct AuthSession: Codable, Equatable, Sendable {

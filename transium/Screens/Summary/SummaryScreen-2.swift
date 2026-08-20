@@ -7,90 +7,151 @@
 
 import SwiftUI
 
-struct SummaryScreen_2: View {
-    
+struct SummaryCelebrationScreen: View {
+
     let cards: [StatCardData]
-    let columns = [GridItem(.flexible()), GridItem(.flexible())]
-    
+    let origin: String = "Jimbaran"
+    let destination: String = "Sanur Beach"
+    let tripTitle: String = "Sanoored Trip"
+    let photoName: String = "sanoored"
+
+    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+
     var body: some View {
         ZStack {
+
             Color.primaryBlue
                 .ignoresSafeArea()
-            
-            VStack {
-                ZStack {
+            ZStack{
+                VStack {
                     Image("BadgeShine")
                         .resizable()
                         .frame(width: 400, height: 400)
-                    
-                    VStack (spacing: -20){
+                    Spacer()
+                }
+                .offset(y:-110)
+
+            }
+            
+            VStack {
+                ZStack{
+                    ZStack {
+                        
+                        Image("Confetti-L")
+                            .resizable()
+                            .frame(width: 63, height: 108)
+                            .offset(x: -110, y: -50)
+                        
+                        Image("Confetti-R")
+                            .resizable()
+                            .frame(width: 63, height: 108)
+                            .offset(x: 130, y: -20)
+                        
+                    }
+                    ZStack{
+                        
                         Image("SampleBadge")
                             .resizable()
                             .frame(width: 150, height: 150)
                         
-                        ZStack {
-                            Text("Sanoored")
-                                .font(TransiumFont.display(43))
-                                .foregroundStyle(Color.white)
-                                .rotationEffect(.degrees(-5))
+                    }
+                }
+
+                ZStack(alignment: .top){
+
+                    VStack {
+                        HStack {
+                            Image("RedPoint")
+                                .resizable()
+                                .frame(width: 12, height: 12)
+                            
+                            Text("Jimbaran")
+                            
+                            Image(systemName: "arrow.right")
+                            
+                            Image("GreenPoint")
+                                .resizable()
+                                .frame(width: 12, height: 12)
+                            
+                            Text("Sanur Beach")
+                            
                         }
-                    }
-                }
-                Spacer()
-                
-                VStack {
-                    HStack {
-                        Image("RedPoint")
+                        .padding(.top, 20)
+                        .font(TransiumFont.body(13).weight(.semibold))
+                        
+                        Image("map")
                             .resizable()
-                            .frame(width: 12, height: 12)
+                            .scaledToFill()
+                            .frame(height: 160)
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                            .padding(.horizontal, 20)
+                            .padding(.top, 12)
                         
-                        Text("Jimbaran")
+                        Divider()
                         
-                        Image(systemName: "arrow.right")
+                        LazyVGrid(columns: columns) {
+                            ForEach(cards) { SummaryBox(data: $0) }
+                        }
                         
-                        Image("GreenPoint")
+                    }
+                    .foregroundStyle(.black)
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 30))
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 8)
+                    
+                    ZStack{
+                        OutlinedText(
+                            text: "Sanoored",
+                            font: TransiumFont.display(43),
+                            fillColor: .white,
+                            strokeColor: .primaryBlue,
+                            strokeWidth: 5
+                        )
+                        .rotationEffect(.degrees(-5))
+                        .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 5)
+                        
+                        Image("Splash")
                             .resizable()
-                            .frame(width: 12, height: 12)
-                        
-                        Text("Sanur Beach")
-                        
+                            .frame(width: 58, height: 52)
+                            .offset(x: 100, y: -30)
                     }
-                    .padding()
-                    .font(TransiumFont.body(12).weight(.semibold))
-                    
-                    
-                    Divider()
-                    
-                    LazyVGrid(columns: columns) {
-                        ForEach(cards) { SummaryBox(data: $0) }
-                    }
-                    
+                    .offset(y: -20)
+
                 }
-                .foregroundStyle(.black)
-                .background(Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 30))
                 
-                TransiumPrimaryButton(
-                    title: "􀈂 Share your experience",
-                    backgroundColor: .black,
-                    foregroundColor: .white
-                ) {}
-                .padding()
-                
-                TransiumPrimaryButton(
-                    title: "Go to the Next Trip! 􀄫") {
-                    }
-                    .padding()
-                    .accessibilityLabel("Go to the Next Trip ")
-            }  
+
+                VStack(spacing: 15) {
+                    TransiumSecondaryButton(
+                        title: "Share your experience",
+                        backgroundColor: .black,
+                        foregroundColor: .white,
+                        icon: "square.and.arrow.up",
+                        iconPosition: .trailing
+                    ) {}
+
+                    TransiumSecondaryButton(
+                        title: "Go to the Next Trip!",
+                        backgroundColor: .white,
+                        foregroundColor: .blue,
+                        icon: "arrow.right",
+                        iconPosition: .trailing
+                    ) {}
+                    .accessibilityLabel("Go to the Next Trip")
+                }
+                .padding(.horizontal)
+            }
+            
+
         }
+        
     }
 }
 
-
-
 #Preview {
-    SummaryScreen_2(cards: [
+    SummaryCelebrationScreen(cards: [
         StatCardData(title: "Distance", value: "17", unit: "km",
                      icon: "distance-icon"),
         StatCardData(title: "Travel Cost", value: "4.4k", unit: "Rp",

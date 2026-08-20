@@ -19,6 +19,10 @@ public final class PushNotificationManager {
     /// synced once `retryPendingRegistration()` is called after sign-in.
     private var pendingToken: String?
 
+    /// The token last confirmed as registered with the backend, kept so
+    /// sign-out can unregister this specific device.
+    private var registeredToken: String?
+
     private var currentEnvironment: DeviceEnvironment {
         #if DEBUG
         .sandbox
@@ -66,6 +70,18 @@ public final class PushNotificationManager {
         await registerWithBackend(token: token)
     }
 
+    /// Unregisters this device's token from the backend. Must be called
+    /// while the session's access token is still available, i.e. before
+    /// `SessionTokenStore.clear()` runs as part of sign-out.
+    public func unregisterCurrentDevice() async {
+        guard let token = registeredToken else { return }
+
+        // Best-effort: sign-out should proceed locally even if this fails.
+        try? await deviceService.unregisterDevice(token: token)
+        registeredToken = nil
+        pendingToken = nil
+    }
+
     private func registerWithBackend(token: String) async {
         guard SessionTokenStore.read() != nil else {
             pendingToken = token
@@ -75,6 +91,7 @@ public final class PushNotificationManager {
         do {
             _ = try await deviceService.registerDevice(token: token, environment: currentEnvironment)
             pendingToken = nil
+            registeredToken = token
         } catch {
             // Keep the token around so the next retry (e.g. after sign-in
             // or app relaunch) can attempt the sync again.
