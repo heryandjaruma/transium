@@ -48,6 +48,7 @@ final class SessionController {
 
         do {
             phase = .signedIn(try await backend.fetchPrivateProfile(accessToken: token))
+            await syncPushNotifications()
         } catch BackendError.unauthorized {
             // Remove tokens that the server no longer accepts.
             SessionTokenStore.clear()
@@ -79,9 +80,16 @@ final class SessionController {
             )
 
             phase = .signedIn(session.profile)
+            await syncPushNotifications()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // Request notification permission and sync any pending or fresh device token.
+    private func syncPushNotifications() async {
+        await PushNotificationManager.shared.retryPendingRegistration()
+        await PushNotificationManager.shared.requestAuthorizationAndRegister()
     }
 
     // MARK: Important Flow - DEV_MODE Preview Sign In
