@@ -297,15 +297,8 @@ struct RecommendedQuestCard: View {
  
             // Right postage column with wow glow background
             ZStack(alignment: .bottom) {
-                Image(TransiumAsset.Illustration.wow)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 140, height: 140)
-                    .offset(y: -14)
-                    .allowsHitTesting(false)
-
                 TransiumStampCard(
-                    size: 96,
+                    size: 88,
                     tilt: .degrees(0),
                     variant: .green
                 ) {
@@ -335,22 +328,29 @@ struct RecommendedQuestCard: View {
                             .scaledToFill()
                     }
                 }
-                .padding(.bottom, 16)
+                .background(
+                    Image(TransiumAsset.Illustration.wow)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 130, height: 130)
+                        .allowsHitTesting(false)
+                )
+                .padding(.bottom, 12)
  
                 TransiumPrimaryButton(
                     title: "Start Quest",
                     backgroundColor: .white,
                     foregroundColor: accent,
                     trailingIcon: "arrow.right",
-                    height: 36,
+                    height: 34,
                     fillWidth: false,
-                    font: TransiumFont.body(13, weight: .bold),
+                    font: TransiumFont.body(12.5, weight: .bold),
                     iconHorizontalPadding: 6
                 ) {
                     onStart?()
                 }
             }
-            .frame(width: 128)
+            .frame(width: 124)
         }
         .padding(18)
         .background(
@@ -423,16 +423,8 @@ struct RecommendedQuestCardSkeleton: View {
 
             // Right postage column skeleton
             ZStack(alignment: .bottom) {
-                Image(TransiumAsset.Illustration.wow)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 140, height: 140)
-                    .opacity(0.3)
-                    .offset(y: -14)
-                    .allowsHitTesting(false)
-
                 TransiumStampCard(
-                    size: 96,
+                    size: 88,
                     tilt: .degrees(0),
                     variant: .green
                 ) {
@@ -444,18 +436,26 @@ struct RecommendedQuestCardSkeleton: View {
                             highlightColor: Color.white.opacity(0.4)
                         )
                 }
-                .padding(.bottom, 16)
+                .background(
+                    Image(TransiumAsset.Illustration.wow)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 130, height: 130)
+                        .opacity(0.3)
+                        .allowsHitTesting(false)
+                )
+                .padding(.bottom, 12)
 
                 // "Start Quest" button skeleton
                 TransiumSkeletonBlock(
                     width: 104,
-                    height: 36,
-                    cornerRadius: 18,
+                    height: 34,
+                    cornerRadius: 17,
                     color: Color.white.opacity(0.35),
                     shimmerHighlight: Color.white.opacity(0.65)
                 )
             }
-            .frame(width: 128)
+            .frame(width: 124)
         }
         .padding(18)
         .background(
