@@ -94,58 +94,43 @@ struct HomeScreen: View {
                 VStack {
                     // Top Bar (Back, Bookmark, Share, Locate)
                     HStack {
-                        Button(action: {
+                        TransiumIconButton(
+                            icon: .system("arrow.left"),
+                            accessibilityLabel: "Back",
+                            size: 44
+                        ) {
                             withAnimation(.spring()) {
                                 activeJourney = nil
                                 showNavigationSheet = false
                             }
-                        }) {
-                            Image(systemName: "arrow.left")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(.black)
-                                .frame(width: 44, height: 44)
-                                .background(.white)
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                         }
-                        
+
                         Spacer()
-                        
+
                         HStack(spacing: 12) {
-                            Button(action: {
+                            TransiumIconButton(
+                                icon: .system("bookmark"),
+                                accessibilityLabel: "Bookmark",
+                                size: 44
+                            ) {
                                 AppToastCenter.shared.showSuccess(title: "Saved", message: "Quest path saved to bookmarks.")
-                            }) {
-                                Image(systemName: "bookmark")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(.black)
-                                    .frame(width: 44, height: 44)
-                                    .background(.white)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                             }
-                            
-                            Button(action: {
+
+                            TransiumIconButton(
+                                icon: .system("square.and.arrow.up"),
+                                accessibilityLabel: "Share",
+                                size: 44
+                            ) {
                                 AppToastCenter.shared.showSuccess(title: "Share", message: "Sharing option selected.")
-                            }) {
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(.black)
-                                    .frame(width: 44, height: 44)
-                                    .background(.white)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                             }
-                            
-                            Button(action: {
+
+                            TransiumIconButton(
+                                icon: .system("location.fill"),
+                                accessibilityLabel: "Recenter map",
+                                foregroundColor: TransiumColor.primaryBlue,
+                                size: 44
+                            ) {
                                 mapCenterRequestID += 1
-                            }) {
-                                Image("location.fill")
-                                    .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(TransiumColor.primaryBlue)
-                                    .frame(width: 44, height: 44)
-                                    .background(.white)
-                                    .clipShape(Circle())
-                                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
                             }
                         }
                     }
@@ -200,17 +185,12 @@ struct HomeScreen: View {
                         if !isSearchPresented {          // ⬅️ BARU — cegah tumpang tindih dengan pinningOverlayControls
                             VStack(alignment: .leading, spacing: 10) {
                                 quickMenu
-                                Button(action: {
+                                TransiumIconButton(
+                                    icon: .asset("focus"),
+                                    accessibilityLabel: "Recenter map",
+                                    size: 44
+                                ) {
                                     mapCenterRequestID += 1
-                                }) {
-                                    Image("focus")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 20, height: 20)
-                                        .frame(width: 44, height: 44)
-                                        .background(.white)
-                                        .clipShape(Circle())
-                                        .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
                                 }
                             }
                             .padding(.top, 6)
@@ -322,20 +302,15 @@ struct HomeScreen: View {
 
     private var quickMenu: some View {
         VStack(spacing: 12) {
-            Button(action: {
+            TransiumIconButton(
+                icon: .system("ellipsis"),
+                accessibilityLabel: "More options",
+                size: 44
+            ) {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isMenuExpanded.toggle()
                 }
-            }) {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.black)
-                    .frame(width: 44, height: 44)
-                    .background(.white)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
             }
-            .accessibilityLabel("More options")
 
             if isMenuExpanded {
                 quickMenuButton(icon: "gearshape.fill", accessibilityLabel: "Settings") {
@@ -358,16 +333,12 @@ struct HomeScreen: View {
     }
 
     private func quickMenuButton(icon: String, accessibilityLabel: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(.black)
-                .frame(width: 44, height: 44)
-                .background(.white)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-        }
-        .accessibilityLabel(accessibilityLabel)
+        TransiumIconButton(
+            icon: .system(icon),
+            accessibilityLabel: accessibilityLabel,
+            size: 44,
+            action: action
+        )
         .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .top)))
     }
     
@@ -403,7 +374,7 @@ struct HomeScreen: View {
             }
             .padding(.horizontal, 20)
 
-            dragHintLabel  
+            dragHintLabel
 
             Spacer()
         }

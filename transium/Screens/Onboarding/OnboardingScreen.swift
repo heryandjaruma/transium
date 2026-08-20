@@ -133,7 +133,7 @@ struct OnboardingScreen: View {
     private var navigationBar: some View {
         HStack {
             if currentPage > 0 {
-                TransiumIconButton(systemName: "arrow.left", accessibilityLabel: "Previous onboarding page", action: goBack)
+                TransiumIconButton(icon: .system("arrow.left"), accessibilityLabel: "Previous onboarding page", action: goBack)
                     .transition(.opacity.combined(with: .scale))
             }
 

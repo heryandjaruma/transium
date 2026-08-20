@@ -41,6 +41,7 @@ enum TransiumColor {
     static let darkBlue = Color("DarkBlue")
     static let primary9Blue = Color("Primary9Blue")
     static let mainGreen = Color("MainGreen")
+    static let lightRed = Color("lightRed")
     static let authBlue = Color(red: 0.19, green: 0.43, blue: 0.91)
     static let linkBlue = Color(red: 0.0, green: 0.18, blue: 0.62)
     static let ticketBlue = Color(red: 0.20, green: 0.45, blue: 0.95)

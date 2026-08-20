@@ -118,7 +118,8 @@ struct SearchSheetView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "location")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 21, weight: .semibold))
+                            .foregroundStyle(TransiumColor.primaryBlue)
                         Text("Use my Current Location")
                             .font(TransiumFont.body(16, weight: .semibold))
                     }
