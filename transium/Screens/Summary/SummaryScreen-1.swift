@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct SummaryScreen_1: View {
+struct Summary: View {
     
     let cards: [StatCardData]
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
@@ -74,7 +74,7 @@ struct SummaryScreen_1: View {
                         
 
                         VStack (alignment: .leading){
-                            Text("Cool! ✨") //\(random texts?)
+                            Text("Such a Great Trip! ✨") //\(random texts?)
                                 .font(TransiumFont.display(21))
                             
                             HStack {
@@ -89,7 +89,7 @@ struct SummaryScreen_1: View {
                         }
                         .padding()
                         .foregroundStyle(.white)
-                        .background(Color.primary.opacity(0.15))
+                        .background(TransiumColor.darkBlue.opacity(0.50))
                         .clipShape(RoundedRectangle(cornerRadius: 30))
                     }
                     .padding()
@@ -104,7 +104,7 @@ struct SummaryScreen_1: View {
 }
 
 #Preview {
-    SummaryScreen_1(cards: [
+    Summary(cards: [
         StatCardData(title: "Distance", value: "17", unit: "km",
                      icon: "distance-icon"),
         StatCardData(title: "Travel Cost", value: "4.4k", unit: "Rp",

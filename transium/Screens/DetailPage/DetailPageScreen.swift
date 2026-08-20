@@ -47,17 +47,8 @@ struct DetailPlaceScreen: View {
             }
         }
         
-        /// Solid pastel background (accent blended 10% into white).
-        /// Deliberately NOT `accent.opacity(0.10)` — a true-alpha color lets
-        /// whatever sits behind it (map, images, other cards) show through.
-        /// Blending into an opaque color keeps the same pastel look everywhere
-        /// this theme is used, regardless of what's underneath.
         var background: Color {
-            switch self {
-            case .blue: return Color(red: 0.92, green: 0.942, blue: 0.995)
-            case .red: return Color(red: 0.992, green: 0.942, blue: 0.938)
-            case .green: return Color(red: 0.93, green: 0.968, blue: 0.942)
-            }
+            accent.opacity(0.10)
         }
     }
     
@@ -119,15 +110,8 @@ struct DetailPlaceScreen: View {
     }
     
     // MARK: - Image Carousel
-    
     private var imageCarousel: some View {
         ZStack(alignment: .top) {
-            VStack {
-                Spacer()
-                PageIndicator(currentPage: selectedImageIndex, totalPages: galleryImages.count)
-                    .padding(.bottom, 20)
-            }
-            
             TabView(selection: $selectedImageIndex) {
                 ForEach(Array(galleryImages.enumerated()), id: \.offset) { index, imageName in
                     Image(imageName)
@@ -137,24 +121,33 @@ struct DetailPlaceScreen: View {
                         .clipped()
                 }
             }
-            .frame(height: 300)
+            .frame(height: 400)
             .tabViewStyle(.page(indexDisplayMode: .never))
-            
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "arrow.left")
-                        .foregroundColor(.black)
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(Color.white)
-                        .clipShape(Circle())
+
+            // Back button + page indicator, digambar SETELAH TabView → muncul di atasnya
+            VStack {
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "arrow.left")
+                            .foregroundColor(.black)
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                    }
+                    Spacer()
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 60)
+
                 Spacer()
+
+                PageIndicator(currentPage: selectedImageIndex, totalPages: galleryImages.count)
+//                    .padding(.bottom, 15)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 60)
+            .frame(height: 300) // batasi area overlay supaya "Spacer" di dalamnya pas dengan tinggi foto (300), bukan 400
         }
         .frame(height: 400)
     }
@@ -192,7 +185,7 @@ struct DetailPlaceScreen: View {
             Color.white
                 .clipShape(RoundedCorner(radius: 28, corners: [.topLeft, .topRight]))
         )
-        .offset(y: -130)
+        .offset(y: -75)
     }
 
     private var dragHandle: some View {
