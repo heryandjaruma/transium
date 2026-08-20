@@ -1,11 +1,7 @@
 {
   "images" : [
     {
-<<<<<<<< HEAD:transium/Assets.xcassets/Illustrations/Onboarding/onboard3photo2.imageset/Contents.json
       "filename" : "Badges2.png",
-========
-      "filename" : "Hammer.png",
->>>>>>>> origin/noia_punya:transium/Assets.xcassets/Illustrations/States/Hammer.imageset/Contents.json
       "idiom" : "universal",
       "scale" : "1x"
     },

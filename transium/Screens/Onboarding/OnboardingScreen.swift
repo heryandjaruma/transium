@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-internal import Combine
+import Combine
 
 struct OnboardingScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

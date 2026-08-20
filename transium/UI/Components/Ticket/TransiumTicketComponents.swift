@@ -95,6 +95,8 @@ struct TransiumTicketVariant: Equatable {
         notchColor: TransiumColor.ticketInk
     )
 
+    static let mint = green
+
     static let coral = TransiumTicketVariant(
         backgroundColor: TransiumColor.ticketCoral,
         foregroundColor: .white,

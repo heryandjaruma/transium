@@ -37,6 +37,25 @@ struct DetailPlaceScreen: View {
             self.points = points
             self.theme = theme
         }
+
+        init(
+            id: String = UUID().uuidString,
+            imageName: String,
+            title: String,
+            description: String,
+            points: Int = 10,
+            theme: QuestTheme = .blue
+        ) {
+            self.init(
+                id: id,
+                imageUrl: nil,
+                fallbackImageName: imageName,
+                title: title,
+                description: description,
+                points: points,
+                theme: theme
+            )
+        }
     }
     
     enum QuestTheme {

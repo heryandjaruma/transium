@@ -361,7 +361,7 @@ struct RecommendedQuestCard: View {
             QuestRow(
                 quest: DetailPlaceScreen.Quest(
                     id: "preview-sanoored",
-                    imageName: "sanoored",
+                    fallbackImageName: "sanoored",
                     title: "Sanoored",
                     description: "Enjoy the vibe along the shore of Sanur",
                     points: 10,
@@ -372,7 +372,7 @@ struct RecommendedQuestCard: View {
             QuestRow(
                 quest: DetailPlaceScreen.Quest(
                     id: "preview-gela-tour",
-                    imageName: "traveling",
+                    fallbackImageName: "traveling",
                     title: "Gela-tour",
                     description: "Gelato + Sanur weather = perfect summer",
                     points: 10,
@@ -383,7 +383,7 @@ struct RecommendedQuestCard: View {
             QuestRow(
                 quest: DetailPlaceScreen.Quest(
                     id: "preview-little-stalls",
-                    imageName: "gwk",
+                    fallbackImageName: "gwk",
                     title: "Little Stalls",
                     description: "Go local by enjoying snacks from small businesses",
                     points: 10,
