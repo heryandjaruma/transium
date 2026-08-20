@@ -235,7 +235,7 @@ struct HomeScreen: View {
                 .zIndex(100)
             }
 
-            if isStartingGoMode {
+            if isStartingGoMode || isFetchingJourney {
                 LoadingScreen()
                     .transition(.opacity)
                     .zIndex(300)
@@ -481,33 +481,20 @@ struct HomeScreen: View {
                 doQuest()
             }) {
                 HStack(spacing: 10) {
-                    if isFetchingJourney {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(0.9)
-                        Text("Planning Route...")
-                            .font(TransiumFont.body(15, weight: .bold))
-                    } else {
-                        Image(systemName: "flag.fill")
-                            .font(.system(size: 16, weight: .bold))
-                        Text("Do Quest")
-                            .font(TransiumFont.body(16, weight: .bold))
-                    }
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: 16, weight: .bold))
+                    Text("Do Quest")
+                        .font(TransiumFont.body(16, weight: .bold))
                 }
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
-                .background(
-                    isFetchingJourney
-                        ? TransiumColor.primaryBlue.opacity(0.85)
-                        : TransiumColor.primaryBlue
-                )
+                .background(TransiumColor.primaryBlue)
                 .cornerRadius(26)
-                .shadow(color: isFetchingJourney ? TransiumColor.primaryBlue.opacity(0.35) : .black.opacity(0.12), radius: 8, y: 4)
+                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
             }
             .disabled(isFetchingJourney)
             .padding(.horizontal, 20)
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isFetchingJourney)
             
             currentLocationPill
         }
