@@ -86,7 +86,16 @@ extension LocationStore: CLLocationManagerDelegate {
         guard newHeading.headingAccuracy >= 0 else { return }
         let heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
         Task { @MainActor in
-            currentHeading = heading
+            var diff = (heading - currentHeading).truncatingRemainder(dividingBy: 360)
+            if diff > 180 { diff -= 360 }
+            if diff < -180 { diff += 360 }
+            
+            // Ignore small compass jitter (< 2.5 degrees)
+            guard abs(diff) >= 2.5 else { return }
+            
+            var target = currentHeading + diff
+            if target < 0 { target += 360 }
+            currentHeading = target.truncatingRemainder(dividingBy: 360)
         }
     }
 
