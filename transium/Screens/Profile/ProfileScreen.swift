@@ -55,6 +55,7 @@ struct ProfileScreen: View {
     @State private var isSavingAccount: Bool = false
     @State private var accountSaveError: String?
     @State private var showDeleteAccountConfirmation: Bool = false
+    @State private var isDeletingAccount: Bool = false
 
     // Gallery
     @State private var galleryPhotos: [GalleryPhoto] = [
@@ -660,10 +661,15 @@ struct ProfileScreen: View {
                     } label: {
                         HStack {
                             Spacer()
-                            Text("Delete Account")
+                            if isDeletingAccount {
+                                ProgressView()
+                            } else {
+                                Text("Delete Account")
+                            }
                             Spacer()
                         }
                     }
+                    .disabled(isDeletingAccount)
                 }
             }
             .navigationTitle("Edit Account")
@@ -673,6 +679,7 @@ struct ProfileScreen: View {
                     Button("Close") {
                         isEditingAccount = false
                     }
+                    .disabled(isDeletingAccount)
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
@@ -706,9 +713,28 @@ struct ProfileScreen: View {
     }
 
     private func deleteAccount() {
-        // TODO: hook this up to the real account-deletion API call.
-        isEditingAccount = false
-        dismiss()
+        Task {
+            await performAccountDeletion()
+        }
+    }
+
+    private func performAccountDeletion() async {
+        isDeletingAccount = true
+        defer { isDeletingAccount = false }
+
+        do {
+            try await AccountService.shared.deleteAccount()
+            isEditingAccount = false
+            // Clears the local token, unregisters the device's push token,
+            // and flips the app back to signed-out — the account and all
+            // its server-side data are already gone at this point.
+            await session.signOut()
+        } catch {
+            AppToastCenter.shared.showError(
+                title: "Couldn't delete account",
+                message: "Please try again in a moment."
+            )
+        }
     }
 }
 

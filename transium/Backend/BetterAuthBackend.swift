@@ -111,13 +111,6 @@ nonisolated struct BetterAuthBackend: AuthBackend {
         )
     }
 
-    func deleteAccount(accessToken: String) async throws {
-        // Account deletion is not enabled on the backend yet.
-        throw BackendError.unsupported(
-            "Account deletion is not enabled on the server yet."
-        )
-    }
-
     // MARK: - Transport
 
     private func perform(
