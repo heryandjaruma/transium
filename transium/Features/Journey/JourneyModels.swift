@@ -210,9 +210,11 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
 public nonisolated struct JourneyAttempt: Codable, Identifiable, Sendable, Equatable {
     public let id: String
     public let userQuestId: String
-    public let questId: String
-    public let questName: String
-    public let questCategory: String
+    // Documented as required by the OpenAPI spec, but POST /private/journey/go's response
+    // currently omits them in practice — kept optional so decoding doesn't hard-fail on that.
+    public let questId: String?
+    public let questName: String?
+    public let questCategory: String?
     public let currentStepSequence: Int
     public let status: String
     public let createdAt: Date
@@ -222,9 +224,9 @@ public nonisolated struct JourneyAttempt: Codable, Identifiable, Sendable, Equat
     public init(
         id: String,
         userQuestId: String,
-        questId: String,
-        questName: String,
-        questCategory: String,
+        questId: String? = nil,
+        questName: String? = nil,
+        questCategory: String? = nil,
         currentStepSequence: Int,
         status: String,
         createdAt: Date,

@@ -5,6 +5,33 @@
 
 import Foundation
 
+/// The backend always emits dates via JS `Date.toISOString()` (e.g. "2026-08-19T02:00:00.000Z"),
+/// which includes fractional seconds — `ISO8601DateFormatter`'s default options don't parse
+/// those and fail decoding entirely. This strategy tries fractional seconds first, then falls
+/// back to the plain format for any date that omits them.
+extension JSONDecoder.DateDecodingStrategy {
+    static let flexibleISO8601 = JSONDecoder.DateDecodingStrategy.custom { decoder in
+        let container = try decoder.singleValueContainer()
+        let dateString = try container.decode(String.self)
+
+        let withFractionalSeconds = ISO8601DateFormatter()
+        withFractionalSeconds.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = withFractionalSeconds.date(from: dateString) {
+            return date
+        }
+
+        let standard = ISO8601DateFormatter()
+        if let date = standard.date(from: dateString) {
+            return date
+        }
+
+        throw DecodingError.dataCorruptedError(
+            in: container,
+            debugDescription: "Expected date string to be ISO8601-formatted: \(dateString)"
+        )
+    }
+}
+
 public enum HTTPMethod: String, Sendable {
     case get = "GET"
     case post = "POST"
@@ -56,7 +83,7 @@ public final class APIClient: APIClientProtocol, @unchecked Sendable {
         self.jsonEncoder.dateEncodingStrategy = .iso8601
 
         self.jsonDecoder = JSONDecoder()
-        self.jsonDecoder.dateDecodingStrategy = .iso8601
+        self.jsonDecoder.dateDecodingStrategy = .flexibleISO8601
     }
 
     public func request<T: Decodable>(
@@ -80,6 +107,7 @@ public final class APIClient: APIClientProtocol, @unchecked Sendable {
         do {
             return try jsonDecoder.decode(T.self, from: data)
         } catch {
+            logDecodingFailure(decoding: T.self, path: path, error: error, data: data)
             throw TransiumAPIError.decodingError(error)
         }
     }
@@ -128,11 +156,23 @@ public final class APIClient: APIClientProtocol, @unchecked Sendable {
         do {
             return try jsonDecoder.decode(T.self, from: data)
         } catch {
+            logDecodingFailure(decoding: T.self, path: path, error: error, data: data)
             throw TransiumAPIError.decodingError(error)
         }
     }
 
     // MARK: - Private Helpers
+
+    private func logDecodingFailure(decoding type: Decodable.Type, path: String, error: Error, data: Data) {
+        let body = String(data: data, encoding: .utf8) ?? "<non-utf8 body, \(data.count) bytes>"
+        print("""
+        [APIClient] Failed to decode \(type) from \(path):
+        \(String(describing: error))
+        --- raw response body ---
+        \(body)
+        --------------------------
+        """)
+    }
 
     private func makeRequest(
         path: String,
@@ -185,6 +225,8 @@ public final class APIClient: APIClientProtocol, @unchecked Sendable {
         }
 
         let serverMessage = parseErrorMessage(from: data)
+        let body = String(data: data, encoding: .utf8) ?? "<non-utf8 body, \(data.count) bytes>"
+        print("[APIClient] HTTP \(statusCode) from \(httpResponse.url?.absoluteString ?? "?"):\n\(body)")
 
         switch statusCode {
         case 400:
