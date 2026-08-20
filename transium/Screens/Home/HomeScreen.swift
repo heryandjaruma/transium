@@ -87,6 +87,7 @@ struct HomeScreen: View {
                     currentSegmentIndex: goCurrentSegmentIndex,
                     steps: goJourneySteps,
                     currentLocation: locationStore.currentLocation?.coordinate,
+                    geofenceMonitor: geofenceMonitor,
                     onBack: { endGoMode() },
                     onEnd: { endGoMode(cancelAttempt: true) },
                     onLocate: { mapCenterRequestID += 1 },

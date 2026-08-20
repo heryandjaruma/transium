@@ -21,6 +21,13 @@ final class JourneyGeofenceMonitor: NSObject, ObservableObject {
 
     private let locationManager = CLLocationManager()
 
+    /// The regions currently registered with Core Location — i.e. actively geofenced right
+    /// now, not just the ones a journey asked for (`startMonitoring` caps at 20; anything
+    /// past that never made it here). Identifier is the step id (see `startMonitoring`).
+    var activeRegions: [CLCircularRegion] {
+        locationManager.monitoredRegions.compactMap { $0 as? CLCircularRegion }
+    }
+
     override init() {
         super.init()
         locationManager.delegate = self

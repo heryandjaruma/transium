@@ -33,6 +33,9 @@ struct GoComponentMode: View {
     /// recomputes its distance/time to go from this instead of the route's static estimate.
     var currentLocation: CLLocationCoordinate2D? = nil
     var isMuted: Bool = false
+    /// Only read from for the debug "active geofences" share button on GoTripDetailsPanel;
+    /// defaults so preview/test call sites don't need one of their own.
+    var geofenceMonitor: JourneyGeofenceMonitor = JourneyGeofenceMonitor()
 
     var onBack: () -> Void = {}
     var onEnd: () -> Void = {}
@@ -171,7 +174,8 @@ struct GoComponentMode: View {
                 currentSegmentIndex: effectiveSegmentIndex,
                 steps: steps,
                 currentLocation: currentLocation,
-                isExpanded: $isTripDetailsExpanded
+                isExpanded: $isTripDetailsExpanded,
+                geofenceMonitor: geofenceMonitor
             )
         }
         .padding(.bottom, 8)

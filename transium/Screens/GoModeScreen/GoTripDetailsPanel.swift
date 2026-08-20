@@ -24,6 +24,7 @@ struct GoTripDetailsPanel: View {
     let steps: [JourneyAttemptStep]
     var currentLocation: CLLocationCoordinate2D? = nil
     @Binding var isExpanded: Bool
+    var geofenceMonitor: JourneyGeofenceMonitor = JourneyGeofenceMonitor()
 
     @State private var isStopsExpanded: [String: Bool] = [:]
     #if DEBUG
@@ -72,6 +73,11 @@ struct GoTripDetailsPanel: View {
                     .foregroundStyle(TransiumColor.primaryBlue)
                 Spacer()
                 #if DEBUG
+                Button(action: shareActiveGeofencesJSON) {
+                    Image(systemName: "location.circle")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
                 Button(action: shareJourneyDebugJSON) {
                     Image(systemName: "ladybug")
                         .font(.system(size: 16, weight: .medium))
@@ -500,6 +506,30 @@ struct GoTripDetailsPanel: View {
             AppToastCenter.shared.showSuccess(title: "Debug", message: "Failed to write journey JSON.")
         }
     }
+
+    /// Writes every region currently registered with Core Location (identifier = step id, per
+    /// `JourneyGeofenceMonitor.startMonitoring`) to a temp .json file and shares it the same
+    /// way — empty array if nothing's actively being monitored right now.
+    private func shareActiveGeofencesJSON() {
+        let regions = geofenceMonitor.activeRegions.map {
+            DebugGeofenceInfo(identifier: $0.identifier, latitude: $0.center.latitude, longitude: $0.center.longitude, radiusMeters: $0.radius)
+        }
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(regions) else {
+            AppToastCenter.shared.showSuccess(title: "Debug", message: "Failed to encode geofences JSON.")
+            return
+        }
+
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("active-geofences-\(Int(Date().timeIntervalSince1970)).json")
+        do {
+            try data.write(to: url)
+            debugShareItem = DebugShareItem(url: url)
+        } catch {
+            AppToastCenter.shared.showSuccess(title: "Debug", message: "Failed to write geofences JSON.")
+        }
+    }
     #endif
 
     // MARK: - Finish Card
@@ -587,6 +617,13 @@ struct GoTripDetailsPanel: View {
 private struct DebugShareItem: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+private struct DebugGeofenceInfo: Codable {
+    let identifier: String
+    let latitude: Double
+    let longitude: Double
+    let radiusMeters: Double
 }
 
 private struct ActivityShareSheet: UIViewControllerRepresentable {
