@@ -48,6 +48,9 @@ struct GoComponentMode: View {
     /// Only offered on walking legs; bus legs are display-only (their card already hosts
     /// the "Download App" action).
     var onAdvanceSegment: () -> Void = {}
+    /// Manual "I'm here" fallback for a specific quest step (mission/photo-checkpoint), passed
+    /// straight through to GoTripDetailsPanel — see its own doc comment for why this exists.
+    var onManualAdvance: (String) -> Void = { _ in }
 
     @State private var isTripDetailsExpanded = false
 
@@ -179,7 +182,8 @@ struct GoComponentMode: View {
                 currentLocation: currentLocation,
                 isExpanded: $isTripDetailsExpanded,
                 geofenceMonitor: geofenceMonitor,
-                goStartResult: goStartResult
+                goStartResult: goStartResult,
+                onManualAdvance: onManualAdvance
             )
         }
         .padding(.bottom, 8)

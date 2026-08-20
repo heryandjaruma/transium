@@ -108,6 +108,10 @@ struct HomeScreen: View {
 //                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
 //                            goCurrentSegmentIndex = min(goCurrentSegmentIndex + 1, journey.segments.count)
 //                        }
+                    },
+                    onManualAdvance: { stepId in
+                        guard let attemptId = goJourneyAttempt?.id else { return }
+                        handleGeofenceEntered(stepId: stepId, attemptId: attemptId)
                     }
                 )
                 .transition(.opacity)

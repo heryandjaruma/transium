@@ -26,6 +26,11 @@ struct GoTripDetailsPanel: View {
     @Binding var isExpanded: Bool
     var geofenceMonitor: JourneyGeofenceMonitor = JourneyGeofenceMonitor()
     var goStartResult: JourneyGoResult? = nil
+    /// POST /private/journey/{id}/advance's own doc calls this "a geofence trigger, or a
+    /// manual arrival check" — this is the latter: a fallback for when the geofence doesn't
+    /// fire (GPS drift, being outside the server's own ~150m tolerance, etc.), wired by the
+    /// caller to the exact same handler a real geofence trigger uses.
+    var onManualAdvance: (String) -> Void = { _ in }
 
     @State private var isStopsExpanded: [String: Bool] = [:]
     #if DEBUG
@@ -71,6 +76,22 @@ struct GoTripDetailsPanel: View {
         }
 
         return assignments
+    }
+
+    /// The JourneyAttemptStep (from POST /private/journey/go) matching a mission segment (from
+    /// GET /journey/real) by coordinate — the two responses don't share a step id directly, so
+    /// this is how a mission card can offer its own manual "I'm here" fallback.
+    private func attemptStep(for mission: JourneySegment) -> JourneyAttemptStep? {
+        guard let coordinate = mission.coordinate else { return nil }
+        let missionLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+
+        return steps
+            .compactMap { step -> (step: JourneyAttemptStep, distance: CLLocationDistance)? in
+                guard let lat = step.lat, let lng = step.lng else { return nil }
+                return (step, CLLocation(latitude: lat, longitude: lng).distance(from: missionLocation))
+            }
+            .min { $0.distance < $1.distance }
+            .flatMap { $0.distance <= 50 ? $0.step : nil }
     }
 
     var body: some View {
@@ -501,24 +522,36 @@ struct GoTripDetailsPanel: View {
     /// segments, shown as their own card (never merged into a travel-leg card) right after
     /// the leg that reaches it.
     private func missionCard(_ mission: JourneySegment, isDone: Bool) -> some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(isDone ? Self.doneAccent : TransiumColor.primaryYellow).frame(width: 36, height: 36)
-                Image(systemName: isDone ? "checkmark" : "questionmark.app.fill")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(.white)
+        let matchedStep = attemptStep(for: mission)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().fill(isDone ? Self.doneAccent : TransiumColor.primaryYellow).frame(width: 36, height: 36)
+                    Image(systemName: isDone ? "checkmark" : "questionmark.app.fill")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Mission")
+                        .font(TransiumFont.body(11, weight: .bold))
+                        .foregroundColor(.secondary)
+                    Text(mission.instructions ?? "Complete the mission")
+                        .font(TransiumFont.body(15, weight: .bold))
+                        .foregroundColor(.black)
+                }
+
+                Spacer()
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Mission")
-                    .font(TransiumFont.body(11, weight: .bold))
-                    .foregroundColor(.secondary)
-                Text(mission.instructions ?? "Complete the mission")
-                    .font(TransiumFont.body(15, weight: .bold))
-                    .foregroundColor(.black)
+            if let matchedStep, matchedStep.status != .done {
+                Divider()
+                HStack {
+                    Spacer()
+                    markDoneButton(for: matchedStep, tint: TransiumColor.primaryYellow)
+                }
             }
-
-            Spacer()
         }
         .padding(14)
         .background(isDone ? Self.doneBackground : Color.white)
@@ -528,21 +561,52 @@ struct GoTripDetailsPanel: View {
     }
 
     private func questActionRow(_ step: JourneyAttemptStep, tint: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "camera.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(tint.opacity(0.85))
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(tint.opacity(0.85))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(step.description.isEmpty ? "Take a pic during your journey" : step.description)
-                    .font(TransiumFont.body(13, weight: .semibold))
-                    .foregroundColor(tint)
-                Text("Random camera pop-up for your digital keepsake")
-                    .font(TransiumFont.body(11))
-                    .foregroundColor(tint.opacity(0.7))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(step.description.isEmpty ? "Take a pic during your journey" : step.description)
+                        .font(TransiumFont.body(13, weight: .semibold))
+                        .foregroundColor(tint)
+                    Text("Random camera pop-up for your digital keepsake")
+                        .font(TransiumFont.body(11))
+                        .foregroundColor(tint.opacity(0.7))
+                }
+
+                Spacer()
+            }
+
+            if step.status != .done {
+                HStack {
+                    Spacer()
+                    markDoneButton(for: step, tint: tint)
+                }
             }
         }
         .padding(.leading, 8)
+    }
+
+    /// A manual fallback for POST /private/journey/{id}/advance's own documented "manual
+    /// arrival check" case — wired by the caller to the exact same handler a real geofence
+    /// trigger uses, for when the geofence itself doesn't fire.
+    private func markDoneButton(for step: JourneyAttemptStep, tint: Color) -> some View {
+        Button(action: { onManualAdvance(step.id) }) {
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("I'm here")
+                    .font(TransiumFont.body(11, weight: .semibold))
+            }
+            .foregroundColor(tint)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(tint.opacity(0.12))
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.transiumNoOpacity)
     }
 
     #if DEBUG
