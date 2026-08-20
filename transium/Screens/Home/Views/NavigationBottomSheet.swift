@@ -79,9 +79,9 @@ struct NavigationBottomSheet: View {
             
             // Leave sub-header card
             HStack {
-                Text("Leave within **1 min**")
-                    .font(TransiumFont.body(14))
-                    .foregroundColor(.black)
+//                Text("Leave within **1 min**")
+//                    .font(TransiumFont.body(14))
+//                    .foregroundColor(.black)
                 
                 Spacer()
                 

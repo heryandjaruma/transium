@@ -22,6 +22,7 @@ struct GoTripDetailsPanel: View {
     let journey: JourneyResult
     let currentSegmentIndex: Int
     let steps: [JourneyAttemptStep]
+    var currentLocation: CLLocationCoordinate2D? = nil
     @Binding var isExpanded: Bool
 
     private var matchedSteps: [String: JourneyAttemptStep] {
@@ -239,8 +240,11 @@ struct GoTripDetailsPanel: View {
 
                 Spacer()
 
-                if let dur = segment.durationSeconds {
-                    Text("\(Int(round(dur / 60))) min")
+                let activeRemaining = segment.type != "bus"
+                    ? segment.liveRemaining(from: currentLocation)
+                    : (distanceMeters: segment.distanceMeters, durationSeconds: segment.durationSeconds)
+                if let dur = activeRemaining.durationSeconds {
+                    Text("\(max(0, Int(round(dur / 60)))) min")
                         .font(TransiumFont.body(14, weight: .bold))
                         .foregroundColor(.white)
                 }

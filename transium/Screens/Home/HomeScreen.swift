@@ -79,6 +79,7 @@ struct HomeScreen: View {
                     journey: journey,
                     currentSegmentIndex: goCurrentSegmentIndex,
                     steps: goJourneySteps,
+                    currentLocation: locationStore.currentLocation?.coordinate,
                     onBack: { endGoMode() },
                     onEnd: { endGoMode(cancelAttempt: true) },
                     onLocate: { mapCenterRequestID += 1 },

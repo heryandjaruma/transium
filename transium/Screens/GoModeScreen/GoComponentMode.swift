@@ -16,6 +16,7 @@
 //  a modal .sheet() would. The floating card hides while the sheet is expanded, since the
 //  expanded itinerary already shows the current leg as its own highlighted card.
 
+import CoreLocation
 import SwiftUI
 
 struct GoComponentMode: View {
@@ -28,6 +29,9 @@ struct GoComponentMode: View {
     let journey: JourneyResult
     let currentSegmentIndex: Int
     var steps: [JourneyAttemptStep] = []
+    /// The device's live position — when set, the current walking leg's "Walk to X" card
+    /// recomputes its distance/time to go from this instead of the route's static estimate.
+    var currentLocation: CLLocationCoordinate2D? = nil
     var isMuted: Bool = false
 
     var onBack: () -> Void = {}
@@ -76,6 +80,7 @@ struct GoComponentMode: View {
                 journey: journey,
                 currentSegmentIndex: currentSegmentIndex,
                 steps: steps,
+                currentLocation: currentLocation,
                 isExpanded: $isTripDetailsExpanded
             )
         }
@@ -135,12 +140,16 @@ struct GoComponentMode: View {
     }
 
     private func metrics(for segment: JourneySegment) -> [GoStepCard.Metric] {
+        let live = segment.type != "bus"
+            ? segment.liveRemaining(from: currentLocation)
+            : (distanceMeters: segment.distanceMeters, durationSeconds: segment.durationSeconds)
+
         var result: [GoStepCard.Metric] = []
-        if let duration = segment.durationSeconds {
-            result.append(.init("\(Int(round(duration / 60)))", "min"))
+        if let duration = live.durationSeconds {
+            result.append(.init("\(max(0, Int(round(duration / 60))))", "min"))
         }
-        if let distance = segment.distanceMeters {
-            result.append(.init(String(format: "%.1f", distance / 1000), "kilometer"))
+        if let distance = live.distanceMeters {
+            result.append(.init(String(format: "%.1f", max(0, distance) / 1000), "kilometer"))
         }
         return result.isEmpty ? [.init("--", "min")] : result
     }

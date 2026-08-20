@@ -203,6 +203,32 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
             stops: stops
         )
     }
+
+    private static let defaultWalkingSpeedMetersPerSecond: Double = 1.35
+
+    /// Distance/duration to this segment's destination, recomputed live from the device's
+    /// current position when available — so a "Walk to X" card can count down as the user
+    /// actually gets closer, rather than showing the route's precomputed estimate for its
+    /// whole length regardless of progress. Falls back to the segment's own precomputed
+    /// values when no live position is available. Only meaningful for non-"bus" segments
+    /// (walk/transfer) — there's no live vehicle position to track a bus leg against.
+    public func liveRemaining(from currentLocation: CLLocationCoordinate2D?) -> (distanceMeters: Double?, durationSeconds: Double?) {
+        guard let currentLocation else {
+            return (distanceMeters, durationSeconds)
+        }
+
+        let liveDistance = CLLocation(latitude: currentLocation.latitude, longitude: currentLocation.longitude)
+            .distance(from: CLLocation(latitude: to.lat, longitude: to.lng))
+
+        let pace: Double = {
+            if let distanceMeters, let durationSeconds, distanceMeters > 0, durationSeconds > 0 {
+                return distanceMeters / durationSeconds
+            }
+            return Self.defaultWalkingSpeedMetersPerSecond
+        }()
+
+        return (liveDistance, liveDistance / pace)
+    }
 }
 
 // MARK: - Journey Attempt Models (/private/journey/*)
