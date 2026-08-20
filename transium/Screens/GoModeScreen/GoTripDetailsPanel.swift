@@ -36,10 +36,21 @@ struct GoTripDetailsPanel: View {
     private static let doneAccent = Color(red: 0.06, green: 0.72, blue: 0.51)
 
     private var matchedSteps: [String: JourneyAttemptStep] {
+        // Anything already surfaced precisely by its own `missionCard` (journey.segments now
+        // gives mission steps exact, authoritative placement) shouldn't also be guessed at here
+        // — a nearby-but-wrong travel leg can otherwise steal it, since this match is only ever
+        // best-effort straight-line distance.
+        let missionLocations: [CLLocation] = journey.segments.compactMap { segment in
+            guard segment.isMission, let coordinate = segment.coordinate else { return nil }
+            return CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        }
+
         let candidates: [(step: JourneyAttemptStep, location: CLLocation)] = steps.compactMap { step in
             guard step.name.localizedCaseInsensitiveContains("picture"),
                   let lat = step.lat, let lng = step.lng else { return nil }
-            return (step, CLLocation(latitude: lat, longitude: lng))
+            let location = CLLocation(latitude: lat, longitude: lng)
+            guard !missionLocations.contains(where: { $0.distance(from: location) <= 50 }) else { return nil }
+            return (step, location)
         }
 
         var assignments: [String: JourneyAttemptStep] = [:]
