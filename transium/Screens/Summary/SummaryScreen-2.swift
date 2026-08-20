@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct Animation: View {
+struct SummaryCelebrationScreen: View {
 
     let cards: [StatCardData]
     let origin: String = "Jimbaran"
@@ -151,7 +151,7 @@ struct Animation: View {
 }
 
 #Preview {
-    Animation(cards: [
+    SummaryCelebrationScreen(cards: [
         StatCardData(title: "Distance", value: "17", unit: "km",
                      icon: "distance-icon"),
         StatCardData(title: "Travel Cost", value: "4.4k", unit: "Rp",
