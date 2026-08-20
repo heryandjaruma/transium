@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+internal import Combine
 
 struct OnboardingScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -30,34 +31,64 @@ struct OnboardingScreen: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
+
+                // MARK: Navigation
+
                 navigationBar
 
-                Spacer(minLength: 26)
+                Spacer(minLength: 20)
 
-                OnboardingCopyPager(
-                    pages: pages,
-                    currentPage: currentPage,
-                    dragOffset: dragOffset,
-                    animation: pageAnimation
-                )
-                .frame(height: 120)
+                // MARK: Page Content
 
-                OnboardingVisualPager(
-                    pages: pages,
-                    currentPage: currentPage,
-                    dragOffset: dragOffset,
-                    animation: pageAnimation
-                )
+                if currentPage == 2 {
+
+                    // --------------------------------
+                    // ONBOARDING 3
+                    // --------------------------------
+
+                    Onboarding3Layout(
+                        page: page,
+                        animation: pageAnimation
+                    )
+
+                } else {
+
+                    // --------------------------------
+                    // ONBOARDING 1 & 2
+                    // --------------------------------
+
+                    OnboardingPageContent(
+                        page: page,
+                        animation: pageAnimation
+                    )
+                    .padding(.horizontal, 25)
+
+                    OnboardingVisualPager(
+                        pages: pages,
+                        currentPage: currentPage,
+                        animation: pageAnimation
+                    )
                     .frame(height: 350)
                     .padding(.top, 10)
+                }
 
-                Spacer(minLength: 28)
+                Spacer(minLength: 20)
 
-                PageIndicator(currentPage: currentPage, totalPages: pages.count)
-                    .padding(.bottom, 20)
+                // MARK: Page Indicator
 
-                TransiumPrimaryButton(title: page.buttonTitle, action: advance)
-                    .padding(.horizontal, 20)
+                PageIndicator(
+                    currentPage: currentPage,
+                    totalPages: pages.count
+                )
+                .padding(.bottom, 20)
+
+                // MARK: Bottom Button
+
+                TransiumPrimaryButton(
+                    title: page.buttonTitle,
+                    action: advance
+                )
+                .padding(.horizontal, 20)
             }
             .padding(.top, 10)
             .padding(.bottom, 24)
@@ -76,6 +107,15 @@ struct OnboardingScreen: View {
             .onEnded { value in
                 handleSwipe(value.predictedEndTranslation.width)
             }
+    }
+
+    private func rubberBandedDragOffset(_ horizontalTranslation: CGFloat) -> CGFloat {
+        let isDraggingBeforeFirstPage = currentPage == 0 && horizontalTranslation > 0
+        let isDraggingAfterLastPage = currentPage == pages.count - 1 && horizontalTranslation < 0
+
+        return isDraggingBeforeFirstPage || isDraggingAfterLastPage
+            ? horizontalTranslation * 0.22
+            : horizontalTranslation
     }
 
     private func handleSwipe(_ horizontalTranslation: CGFloat) {
@@ -118,104 +158,281 @@ struct OnboardingScreen: View {
     }
 
     private var pageAnimation: Animation {
-        reduceMotion ? .linear(duration: 0.12) : .smooth(duration: 0.34, extraBounce: 0)
+        reduceMotion
+            ? .linear(duration: 0.12)
+            : .smooth(duration: 0.34, extraBounce: 0)
     }
 
-    private func rubberBandedDragOffset(_ horizontalTranslation: CGFloat) -> CGFloat {
-        let isDraggingBeforeFirstPage = currentPage == 0 && horizontalTranslation > 0
-        let isDraggingAfterLastPage = currentPage == pages.count - 1 && horizontalTranslation < 0
-
-        return isDraggingBeforeFirstPage || isDraggingAfterLastPage
-            ? horizontalTranslation * 0.22
-            : horizontalTranslation
-    }
+    // MARK: Navigation Bar
 
     private var navigationBar: some View {
         HStack {
             if currentPage > 0 {
-                TransiumIconButton(systemName: "arrow.left", accessibilityLabel: "Previous onboarding page", action: goBack)
-                    .transition(.opacity.combined(with: .scale))
+                TransiumIconButton(
+                    systemName: "arrow.left",
+                    accessibilityLabel: "Previous onboarding page",
+                    action: goBack
+                )
+                .transition(.opacity.combined(with: .scale))
             }
 
             Spacer()
 
-            TransiumCapsuleTextButton(title: "Skip", action: onComplete)
-                .accessibilityLabel("Skip onboarding")
+            TransiumCapsuleTextButton(
+                title: "Skip",
+                action: onComplete
+            )
+            .accessibilityLabel("Skip onboarding")
         }
         .frame(height: 44)
         .padding(.horizontal, 20)
     }
 }
 
-private struct OnboardingCopyPager: View {
-    let pages: [OnboardingPage]
-    let currentPage: Int
-    let dragOffset: CGFloat
+// MARK: - Onboarding 3 Layout
+
+private struct Onboarding3Layout: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let page: OnboardingPage
     let animation: Animation
 
     var body: some View {
-        GeometryReader { proxy in
-            HStack(spacing: 0) {
-                ForEach(pages.indices, id: \.self) { pageIndex in
-                    OnboardingPageContent(page: pages[pageIndex])
-                        .padding(.horizontal, 25)
-                        .frame(width: proxy.size.width)
-                }
-            }
-            .offset(x: pageTrackOffset(width: proxy.size.width))
-            .animation(animation, value: currentPage)
-        }
-        .clipped()
-    }
+        VStack(spacing: 0) {
 
-    private func pageTrackOffset(width: CGFloat) -> CGFloat {
-        (-CGFloat(currentPage) * width) + dragOffset
+            // Trophy
+            Image("onboard3trophy")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 100)
+                .accessibilityHidden(true)
+                .offset(y: -50)
+
+            // Title + Description
+            VStack(spacing: 10) {
+
+                Text(page.title)
+                    .font(TransiumFont.display(36))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.86)
+                    .offset(y: -40)
+
+                Text(page.description)
+                    .font(TransiumFont.body(17))
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .offset(y: -40)
+            }
+            .frame(maxWidth: .infinity)
+
+            // Automatically changing photos
+            Onboarding3PhotoCarousel()
+                .padding(.top, 20)
+                .offset(y: -30)
+        }
+        .frame(maxWidth: .infinity)
+        .contentTransition(
+            reduceMotion ? .identity : .interpolate
+        )
+        .animation(
+            reduceMotion ? nil : animation,
+            value: page.title
+        )
+        .padding(.horizontal, 25)
     }
 }
 
+// MARK: - Onboarding 3 Photo Carousel
+
+private struct Onboarding3PhotoCarousel: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var currentPhoto = 0
+
+    private let photos = [
+        "onboard3photo1",
+        "onboard3photo2",
+        "onboard3photo3"
+    ]
+
+    private let timer = Timer.publish(
+        every: 3,
+        on: .main,
+        in: .common
+    )
+    .autoconnect()
+
+    var body: some View {
+        Group {
+            if reduceMotion {
+
+                Image(photos[currentPhoto])
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 220)
+
+            } else {
+
+                GeometryReader { proxy in
+
+                    ZStack {
+
+                        ForEach(photos.indices, id: \.self) { index in
+
+                            Image(photos[index])
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: proxy.size.width, height: 220)
+                                .offset(
+                                    x: pageOffset(
+                                        for: index,
+                                        width: proxy.size.width
+                                    )
+                                )
+                        }
+                    }
+                }
+            }
+        }
+        .frame(height: 220)
+        .frame(maxWidth: .infinity)
+        .clipped()
+        .animation(
+            reduceMotion ? nil : .smooth(duration: 0.4, extraBounce: 0),
+            value: currentPhoto
+        )
+        .onReceive(timer) { _ in
+
+            guard photos.count > 1 else {
+                return
+            }
+
+            currentPhoto = (currentPhoto + 1) % photos.count
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func pageOffset(
+        for index: Int,
+        width: CGFloat
+    ) -> CGFloat {
+
+        CGFloat(index - currentPhoto) * width
+    }
+}
+
+// MARK: - Regular Onboarding Content
+
 private struct OnboardingPageContent: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let page: OnboardingPage
+    let animation: Animation
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+
             Text(page.title)
                 .font(TransiumFont.display(45))
                 .foregroundStyle(.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.86)
+                .contentTransition(textTransition)
+                .animation(
+                    titleAnimation,
+                    value: page.title
+                )
 
             Text(page.description)
                 .font(TransiumFont.body(17))
                 .foregroundStyle(.white)
-                .fixedSize(horizontal: false, vertical: true)
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+                .contentTransition(textTransition)
+                .animation(
+                    descriptionAnimation,
+                    value: page.description
+                )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(
+            maxWidth: .infinity,
+            alignment: .leading
+        )
         .accessibilityElement(children: .combine)
     }
+
+    private var textTransition: ContentTransition {
+        reduceMotion
+            ? .identity
+            : .interpolate
+    }
+
+    private var titleAnimation: Animation? {
+        reduceMotion
+            ? nil
+            : animation
+    }
+
+    private var descriptionAnimation: Animation? {
+        reduceMotion
+            ? nil
+            : animation.delay(0.06)
+    }
 }
+
+// MARK: - Onboarding Visual Pager
 
 private struct OnboardingVisualPager: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let pages: [OnboardingPage]
     let currentPage: Int
-    let dragOffset: CGFloat
     let animation: Animation
 
     var body: some View {
         Group {
             if reduceMotion {
-                visualPage(for: pages[currentPage])
+
+                visualPage(
+                    for: pages[currentPage]
+                )
+
             } else {
+
                 GeometryReader { proxy in
-                    HStack(spacing: 0) {
-                        ForEach(pages.indices, id: \.self) { pageIndex in
-                            visualPage(for: pages[pageIndex])
-                                .frame(width: proxy.size.width)
+
+                    ZStack {
+
+                        ForEach(
+                            pages.indices,
+                            id: \.self
+                        ) { pageIndex in
+
+                            visualPage(
+                                for: pages[pageIndex]
+                            )
+                            .frame(
+                                width: proxy.size.width
+                            )
+                            .offset(
+                                x: pageOffset(
+                                    for: pageIndex,
+                                    width: proxy.size.width
+                                )
+                            )
+                            .animation(
+                                pageAnimation(
+                                    for: pageIndex
+                                ),
+                                value: currentPage
+                            )
                         }
                     }
-                    .offset(x: pageTrackOffset(width: proxy.size.width))
-                    .animation(animation.delay(0.035), value: currentPage)
                 }
             }
         }
@@ -223,21 +440,39 @@ private struct OnboardingVisualPager: View {
         .clipped()
     }
 
-    private func visualPage(for page: OnboardingPage) -> some View {
-        VStack(spacing: 20) {
-            Image(page.imageName)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .frame(height: 350)
-                .accessibilityHidden(true)
-        }
+    private func visualPage(
+        for page: OnboardingPage
+    ) -> some View {
+
+        Image(page.imageName)
+            .resizable()
+            .scaledToFit()
+            .frame(maxWidth: .infinity)
+            .frame(height: 350)
+            .accessibilityHidden(true)
     }
 
-    private func pageTrackOffset(width: CGFloat) -> CGFloat {
-        (-CGFloat(currentPage) * width) + dragOffset
+    private func pageOffset(
+        for pageIndex: Int,
+        width: CGFloat
+    ) -> CGFloat {
+
+        CGFloat(pageIndex - currentPage) * width
+    }
+
+    private func pageAnimation(
+        for pageIndex: Int
+    ) -> Animation {
+
+        let delay = pageIndex == currentPage
+            ? 0.045
+            : 0
+
+        return animation.delay(delay)
     }
 }
+
+// MARK: - Page Model
 
 private struct OnboardingPage {
     let title: String
@@ -246,26 +481,31 @@ private struct OnboardingPage {
     let buttonTitle: String
 
     static let defaultPages = [
+
         OnboardingPage(
             title: "Explore Bali",
             description: "Find places, routes, and local moments without the guesswork.",
             imageName: TransiumAsset.Illustration.onboardingExplore,
             buttonTitle: "Next"
         ),
+
         OnboardingPage(
             title: "Worry-free Adventure!",
             description: "Keep every move simple, safe, and ready before you head out.",
             imageName: TransiumAsset.Illustration.onboardingAdventure,
             buttonTitle: "Next"
         ),
+
         OnboardingPage(
             title: "Make your friend FOMO",
             description: "Wanna be a cooler traveler?\nCollect the badges and share them.",
             imageName: TransiumAsset.Illustration.onboardingShare,
-            buttonTitle: "Get Started!"
+            buttonTitle: "Let's Go!"
         )
     ]
 }
+
+// MARK: - Preview
 
 #Preview {
     OnboardingScreen {}
