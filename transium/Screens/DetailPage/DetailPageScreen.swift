@@ -13,7 +13,8 @@ struct DetailPlaceScreen: View {
     
     struct Quest: Identifiable {
         let id: String
-        let imageName: String
+        let imageUrl: String?
+        let fallbackImageName: String
         let title: String
         let description: String
         let points: Int
@@ -21,14 +22,16 @@ struct DetailPlaceScreen: View {
         
         init(
             id: String = UUID().uuidString,
-            imageName: String,
+            imageUrl: String? = nil,
+            fallbackImageName: String = "sanoored",
             title: String,
             description: String,
             points: Int = 10,
             theme: QuestTheme = .blue
         ) {
             self.id = id
-            self.imageName = imageName
+            self.imageUrl = imageUrl
+            self.fallbackImageName = fallbackImageName
             self.title = title
             self.description = description
             self.points = points
@@ -54,8 +57,9 @@ struct DetailPlaceScreen: View {
     
     // MARK: - Properties & State
     
-    var kelurahan: Kelurahan = Kelurahan(id: "20447277", kelurahanName: "Sanur", kecamatanName: "Denpasar Selatan")
+    var kelurahan: Kelurahan = Kelurahan(id: "7760985", kelurahanName: "Benoa", kecamatanName: "Kuta Selatan")
     var initialQuests: [Quest] = []
+    var onBack: (() -> Void)? = nil
     var onStartQuest: ((String) -> Void)? = nil
     
     @Environment(\.dismiss) private var dismiss
@@ -64,10 +68,16 @@ struct DetailPlaceScreen: View {
     @State private var isLoadingQuests: Bool = false
     
     private var galleryImages: [String] {
-        if isUbud {
+        if isBenoa {
+            return ["kintamani", "traveling", "gwk"]
+        } else if isUbud {
             return ["kintamani", "traveling", "gwk"]
         }
         return ["gallery-1", "gallery-2", "gallery-3"]
+    }
+    
+    private var isBenoa: Bool {
+        kelurahan.kelurahanName.localizedCaseInsensitiveContains("benoa")
     }
     
     private var isUbud: Bool {
@@ -77,13 +87,32 @@ struct DetailPlaceScreen: View {
     // MARK: - Body
     
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
-                imageCarousel
-                content
+        ZStack(alignment: .topLeading) {
+            Color.white.ignoresSafeArea()
+            
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    imageCarousel
+                    content
+                }
             }
+            .ignoresSafeArea(edges: .top)
+            
+            // Top Floating Back Button
+            Button {
+                dismissScreen()
+            } label: {
+                Image(systemName: "arrow.left")
+                    .foregroundColor(.black)
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 44, height: 44)
+                    .background(Color.white)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+            }
+            .padding(.leading, 20)
+            .padding(.top, 56)
         }
-        .ignoresSafeArea(edges: .top)
         .background(Color.white)
         .navigationBarBackButtonHidden(true)
         .task {
@@ -91,16 +120,18 @@ struct DetailPlaceScreen: View {
         }
     }
     
+    private func dismissScreen() {
+        if let onBack {
+            onBack()
+        } else {
+            dismiss()
+        }
+    }
+    
     // MARK: - Image Carousel
     
     private var imageCarousel: some View {
-        ZStack(alignment: .top) {
-            VStack {
-                Spacer()
-                PageIndicator(currentPage: selectedImageIndex, totalPages: galleryImages.count)
-                    .padding(.bottom, 20)
-            }
-            
+        ZStack(alignment: .bottom) {
             TabView(selection: $selectedImageIndex) {
                 ForEach(Array(galleryImages.enumerated()), id: \.offset) { index, imageName in
                     Image(imageName)
@@ -110,26 +141,13 @@ struct DetailPlaceScreen: View {
                         .clipped()
                 }
             }
-            .frame(height: 300)
+            .frame(height: 340)
             .tabViewStyle(.page(indexDisplayMode: .never))
             
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "arrow.left")
-                        .foregroundColor(.black)
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 60)
+            PageIndicator(currentPage: selectedImageIndex, totalPages: galleryImages.count)
+                .padding(.bottom, 60)
         }
-        .frame(height: 400)
+        .frame(height: 340)
     }
     
     // MARK: - Content
@@ -144,9 +162,11 @@ struct DetailPlaceScreen: View {
                 RecommendedQuestCard(
                     title: firstQuest.title,
                     subtitle: firstQuest.description,
+                    imageUrl: firstQuest.imageUrl,
+                    fallbackImageName: firstQuest.fallbackImageName,
                     points: firstQuest.points
                 ) {
-                    dismiss()
+                    dismissScreen()
                     onStartQuest?(firstQuest.id)
                 }
             }
@@ -154,31 +174,31 @@ struct DetailPlaceScreen: View {
             VStack(spacing: 14) {
                 ForEach(quests) { quest in
                     QuestRow(quest: quest) {
-                        dismiss()
+                        dismissScreen()
                         onStartQuest?(quest.id)
                     }
                 }
             }
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 30)
+        .padding(.bottom, 36)
         .background(
             Color.white
                 .clipShape(RoundedCorner(radius: 28, corners: [.topLeft, .topRight]))
         )
-        .offset(y: -130)
+        .offset(y: -44)
     }
 
     private var dragHandle: some View {
         Capsule()
             .fill(Color.gray.opacity(0.35))
             .frame(width: 44, height: 5)
-            .padding(.top, 10)
+            .padding(.top, 12)
             .frame(maxWidth: .infinity, alignment: .center)
     }
     
     private var titleSection: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
                 Text("\(kelurahan.kelurahanName) Quests")
                     .font(TransiumFont.display(28, weight: .bold))
@@ -187,7 +207,7 @@ struct DetailPlaceScreen: View {
                 Spacer()
                 
                 HStack(spacing: 8) {
-                    Image(isUbud ? "kintamani" : "Beach")
+                    Image(categoryBadgeImage)
                         .resizable()
                         .scaledToFit()
                         .frame(width: 95, height: 30)
@@ -199,10 +219,22 @@ struct DetailPlaceScreen: View {
                 }
             }
             
-            Text(isUbud ? "\(kelurahan.kecamatanName) • Rice fields, art walks & mountain air 🌿" : "\(kelurahan.kecamatanName) • Where earlybirds relax 🌊")
-                .font(TransiumFont.body(15))
+            Text("\(kelurahan.kecamatanName) • \(kelurahanTagline)")
+                .font(TransiumFont.body(14))
                 .foregroundColor(.gray)
         }
+    }
+    
+    private var categoryBadgeImage: String {
+        if isBenoa { return "Beach" }
+        if isUbud { return "kintamani" }
+        return "Beach"
+    }
+    
+    private var kelurahanTagline: String {
+        if isBenoa { return "Where earlybirds relax 🌊" }
+        if isUbud { return "Rice fields, art walks & mountain air 🌿" }
+        return "Where earlybirds relax 🌊"
     }
     
     // MARK: - Data Loading
@@ -220,37 +252,28 @@ struct DetailPlaceScreen: View {
             let detail = try await QuestService.shared.getKelurahanQuests(id: kelurahan.id)
             if !detail.quests.isEmpty {
                 var loaded: [Quest] = []
-                for q in detail.quests {
-                    if !q.badges.isEmpty {
-                        for (index, badge) in q.badges.enumerated() {
-                            let theme: QuestTheme = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .red : .green)
-                            let imageName: String = {
-                                let name = badge.badgeName.lowercased()
-                                if name.contains("sanur") { return "sanoored" }
-                                if name.contains("gela") { return "traveling" }
-                                if name.contains("art") || name.contains("stalls") { return "gwk" }
-                                return "kintamani"
-                            }()
-                            loaded.append(Quest(
-                                id: q.id,
-                                imageName: imageName,
-                                title: badge.badgeName,
-                                description: "\(badge.badgeCategory) • \(badge.badgeName) in \(kelurahan.kelurahanName)",
-                                points: 10,
-                                theme: theme
-                            ))
-                        }
-                    } else {
-                        loaded.append(Quest(
-                            id: q.id,
-                            imageName: isUbud ? "kintamani" : "sanoored",
-                            title: q.name,
-                            description: q.description,
-                            points: 10,
-                            theme: .blue
-                        ))
-                    }
+                for (index, q) in detail.quests.enumerated() {
+                    let theme: QuestTheme = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .red : .green)
+                    let thumbUrl = q.thumbnails.first?.url
+                    let fallbackImg: String = {
+                        let cat = q.category.lowercased()
+                        if cat.contains("beach") || cat.contains("leisure") { return "Beach" }
+                        if cat.contains("nature") { return "kintamani" }
+                        if cat.contains("cult") { return "gwk" }
+                        return "sanoored"
+                    }()
+                    
+                    loaded.append(Quest(
+                        id: q.id,
+                        imageUrl: thumbUrl,
+                        fallbackImageName: fallbackImg,
+                        title: q.name,
+                        description: "\(q.category) • \(q.description)",
+                        points: 10,
+                        theme: theme
+                    ))
                 }
+                
                 if !loaded.isEmpty {
                     quests = loaded
                     return

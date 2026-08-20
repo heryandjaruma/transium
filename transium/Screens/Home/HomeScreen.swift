@@ -191,6 +191,26 @@ struct HomeScreen: View {
                     centerPinIndicator
                 }
             }
+            
+            if isDetailPresented {
+                DetailPlaceScreen(
+                    kelurahan: selectedKelurahan,
+                    initialQuests: [],
+                    onBack: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            isDetailPresented = false
+                        }
+                    },
+                    onStartQuest: { questId in
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            isDetailPresented = false
+                        }
+                        doQuest(questId: questId)
+                    }
+                )
+                .transition(.move(edge: .trailing))
+                .zIndex(100)
+            }
         }
         .task {
             locationStore.requestCurrentLocation()
@@ -212,16 +232,6 @@ struct HomeScreen: View {
         }
         .sheet(isPresented: $isProfilePresented) {
             ProfileScreen()
-        }
-        .sheet(isPresented: $isDetailPresented) {
-            DetailPlaceScreen(
-                kelurahan: selectedKelurahan,
-                initialQuests: [],
-                onStartQuest: { questId in
-                    isDetailPresented = false
-                    doQuest(questId: questId)
-                }
-            )
         }
     }
     
@@ -485,8 +495,10 @@ struct HomeScreen: View {
                             )
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                selectedKelurahan = group.kelurahan
-                                isDetailPresented = true
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    selectedKelurahan = group.kelurahan
+                                    isDetailPresented = true
+                                }
                             }
                         }
                         .frame(width: 336)

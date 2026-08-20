@@ -223,8 +223,6 @@ struct LocalBaliMapView: UIViewRepresentable {
             // 3. Add segment route lines and compact stop annotations
             for (index, segment) in activeJourney.segments.enumerated() {
                 let sourceId = "route-source-\(index)"
-                let lineLayerId = "route-line-\(index)"
-                let casingLayerId = "route-casing-\(index)"
                 let busColor = resolveRouteColor(routeColor: segment.routeColor, routeRef: segment.routeRef)
                 let fromCoord = CLLocationCoordinate2D(latitude: segment.from.lat, longitude: segment.from.lng)
                 let toCoord = CLLocationCoordinate2D(latitude: segment.to.lat, longitude: segment.to.lng)

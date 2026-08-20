@@ -165,19 +165,26 @@ struct QuestRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Image(quest.imageName)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 78, height: 78)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            ZStack(alignment: .center) {
+                Image("Wow")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 86, height: 86)
+                
+                thumbnailView
+                    .frame(width: 58, height: 58)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .frame(width: 80, height: 80)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(quest.title)
-                    .font(TransiumFont.body(14, weight: .semibold))
+                    .font(TransiumFont.body(15, weight: .bold))
                     .foregroundColor(.black)
+                    .lineLimit(1)
 
                 Text(quest.description)
-                    .font(TransiumFont.body(11, weight: .medium))
+                    .font(TransiumFont.body(12, weight: .medium))
                     .foregroundColor(.gray)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -190,7 +197,7 @@ struct QuestRow: View {
                     onStart?()
                 } label: {
                     Text("Start Quest")
-                        .font(TransiumFont.body(11, weight: .semibold))
+                        .font(TransiumFont.body(11, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
@@ -200,10 +207,10 @@ struct QuestRow: View {
 
                 HStack(spacing: 3) {
                     Image(systemName: "star.fill")
-                        .font(.system(size: 12))
+                        .font(.system(size: 11))
                         .foregroundColor(.yellow)
                     Text("+\(quest.points) pts")
-                        .font(TransiumFont.body(11, weight: .medium))
+                        .font(TransiumFont.body(11, weight: .semibold))
                         .foregroundColor(.gray)
                 }
             }
@@ -212,20 +219,42 @@ struct QuestRow: View {
         .background(quest.theme.background)
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
+    
+    @ViewBuilder
+    private var thumbnailView: some View {
+        if let imageUrl = quest.imageUrl, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    Image(quest.fallbackImageName)
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+        } else {
+            Image(quest.fallbackImageName)
+                .resizable()
+                .scaledToFill()
+        }
+    }
 }
 
 // MARK: - Recommended Quest Card
 struct RecommendedQuestCard: View {
     var title: String = "Early Bird Walk"
     var subtitle: String = "Visit Sanur before 8 AM and capture the sunrise."
+    var imageUrl: String? = nil
+    var fallbackImageName: String = "sanoored"
     var points: Int = 10
     var onStart: (() -> Void)? = nil
 
     var body: some View {
         let accent = Color(red: 0.20, green: 0.42, blue: 0.95)
  
-        // HStack (bukan ZStack) supaya blok teks ada di kiri
-        // dan blok gambar+tombol otomatis terdorong ke kanan card.
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 10) {
                 Text("RECOMMENDED")
@@ -258,21 +287,40 @@ struct RecommendedQuestCard: View {
                 .background(TransiumColor.darkBlue.opacity(0.9))
                 .clipShape(Capsule())
             }
-            .frame(maxWidth: .infinity, alignment: .leading) // ambil semua ruang tersisa di kiri
+            .frame(maxWidth: .infinity, alignment: .leading)
  
-            // Kolom kanan: foto (Wow + sanoored), tombol Start Quest menumpuk di bawahnya.
+            // Right postage column
             ZStack(alignment: .bottom) {
                 ZStack(alignment: .center) {
                     Image("Wow")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 220, height: 120)
-                    Image("sanoored")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 100, height: 100)
+                        .frame(width: 140, height: 110)
+                    
+                    if let imageUrl, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            default:
+                                Image(fallbackImageName)
+                                    .resizable()
+                                    .scaledToFill()
+                            }
+                        }
+                        .frame(width: 78, height: 78)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
+                    } else {
+                        Image(fallbackImageName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 78, height: 78)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
                 }
+                .offset(y: -14)
  
                 TransiumPrimaryButton(
                     title: "Start Quest",
@@ -281,8 +329,8 @@ struct RecommendedQuestCard: View {
                     trailingIcon: "arrow.right",
                     height: 36,
                     fillWidth: false,
-                    font: TransiumFont.body(15, weight: .semibold),
-                    iconHorizontalPadding: 10
+                    font: TransiumFont.body(14, weight: .bold),
+                    iconHorizontalPadding: 8
                 ) {
                     onStart?()
                 }
