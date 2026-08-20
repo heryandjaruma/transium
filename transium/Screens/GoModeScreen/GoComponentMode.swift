@@ -45,6 +45,13 @@ struct GoComponentMode: View {
 
     @State private var isTripDetailsExpanded = false
 
+    /// Segment ids the live position has ever come within `busStopProximityMeters` of.
+    /// `currentSegmentIndex` only advances on a manual tap (see `onAdvanceSegment`), so while
+    /// still nominally on the walk-to-stop leg, this is what lets us tell "far from the stop
+    /// because we haven't arrived yet" apart from "far because we boarded and it pulled away" —
+    /// a bare distance check alone can't distinguish those without remembering having been close.
+    @State private var everNearStopSegmentIds: Set<String> = []
+
     private static let busStopProximityMeters: Double = 69
 
     private var currentSegment: JourneySegment? {
@@ -59,23 +66,53 @@ struct GoComponentMode: View {
         return next.type == "bus" ? next : nil
     }
 
-    /// True once the live distance to the current walking leg's destination (the bus stop)
-    /// drops within `busStopProximityMeters` — switches the card over to "check bus live
-    /// location" early, before the segment index itself advances.
-    private var isNearUpcomingBusStop: Bool {
-        guard upcomingBusSegment != nil, let segment = currentSegment,
-              let distance = segment.liveRemaining(from: currentLocation).distanceMeters else { return false }
+    /// Live distance from the current position to `segment`'s destination, when both are known.
+    private func liveDistance(to segment: JourneySegment) -> Double? {
+        segment.liveRemaining(from: currentLocation).distanceMeters
+    }
+
+    /// True while still near the current bus leg's *boarding* stop — i.e., still waiting.
+    /// Defaults to true (still waiting) with no live position yet, so we don't jump to
+    /// "riding" without real GPS evidence.
+    private var isNearBoardingStop: Bool {
+        guard let segment = currentSegment, segment.type == "bus", let currentLocation else { return true }
+        let distance = CLLocation(latitude: currentLocation.latitude, longitude: currentLocation.longitude)
+            .distance(from: CLLocation(latitude: segment.from.lat, longitude: segment.from.lng))
         return distance <= Self.busStopProximityMeters
     }
 
     private var variant: Variant {
-        if currentSegment?.type == "bus" { return .commute }
-        if isNearUpcomingBusStop { return .commute }
-        return .walking
+        if let segment = currentSegment, segment.type == "bus" {
+            return isNearBoardingStop ? .commute : .commuteOnGoing
+        }
+
+        guard let segment = currentSegment, let busSegment = upcomingBusSegment else {
+            return .walking
+        }
+
+        // Primary signal: the live position is on/near the bus's own road — this alone is
+        // enough to call it "riding", regardless of whether the walk to the stop ever
+        // registered as close (GPS noise, boarding slightly off the marked stop coordinate,
+        // or a missed update near the stop can all mean that moment is never observed).
+        if busSegment.isAligned(with: currentLocation) {
+            return .commuteOnGoing
+        }
+
+        guard let distance = liveDistance(to: segment) else {
+            return everNearStopSegmentIds.contains(segment.id) ? .commuteOnGoing : .walking
+        }
+
+        if distance <= Self.busStopProximityMeters {
+            return .commute
+        }
+        // Far from the stop, not aligned to the route road (e.g. geometry resolution fell back
+        // to a straight line): fall back to "was ever close, now far" as a secondary signal.
+        return everNearStopSegmentIds.contains(segment.id) ? .commuteOnGoing : .walking
     }
 
-    /// The segment whose route info (name, ref, color) the commute card should show —
-    /// either the current bus leg itself, or the upcoming one when near its stop on the walk in.
+    /// The segment whose route info (name, ref, color) the commute/ride card should show —
+    /// either the current bus leg itself, or the upcoming one when near its stop (or riding
+    /// away from it) on the walk leading into it.
     private var busInfoSegment: JourneySegment? {
         currentSegment?.type == "bus" ? currentSegment : upcomingBusSegment
     }
@@ -95,6 +132,15 @@ struct GoComponentMode: View {
 
             bottomPanel
         }
+        .onAppear { recordProximityIfNeeded() }
+        .onChange(of: currentLocation?.latitude) { _, _ in recordProximityIfNeeded() }
+        .onChange(of: currentLocation?.longitude) { _, _ in recordProximityIfNeeded() }
+    }
+
+    private func recordProximityIfNeeded() {
+        guard let segment = currentSegment, segment.type != "bus", upcomingBusSegment != nil,
+              let distance = liveDistance(to: segment), distance <= Self.busStopProximityMeters else { return }
+        everNearStopSegmentIds.insert(segment.id)
     }
 
     private var bottomPanel: some View {
@@ -122,7 +168,12 @@ struct GoComponentMode: View {
             case .walking:
                 walkCard(segment)
 
-            case .commute, .commuteOnGoing:
+            case .commuteOnGoing:
+                if let busSegment = busInfoSegment {
+                    rideCard(busSegment)
+                }
+
+            case .commute:
                 if let busSegment = busInfoSegment {
                     VStack(alignment: .leading, spacing: 10) {
                         GoBusLivePill(
@@ -170,6 +221,18 @@ struct GoComponentMode: View {
         .buttonStyle(.transiumNoOpacity)
     }
 
+    /// Shown once the user is assumed to have boarded (see `isNearBoardingStop`) — the
+    /// device's own GPS doubles as a rough proxy for the bus's position while riding, so this
+    /// still recomputes distance/time to the alighting stop live, using the segment's own pace.
+    private func rideCard(_ segment: JourneySegment) -> some View {
+        GoStepCard(
+            mode: .bus(providerCode: segment.routeRef ?? "BUS"),
+            verb: "Ride to",
+            destination: segment.to.name,
+            metrics: metrics(for: segment)
+        )
+    }
+
     private var arrivedCard: some View {
         GoStepCard(
             mode: .walking,
@@ -181,9 +244,11 @@ struct GoComponentMode: View {
     }
 
     private func metrics(for segment: JourneySegment) -> [GoStepCard.Metric] {
-        let live = segment.type != "bus"
-            ? segment.liveRemaining(from: currentLocation)
-            : (distanceMeters: segment.distanceMeters, durationSeconds: segment.durationSeconds)
+        // Called for the walking leg and, once `isNearBoardingStop` is false, the bus leg
+        // being ridden — in both cases the device's live position is a meaningful proxy for
+        // progress, so `liveRemaining` (segment's own pace, gracefully falling back to the
+        // static estimate with no live fix) applies uniformly.
+        let live = segment.liveRemaining(from: currentLocation)
 
         var result: [GoStepCard.Metric] = []
         if let duration = live.durationSeconds {
@@ -207,6 +272,18 @@ struct GoComponentMode: View {
     ZStack {
         Color(.systemGray5).ignoresSafeArea()
         GoComponentMode(journey: .previewMock, currentSegmentIndex: 1)
+    }
+}
+
+#Preview("Riding") {
+    // Current location far from the bus segment's boarding stop, simulating "already boarded".
+    ZStack {
+        Color(.systemGray5).ignoresSafeArea()
+        GoComponentMode(
+            journey: .previewMock,
+            currentSegmentIndex: 1,
+            currentLocation: CLLocationCoordinate2D(latitude: -8.685, longitude: 115.20)
+        )
     }
 }
 

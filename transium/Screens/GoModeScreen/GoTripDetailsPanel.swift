@@ -25,6 +25,11 @@ struct GoTripDetailsPanel: View {
     var currentLocation: CLLocationCoordinate2D? = nil
     @Binding var isExpanded: Bool
 
+    @State private var isStopsExpanded: [String: Bool] = [:]
+
+    private static let doneBackground = Color(red: 0.86, green: 0.97, blue: 0.89)
+    private static let doneAccent = Color(red: 0.06, green: 0.72, blue: 0.51)
+
     private var matchedSteps: [String: JourneyAttemptStep] {
         let candidates: [(step: JourneyAttemptStep, location: CLLocation)] = steps.compactMap { step in
             guard step.name.localizedCaseInsensitiveContains("picture"),
@@ -204,9 +209,9 @@ struct GoTripDetailsPanel: View {
                     if index == currentSegmentIndex {
                         activeCard(segment, index: index)
                     } else if segment.type == "bus" {
-                        inactiveBusCard(segment)
+                        inactiveBusCard(segment, isDone: index < currentSegmentIndex)
                     } else {
-                        inactiveWalkCard(segment, index: index)
+                        inactiveWalkCard(segment, index: index, isDone: index < currentSegmentIndex)
                     }
                 }
 
@@ -268,6 +273,14 @@ struct GoTripDetailsPanel: View {
                 }
                 .foregroundColor(.white.opacity(0.9))
                 .padding(.leading, 8)
+            } else if segment.type == "bus" {
+                Divider().overlay(Color.white.opacity(0.3))
+                stopsMiniTimeline(segment, textColor: .white, mutedColor: .white.opacity(0.75), chipBackground: .white.opacity(0.18))
+
+                if let matched = matchedSteps[segment.id] {
+                    Divider().overlay(Color.white.opacity(0.3))
+                    questActionRow(matched, tint: .white)
+                }
             } else if let matched = matchedSteps[segment.id] {
                 Divider().overlay(Color.white.opacity(0.3))
                 questActionRow(matched, tint: .white)
@@ -278,14 +291,76 @@ struct GoTripDetailsPanel: View {
         .cornerRadius(16)
     }
 
+    // MARK: - Stops Mini-Timeline (shared between the active and inactive bus cards)
+
+    private func stopsMiniTimeline(_ segment: JourneySegment, textColor: Color, mutedColor: Color, chipBackground: Color) -> some View {
+        let routeColor = TransiumTransitColor.color(for: segment.routeRef, hex: segment.routeColor)
+        let stopCount = segment.stops?.count ?? 0
+        let isExpanded = isStopsExpanded[segment.id] ?? false
+
+        return HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 0) {
+                Circle().fill(routeColor).frame(width: 12, height: 12)
+                Rectangle().fill(routeColor.opacity(0.7)).frame(width: 3, height: isExpanded ? CGFloat(max(1, stopCount - 2) * 22) : 24)
+                Circle().fill(routeColor).frame(width: 12, height: 12)
+            }
+            .padding(.top, 3)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(segment.from.name)
+                    .font(TransiumFont.body(13, weight: .semibold))
+                    .foregroundColor(textColor)
+
+                if stopCount > 2 {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            isStopsExpanded[segment.id] = !isExpanded
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Text("\(stopCount - 2) Stops")
+                                .font(TransiumFont.body(11, weight: .medium))
+                            Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .foregroundColor(mutedColor)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(chipBackground)
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.transiumNoOpacity)
+
+                    if isExpanded, let stops = segment.stops {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(Array(stops.dropFirst().dropLast().enumerated()), id: \.offset) { _, stop in
+                                Text("• \(stop.name)")
+                                    .font(TransiumFont.body(12))
+                                    .foregroundColor(mutedColor)
+                            }
+                        }
+                        .padding(.leading, 4)
+                    }
+                }
+
+                Text(segment.to.name)
+                    .font(TransiumFont.body(13, weight: .semibold))
+                    .foregroundColor(textColor)
+            }
+
+            Spacer()
+        }
+        .padding(.leading, 4)
+    }
+
     // MARK: - Inactive Cards
 
-    private func inactiveWalkCard(_ segment: JourneySegment, index: Int) -> some View {
+    private func inactiveWalkCard(_ segment: JourneySegment, index: Int, isDone: Bool) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 ZStack {
-                    Circle().fill(Color(red: 0.06, green: 0.72, blue: 0.51)).frame(width: 36, height: 36)
-                    Image(systemName: "figure.walk")
+                    Circle().fill(isDone ? Self.doneAccent : Color(red: 0.06, green: 0.72, blue: 0.51)).frame(width: 36, height: 36)
+                    Image(systemName: isDone ? "checkmark" : "figure.walk")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                 }
@@ -309,26 +384,34 @@ struct GoTripDetailsPanel: View {
             }
         }
         .padding(14)
-        .background(Color.white)
+        .background(isDone ? Self.doneBackground : Color.white)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(.systemGray5), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(isDone ? Self.doneAccent.opacity(0.4) : Color(.systemGray5), lineWidth: 1))
     }
 
-    private func inactiveBusCard(_ segment: JourneySegment) -> some View {
+    private func inactiveBusCard(_ segment: JourneySegment, isDone: Bool) -> some View {
         let routeRef = segment.routeRef ?? "Bus"
         let routeColor = TransiumTransitColor.color(for: segment.routeRef, hex: segment.routeColor)
-        let stopCount = segment.stops?.count ?? 0
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Text(routeRef)
-                    .font(TransiumFont.body(12, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(routeColor)
-                    .cornerRadius(8)
+                if isDone {
+                    ZStack {
+                        Circle().fill(Self.doneAccent).frame(width: 24, height: 24)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                } else {
+                    Text(routeRef)
+                        .font(TransiumFont.body(12, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(routeColor)
+                        .cornerRadius(8)
+                }
 
                 Text("Get off at **\(segment.to.name)**")
                     .font(TransiumFont.body(15, weight: .bold))
@@ -346,37 +429,7 @@ struct GoTripDetailsPanel: View {
 
             Divider()
 
-            HStack(alignment: .top, spacing: 12) {
-                VStack(spacing: 0) {
-                    Circle().fill(routeColor).frame(width: 12, height: 12)
-                    Rectangle().fill(routeColor.opacity(0.7)).frame(width: 3, height: 24)
-                    Circle().fill(routeColor).frame(width: 12, height: 12)
-                }
-                .padding(.top, 3)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(segment.from.name)
-                        .font(TransiumFont.body(13, weight: .semibold))
-                        .foregroundColor(.black)
-
-                    if stopCount > 2 {
-                        Text("\(stopCount - 2) Stops")
-                            .font(TransiumFont.body(11, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color(.systemGray6))
-                            .cornerRadius(12)
-                    }
-
-                    Text(segment.to.name)
-                        .font(TransiumFont.body(13, weight: .semibold))
-                        .foregroundColor(.black)
-                }
-
-                Spacer()
-            }
-            .padding(.leading, 4)
+            stopsMiniTimeline(segment, textColor: .black, mutedColor: .secondary, chipBackground: Color(.systemGray6))
 
             if let matched = matchedSteps[segment.id] {
                 Divider()
@@ -384,10 +437,10 @@ struct GoTripDetailsPanel: View {
             }
         }
         .padding(14)
-        .background(Color.white)
+        .background(isDone ? Self.doneBackground : Color.white)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color(.systemGray5), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(isDone ? Self.doneAccent.opacity(0.4) : Color(.systemGray5), lineWidth: 1))
     }
 
     private func questActionRow(_ step: JourneyAttemptStep, tint: Color) -> some View {

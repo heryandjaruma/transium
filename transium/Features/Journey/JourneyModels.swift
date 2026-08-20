@@ -229,6 +229,20 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
 
         return (liveDistance, liveDistance / pace)
     }
+
+    /// True when `location` lies within `toleranceMeters` of this segment's route geometry
+    /// (nearest-vertex distance over the resolved road-following polyline — good enough to
+    /// tell "on this road" from "nowhere near it" without true point-to-segment projection).
+    /// Geometry points are `[lng, lat]` (see `RoadGeometryResolver`).
+    public func isAligned(with location: CLLocationCoordinate2D?, toleranceMeters: Double = 80) -> Bool {
+        guard let location, geometry.count > 1 else { return false }
+        let point = CLLocation(latitude: location.latitude, longitude: location.longitude)
+        let nearestDistance = geometry.compactMap { coordinate -> Double? in
+            guard coordinate.count >= 2 else { return nil }
+            return CLLocation(latitude: coordinate[1], longitude: coordinate[0]).distance(from: point)
+        }.min()
+        return (nearestDistance ?? .infinity) <= toleranceMeters
+    }
 }
 
 // MARK: - Journey Attempt Models (/private/journey/*)
