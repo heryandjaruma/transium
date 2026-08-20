@@ -43,12 +43,12 @@ struct HomeScreen: View {
     /// started that way — nil when it was entered via `resumeOngoingTrip()` instead, since that
     /// path never hits /go. Backs GoTripDetailsPanel's debug "show /go response" button.
     @State private var goStartDebugResult: JourneyGoResult? = nil
-    /// Set the instant a geofence fires for a `takePicture` checkpoint (see `handleGeofenceEntered`)
-    /// — drives `CameraScreen`'s `.fullScreenCover(item:)` so the camera pops up immediately,
-    /// including while the app was backgrounded when the region trigger came in (UIKit defers
-    /// the presentation itself until the app is foreground again). `advanceJourney` still fires
-    /// independently of this, since these steps are optional and don't require a photo to
-    /// count as done.
+    /// Set the instant a geofence fires for a photo-capture step (see `handleGeofenceEntered`,
+    /// `JourneyAttemptStep.isPhotoCheckpoint`) — drives `CameraScreen`'s
+    /// `.fullScreenCover(item:)` so the camera pops up immediately, including while the app was
+    /// backgrounded when the region trigger came in (UIKit defers the presentation itself
+    /// until the app is foreground again). `advanceJourney` still fires independently of this
+    /// — arrival alone marks the step done regardless of whether a photo actually gets taken.
     @State private var pendingPhotoStep: JourneyAttemptStep? = nil
     /// The device's recorded breadcrumb for the current Go Mode session — submitted as `path`
     /// in POST /private/journey/{id}/complete. Appended to on every live location update while
@@ -703,7 +703,9 @@ struct HomeScreen: View {
         Task {
             do {
                 let originCoordinate = resolvedCurrentLocation?.coordinate ?? CLLocationCoordinate2D(latitude: -8.702105, longitude: 115.176189)
-                let response = try await journeyService.fetchRealJourney(questId: questId, origin: originCoordinate)
+                // Authenticated + scoped to this attempt, so mission segments/steps come back
+                // with an exact `stepId` join key instead of none at all.
+                let response = try await journeyService.fetchRealJourney(questId: questId, origin: originCoordinate, journeyAttemptId: attempt.id)
                 let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(response.best)
 
                 let geofences = geofences(from: ongoingJourneySteps)
@@ -763,6 +765,21 @@ struct HomeScreen: View {
                     handleGeofenceEntered(stepId: stepId, attemptId: result.journeyAttempt.id)
                 }
                 geofenceMonitor.startMonitoring(geofences: result.geofences)
+
+                // `activeJourney` so far is from the pre-/go preview fetch (no attempt existed
+                // yet, so mission segments/steps came back with no `stepId`). Re-fetch now that
+                // an attempt exists, so the rest of the session has the exact join key instead
+                // of relying on coordinate-matching. Best-effort — if it fails, Go Mode still
+                // works fine off the existing `activeJourney`, just without `stepId` on missions.
+                let originCoordinate = resolvedCurrentLocation?.coordinate ?? CLLocationCoordinate2D(latitude: -8.702105, longitude: 115.176189)
+                if let response = try? await journeyService.fetchRealJourney(
+                    questId: questId,
+                    origin: originCoordinate,
+                    journeyAttemptId: result.journeyAttempt.id
+                ) {
+                    let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(response.best)
+                    await MainActor.run { activeJourney = resolvedJourney }
+                }
 
                 await MainActor.run {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -905,8 +922,8 @@ struct HomeScreen: View {
     private func handleGeofenceEntered(stepId: String, attemptId: String) {
         guard let coordinate = locationStore.currentLocation?.coordinate ?? resolvedCurrentLocation?.coordinate else { return }
 
-        // Pop the camera immediately, before the network round-trip below — a "takePicture"
-        // checkpoint is a moment-in-time prompt, not something that should wait on `advance`.
+        // Pop the camera immediately, before the network round-trip below — a photo-capture
+        // step is a moment-in-time prompt, not something that should wait on `advance`.
         // Skip it if this step is already done (a re-firing region, or a previous catch-up
         // advance already covered it) so the user isn't nagged for the same spot twice.
         if let step = goJourneySteps.first(where: { $0.id == stepId }),
@@ -994,7 +1011,7 @@ struct HomeScreen: View {
         }
     }
 
-    /// `CameraScreen`'s `onCaptured` for a `takePicture` checkpoint — uploads via POST
+    /// `CameraScreen`'s `onCaptured` for a photo-capture step — uploads via POST
     /// /private/journey/media and closes the whole camera flow (`pendingPhotoStep = nil` tears
     /// down `CameraScreen` and its nested `PhotoPreviewScreen` cover together). On failure the
     /// flow is left open so the user can retry from the still-visible preview.

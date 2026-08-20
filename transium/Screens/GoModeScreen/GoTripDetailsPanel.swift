@@ -41,17 +41,20 @@ struct GoTripDetailsPanel: View {
     private static let doneAccent = Color(red: 0.06, green: 0.72, blue: 0.51)
 
     private var matchedSteps: [String: JourneyAttemptStep] {
-        // Anything already surfaced precisely by its own `missionCard` (journey.segments now
-        // gives mission steps exact, authoritative placement) shouldn't also be guessed at here
-        // — a nearby-but-wrong travel leg can otherwise steal it, since this match is only ever
-        // best-effort straight-line distance.
+        // Anything already surfaced precisely by its own `missionCard` shouldn't also be
+        // guessed at here. Exact via `stepId` when the mission resolved one (GET /journey/real
+        // is now attempt-scoped for the whole Go Mode session — see HomeScreen.startGoMode/
+        // resumeOngoingTrip); falls back to a coordinate proximity guard only if a mission
+        // somehow has none (e.g. the attempt-scoped re-fetch failed and this session is still
+        // on the earlier, un-scoped preview fetch).
+        let missionStepIds: Set<String> = Set(journey.segments.compactMap { $0.isMission ? $0.stepId : nil })
         let missionLocations: [CLLocation] = journey.segments.compactMap { segment in
-            guard segment.isMission, let coordinate = segment.coordinate else { return nil }
+            guard segment.isMission, segment.stepId == nil, let coordinate = segment.coordinate else { return nil }
             return CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         }
 
         let candidates: [(step: JourneyAttemptStep, location: CLLocation)] = steps.compactMap { step in
-            guard step.isPhotoCheckpoint,
+            guard step.isPhotoCheckpoint, !missionStepIds.contains(step.id),
                   let lat = step.lat, let lng = step.lng else { return nil }
             let location = CLLocation(latitude: lat, longitude: lng)
             guard !missionLocations.contains(where: { $0.distance(from: location) <= 50 }) else { return nil }
@@ -79,9 +82,16 @@ struct GoTripDetailsPanel: View {
     }
 
     /// The JourneyAttemptStep (from POST /private/journey/go) matching a mission segment (from
-    /// GET /journey/real) by coordinate — the two responses don't share a step id directly, so
-    /// this is how a mission card can offer its own manual "I'm here" fallback.
+    /// GET /journey/real) — this is how a mission card offers its own manual "I'm here"
+    /// fallback. Exact via `stepId` now that GET /journey/real is attempt-scoped for the whole
+    /// Go Mode session; falls back to coordinate proximity only if this mission has none (e.g.
+    /// the attempt-scoped re-fetch failed and this session is still on the earlier, un-scoped
+    /// preview fetch).
     private func attemptStep(for mission: JourneySegment) -> JourneyAttemptStep? {
+        if let stepId = mission.stepId {
+            return steps.first(where: { $0.id == stepId })
+        }
+
         guard let coordinate = mission.coordinate else { return nil }
         let missionLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
 

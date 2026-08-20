@@ -112,6 +112,10 @@ public nonisolated struct JourneyStep: Codable, Equatable, Sendable, Identifiabl
     /// Present only when the mission's BadgeAction carries coordinates.
     public let lat: Double?
     public let lng: Double?
+    /// Exact join key to the corresponding `JourneyAttemptStep.id` — only resolved when the
+    /// request that fetched this journey passed an authenticated `journeyAttemptId` the caller
+    /// actually owns; nil otherwise (e.g. previewing a quest before starting it).
+    public let stepId: String?
 
     public init(
         type: String,
@@ -120,7 +124,8 @@ public nonisolated struct JourneyStep: Codable, Equatable, Sendable, Identifiabl
         routeName: String? = nil,
         instructions: String? = nil,
         lat: Double? = nil,
-        lng: Double? = nil
+        lng: Double? = nil,
+        stepId: String? = nil
     ) {
         self.type = type
         self.durationMinutes = durationMinutes
@@ -129,6 +134,7 @@ public nonisolated struct JourneyStep: Codable, Equatable, Sendable, Identifiabl
         self.instructions = instructions
         self.lat = lat
         self.lng = lng
+        self.stepId = stepId
     }
 
     public var isMission: Bool { type == "mission" }
@@ -211,6 +217,10 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
     /// routed to this mission.
     public let lat: Double?
     public let lng: Double?
+    /// Exact join key to the corresponding `JourneyAttemptStep.id` — only resolved when the
+    /// request that fetched this journey passed an authenticated `journeyAttemptId` the caller
+    /// actually owns; nil otherwise (e.g. previewing a quest before starting it).
+    public let stepId: String?
 
     public init(
         type: String,
@@ -227,7 +237,8 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
         stops: [JourneyLocationRef]? = nil,
         instructions: String? = nil,
         lat: Double? = nil,
-        lng: Double? = nil
+        lng: Double? = nil,
+        stepId: String? = nil
     ) {
         self.type = type
         self.from = from
@@ -244,17 +255,19 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
         self.instructions = instructions
         self.lat = lat
         self.lng = lng
+        self.stepId = stepId
     }
 
     private enum CodingKeys: String, CodingKey {
         case type, from, to, distanceMeters, durationSeconds, geometry, steps
         case routeId, routeRef, routeName, routeColor, stops
-        case instructions, lat, lng
+        case instructions, lat, lng, stepId
     }
 
     // Custom decode so a "mission" entry — which the API sends with only `type`, `instructions`,
-    // and optionally `lat`/`lng` — doesn't fail decoding the shared `segments` array just because
-    // it omits every travel field (`from`/`to`/`geometry`/...) a walk/bus/transfer segment has.
+    // and optionally `lat`/`lng`/`stepId` — doesn't fail decoding the shared `segments` array
+    // just because it omits every travel field (`from`/`to`/`geometry`/...) a walk/bus/transfer
+    // segment has.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         type = try container.decode(String.self, forKey: .type)
@@ -272,6 +285,7 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
         instructions = try container.decodeIfPresent(String.self, forKey: .instructions)
         lat = try container.decodeIfPresent(Double.self, forKey: .lat)
         lng = try container.decodeIfPresent(Double.self, forKey: .lng)
+        stepId = try container.decodeIfPresent(String.self, forKey: .stepId)
     }
 
     public var isMission: Bool { type == "mission" }
@@ -297,7 +311,8 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
             stops: stops,
             instructions: instructions,
             lat: lat,
-            lng: lng
+            lng: lng,
+            stepId: stepId
         )
     }
 
@@ -397,8 +412,9 @@ public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, E
     public let description: String
     public let type: String
     /// The step's ActionDefinition.type — a free-text kind of action (e.g. "capture",
-    /// "checkin"), unrelated to `type`'s required/optional-ness. Null for an artificial
-    /// "takePicture" photo checkpoint, which has no backing ActionDefinition.
+    /// "checkin"), unrelated to `type`'s required/optional-ness. POST /private/journey/go no
+    /// longer emits synthetic "takePicture" checkpoints, so every step maps to a real
+    /// ActionDefinition — kept optional defensively rather than because it's expected to be nil.
     public let actionType: String?
     public let lat: Double?
     public let lng: Double?
@@ -431,12 +447,12 @@ public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, E
         self.status = status
     }
 
-    /// True for any step that should pop the camera on arrival — either the artificial
-    /// `name: "takePicture"` checkpoints POST /private/journey/go interleaves into the route
-    /// (1-3 per journey, `actionType` null since they have no backing ActionDefinition), or a
-    /// real quest action whose own `actionType` is a capture-photo kind (contains "capture").
+    /// True for a step whose action requires a photo capture — the ActionDefinition.type
+    /// contains "capture". POST /private/journey/go no longer emits synthetic `"takePicture"`
+    /// checkpoints (removed server-side — every step now maps to a real BadgeAction), so this
+    /// is driven purely by `actionType`.
     public var isPhotoCheckpoint: Bool {
-        name == "takePicture" || (actionType?.localizedCaseInsensitiveContains("capture") ?? false)
+        actionType?.localizedCaseInsensitiveContains("capture") ?? false
     }
 }
 

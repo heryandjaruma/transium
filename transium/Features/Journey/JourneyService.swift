@@ -13,11 +13,13 @@ public protocol JourneyServiceProtocol: Sendable {
     /// Convenience helper for CLLocationCoordinate2D.
     func fetchJourneyOverview(origin: CLLocationCoordinate2D, destination: CLLocationCoordinate2D) async throws -> JourneyResponse
     
-    /// Plan a real door-to-door journey to a quest from the user's origin.
-    func getRealJourney(questId: String, origin: LatLng) async throws -> JourneyResponse
-    
+    /// Plan a real door-to-door journey to a quest from the user's origin. Pass
+    /// `journeyAttemptId` (requires auth) once an attempt has actually started, to get an
+    /// exact `stepId` back on mission segments/steps instead of none at all.
+    func getRealJourney(questId: String, origin: LatLng, journeyAttemptId: String?) async throws -> JourneyResponse
+
     /// Convenience helper for CLLocationCoordinate2D.
-    func fetchRealJourney(questId: String, origin: CLLocationCoordinate2D) async throws -> JourneyResponse
+    func fetchRealJourney(questId: String, origin: CLLocationCoordinate2D, journeyAttemptId: String?) async throws -> JourneyResponse
     
     /// Start a journey attempt for a quest. Returns the attempt, its ordered quest steps,
     /// and the geofences the client should register for step-arrival detection.
@@ -81,26 +83,33 @@ public final class JourneyService: JourneyServiceProtocol, Sendable {
         )
     }
 
-    public func getRealJourney(questId: String, origin: LatLng) async throws -> JourneyResponse {
+    public func getRealJourney(questId: String, origin: LatLng, journeyAttemptId: String? = nil) async throws -> JourneyResponse {
         let originStr = "\(origin.lat),\(origin.lng)"
-        let queryItems = [
+        var queryItems = [
             URLQueryItem(name: "questId", value: questId),
             URLQueryItem(name: "origin", value: originStr)
         ]
+        if let journeyAttemptId {
+            queryItems.append(URLQueryItem(name: "journeyAttemptId", value: journeyAttemptId))
+        }
 
+        // The server requires auth only when journeyAttemptId is passed — it needs the caller's
+        // identity to scope stepId resolution to their own attempt (ownership-checked, so a
+        // foreign/mismatched attempt id silently yields no stepIds rather than erroring).
         return try await apiClient.request(
             path: "/journey/real",
             method: .get,
             queryItems: queryItems,
             body: nil,
-            requiresAuth: false
+            requiresAuth: journeyAttemptId != nil
         )
     }
 
-    public func fetchRealJourney(questId: String, origin: CLLocationCoordinate2D) async throws -> JourneyResponse {
+    public func fetchRealJourney(questId: String, origin: CLLocationCoordinate2D, journeyAttemptId: String? = nil) async throws -> JourneyResponse {
         try await getRealJourney(
             questId: questId,
-            origin: LatLng(coordinate: origin)
+            origin: LatLng(coordinate: origin),
+            journeyAttemptId: journeyAttemptId
         )
     }
 

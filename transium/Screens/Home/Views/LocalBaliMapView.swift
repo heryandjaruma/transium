@@ -42,9 +42,9 @@ struct LocalBaliMapView: UIViewRepresentable {
     let markerHeading: CLLocationDirection
     let centerRequestID: Int
     let activeJourney: JourneyResult?
-    /// The geofences POST /private/journey/go registered for this attempt (real quest-action
-    /// steps and the synthetic "takePicture" ones alike) — shown as subtle checkpoint markers
-    /// so the user can see where the app is actively watching for arrival. Empty outside Go Mode.
+    /// The geofences POST /private/journey/go registered for this attempt — shown as subtle
+    /// checkpoint markers so the user can see where the app is actively watching for arrival.
+    /// Empty outside Go Mode.
     var checkpoints: [JourneyGeofence] = []
 
     func makeCoordinator() -> Coordinator {
@@ -227,7 +227,7 @@ struct LocalBaliMapView: UIViewRepresentable {
             mapView.addAnnotation(RoutePointAnnotation(coordinate: destCoord, type: .destination, title: "Destination"))
 
             // 2.5. Add subtle checkpoint markers for every geofence the app is actively
-            // watching for arrival (real quest-action steps and "takePicture" ones alike).
+            // watching for arrival.
             for geofence in checkpoints {
                 mapView.addAnnotation(RoutePointAnnotation(coordinate: geofence.coordinate, type: .checkpoint, title: "Checkpoint"))
             }
