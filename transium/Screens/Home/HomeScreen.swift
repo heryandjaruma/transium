@@ -50,7 +50,16 @@ struct HomeScreen: View {
     /// independently of this, since these steps are optional and don't require a photo to
     /// count as done.
     @State private var pendingPhotoStep: JourneyAttemptStep? = nil
-    
+    /// The device's recorded breadcrumb for the current Go Mode session — submitted as `path`
+    /// in POST /private/journey/{id}/complete. Appended to on every live location update while
+    /// Go Mode is active (LocationStore already throttles those to real ~5m movement), reset at
+    /// the start of a fresh/replanned session, left alone across a same-session conflict-resume.
+    @State private var goPathBreadcrumb: [JourneyPathPointInput] = []
+    /// Guards against submitting POST /private/journey/{id}/complete more than once per attempt
+    /// — every step reaching "done" is detected from each /advance response, which can fire
+    /// more than once in a row (e.g. two geofences resolving close together).
+    @State private var hasSubmittedJourneyCompletion = false
+
     // MARK: - Search & Profile State
     @State private var isSearchPresented = false
     @State private var isProfilePresented = false
@@ -281,6 +290,8 @@ struct HomeScreen: View {
             guard newPhase == .active, oldPhase == .background else { return }
             Task { await checkOngoingJourney() }
         }
+        .onChange(of: locationStore.currentLocation?.coordinate.latitude) { _, _ in recordPathPointIfNeeded() }
+        .onChange(of: locationStore.currentLocation?.coordinate.longitude) { _, _ in recordPathPointIfNeeded() }
         .preferredColorScheme(.light)
         .alert(
             "Journey Already in Progress",
@@ -409,7 +420,19 @@ struct HomeScreen: View {
         }
         return baliFallbackLocation
     }
-    
+
+    /// Appends the device's live position to `goPathBreadcrumb` while Go Mode is active —
+    /// LocationStore already throttles updates to real ~5m movement, so no extra dedup is
+    /// needed here. Submitted as `path` in POST /private/journey/{id}/complete.
+    private func recordPathPointIfNeeded() {
+        guard showGoMode, let coordinate = locationStore.currentLocation?.coordinate else { return }
+        goPathBreadcrumb.append(JourneyPathPointInput(lat: coordinate.latitude, lng: coordinate.longitude, recordedAt: Date()))
+        // Defensive cap — a very long or backtracking session shouldn't grow this unboundedly.
+        if goPathBreadcrumb.count > 2000 {
+            goPathBreadcrumb.removeFirst(goPathBreadcrumb.count - 2000)
+        }
+    }
+
     // MARK: - Search Trigger
     
 //    private var searchBarTrigger: some View {
@@ -674,10 +697,7 @@ struct HomeScreen: View {
                 let response = try await journeyService.fetchRealJourney(questId: questId, origin: originCoordinate)
                 let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(response.best)
 
-                let geofences: [JourneyGeofence] = ongoingJourneySteps.compactMap { step in
-                    guard step.status == .waiting, let lat = step.lat, let lng = step.lng, let radius = step.radiusMeters else { return nil }
-                    return JourneyGeofence(stepId: step.id, sequence: step.sequence, lat: lat, lng: lng, radiusMeters: radius)
-                }
+                let geofences = geofences(from: ongoingJourneySteps)
 
                 await MainActor.run {
                     geofenceMonitor.onRegionEntered = { [attemptId = attempt.id] stepId in
@@ -693,6 +713,8 @@ struct HomeScreen: View {
                     goCurrentSegmentIndex = 0
                     showOngoingTripCard = false
                     goStartDebugResult = nil
+                    goPathBreadcrumb = []
+                    hasSubmittedJourneyCompletion = false
 
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -740,6 +762,8 @@ struct HomeScreen: View {
                     goGeofences = result.geofences
                     goCurrentSegmentIndex = 0
                     goStartDebugResult = result
+                    goPathBreadcrumb = []
+                    hasSubmittedJourneyCompletion = false
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         showGoMode = true
                         showNavigationSheet = false
@@ -849,6 +873,8 @@ struct HomeScreen: View {
                     goJourneyAttempt = nil
                     goJourneySteps = []
                     goGeofences = []
+                    goPathBreadcrumb = []
+                    hasSubmittedJourneyCompletion = false
                     isCancelingJourney = false
                     AppToastCenter.shared.showSuccess(
                         title: "Journey Canceled",
@@ -890,10 +916,75 @@ struct HomeScreen: View {
             await MainActor.run {
                 goJourneyAttempt = result.journeyAttempt
                 goJourneySteps = result.steps
-                if result.journeyAttempt.status == "completed" {
+
+                // Drop any step that just became done from active monitoring — once its
+                // action is fulfilled there's no reason to keep watching that region.
+                let remaining = geofences(from: result.steps)
+                goGeofences = remaining
+                geofenceMonitor.startMonitoring(geofences: remaining)
+
+                finishJourneyIfNeeded(steps: result.steps, attemptId: attemptId)
+            }
+        }
+    }
+
+    /// Geofences for whichever of `steps` are still outstanding — used both to (re)register
+    /// monitoring after every /advance response (so a step that just became done drops out)
+    /// and when resuming a trip from GET /current, which only returns steps, not the /go
+    /// geofence list.
+    private func geofences(from steps: [JourneyAttemptStep]) -> [JourneyGeofence] {
+        steps.compactMap { step in
+            guard step.status == .waiting, let lat = step.lat, let lng = step.lng, let radius = step.radiusMeters else { return nil }
+            return JourneyGeofence(stepId: step.id, sequence: step.sequence, lat: lat, lng: lng, radiusMeters: radius)
+        }
+    }
+
+    /// POST /private/journey/{id}/advance never finalizes an attempt by itself — once every
+    /// step reaches "done", POST /private/journey/{id}/complete is what actually awards XP/
+    /// badges and records the summary + breadcrumb, so that's called here to make the journey
+    /// actually finish. Must be called from a MainActor context (it touches @State directly,
+    /// not through `MainActor.run`, since every caller already is one).
+    private func finishJourneyIfNeeded(steps: [JourneyAttemptStep], attemptId: String) {
+        guard !hasSubmittedJourneyCompletion, !steps.isEmpty, steps.allSatisfy({ $0.status == .done }) else { return }
+        hasSubmittedJourneyCompletion = true
+
+        let distanceMeters = activeJourney?.summary.distanceMeters ?? 0
+        // No HealthKit/CMPedometer integration yet — these are rough distance-based estimates,
+        // not real device measurements.
+        let estimatedSteps = Int((distanceMeters / 0.75).rounded())
+        let estimatedCalories = distanceMeters * 0.05
+
+        let request = CompleteJourneyRequest(
+            stepsTaken: estimatedSteps,
+            distanceMeters: distanceMeters,
+            calorie: estimatedCalories,
+            startPoint: activeJourney?.segments.first?.from?.name ?? "Start",
+            finishPoint: activeJourney?.destinationName ?? "Destination",
+            path: goPathBreadcrumb
+        )
+
+        Task {
+            do {
+                let result = try await journeyService.completeJourney(attemptId: attemptId, request: request)
+                await MainActor.run {
+                    goJourneyAttempt = result.journeyAttempt
+                    geofenceMonitor.stopMonitoring()
+
+                    let badgeCount = result.badgesAwarded.count
+                    let badgeText = badgeCount == 0 ? "" : " and earned \(badgeCount) badge\(badgeCount == 1 ? "" : "s")"
                     AppToastCenter.shared.showSuccess(
                         title: "Quest Complete!",
-                        message: "You've finished every step of this journey."
+                        message: "You gained \(result.xpAwarded) XP\(badgeText)."
+                    )
+                }
+            } catch {
+                await MainActor.run {
+                    // Let a retry happen — the next /advance response that still finds every
+                    // step done (e.g. a stray re-fired region) will attempt this again.
+                    hasSubmittedJourneyCompletion = false
+                    AppToastCenter.shared.showError(
+                        title: "Couldn't Finish Journey",
+                        message: (error as? TransiumAPIError)?.errorDescription ?? "Please try again."
                     )
                 }
             }

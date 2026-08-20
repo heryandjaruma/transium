@@ -164,7 +164,7 @@ struct ProfileScreen: View {
             let fetched = try await ProfileService.shared.getProfile(userId: userId)
             profile = fetched
             userName = fetched.fullName
-            email = fetched.email
+            email = fetched.email ?? ""
         } catch {
             // Keep the placeholder values if the fetch fails; the user can
             // still browse the rest of the screen.

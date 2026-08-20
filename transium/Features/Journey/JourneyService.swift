@@ -26,6 +26,10 @@ public protocol JourneyServiceProtocol: Sendable {
     /// Report a geofence trigger (or a manual arrival check) for a step on an in-progress attempt.
     func advanceJourney(attemptId: String, stepId: String, lat: Double, lng: Double) async throws -> JourneyAdvanceResult
 
+    /// Finalize an attempt whose steps are all already "done" — awards XP/badges and records
+    /// the journey summary/path. Fails with 400 (and `pendingStepIds`) if any step isn't done yet.
+    func completeJourney(attemptId: String, request: CompleteJourneyRequest) async throws -> JourneyCompleteResult
+
     /// Look up the caller's currently in-progress journey attempt, if any. A user can only
     /// ever have one such attempt at a time, so this is a lookup rather than a list.
     func getCurrentJourney() async throws -> JourneyCurrentResponse
@@ -127,6 +131,25 @@ public final class JourneyService: JourneyServiceProtocol, Sendable {
             requiresAuth: true
         )
         return JourneyAdvanceResult(journeyAttempt: response.journeyAttempt, steps: response.steps)
+    }
+
+    public func completeJourney(attemptId: String, request: CompleteJourneyRequest) async throws -> JourneyCompleteResult {
+        let response: CompleteJourneyResponse = try await apiClient.request(
+            path: "/private/journey/\(attemptId)/complete",
+            method: .post,
+            queryItems: nil,
+            body: request,
+            requiresAuth: true
+        )
+        return JourneyCompleteResult(
+            journeyAttempt: response.journeyAttempt,
+            steps: response.steps,
+            summary: response.summary,
+            path: response.path,
+            xpAwarded: response.xpAwarded,
+            badgesAwarded: response.badgesAwarded,
+            profile: response.profile
+        )
     }
 
     public func getCurrentJourney() async throws -> JourneyCurrentResponse {

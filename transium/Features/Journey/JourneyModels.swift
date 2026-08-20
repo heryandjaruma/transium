@@ -470,6 +470,15 @@ public nonisolated struct JourneySummary: Codable, Identifiable, Sendable, Equat
     public let calorie: Double
     public let startPoint: String
     public let finishPoint: String
+    /// Approximate IDR cost of the private-motorcycle fuel this distance would have used,
+    /// derived from `distanceMeters` (not a real fare quote) and rounded to the nearest Rp 5,000.
+    public let fuelCostSavedIdr: Int?
+    /// Approximate IDR fare an ojek-online (ride-hailing motorcycle) trip of this distance
+    /// would have cost, derived from `distanceMeters` and rounded to the nearest Rp 5,000.
+    public let rideHailingMotorcycleSavedIdr: Int?
+    /// Approximate IDR fare a ride-hailing car trip of this distance would have cost, derived
+    /// from `distanceMeters` and rounded to the nearest Rp 5,000.
+    public let rideHailingCarSavedIdr: Int?
 
     public init(
         id: String,
@@ -478,7 +487,10 @@ public nonisolated struct JourneySummary: Codable, Identifiable, Sendable, Equat
         distanceMeters: Double,
         calorie: Double,
         startPoint: String,
-        finishPoint: String
+        finishPoint: String,
+        fuelCostSavedIdr: Int? = nil,
+        rideHailingMotorcycleSavedIdr: Int? = nil,
+        rideHailingCarSavedIdr: Int? = nil
     ) {
         self.id = id
         self.journeyAttemptId = journeyAttemptId
@@ -487,6 +499,87 @@ public nonisolated struct JourneySummary: Codable, Identifiable, Sendable, Equat
         self.calorie = calorie
         self.startPoint = startPoint
         self.finishPoint = finishPoint
+        self.fuelCostSavedIdr = fuelCostSavedIdr
+        self.rideHailingMotorcycleSavedIdr = rideHailingMotorcycleSavedIdr
+        self.rideHailingCarSavedIdr = rideHailingCarSavedIdr
+    }
+}
+
+/// One GPS sample from the device's recorded breadcrumb for a journey attempt, in walked order.
+public nonisolated struct JourneyPathPoint: Codable, Identifiable, Sendable, Equatable {
+    public let id: String
+    public let journeyAttemptId: String
+    public let sequence: Int
+    public let lat: Double
+    public let lng: Double
+    public let recordedAt: Date?
+
+    public init(
+        id: String,
+        journeyAttemptId: String,
+        sequence: Int,
+        lat: Double,
+        lng: Double,
+        recordedAt: Date? = nil
+    ) {
+        self.id = id
+        self.journeyAttemptId = journeyAttemptId
+        self.sequence = sequence
+        self.lat = lat
+        self.lng = lng
+        self.recordedAt = recordedAt
+    }
+}
+
+/// One breadcrumb sample the client sends to POST /private/journey/{id}/complete — the request
+/// counterpart to `JourneyPathPoint` (no `id`/`journeyAttemptId`/`sequence`; the server assigns
+/// those on write).
+public nonisolated struct JourneyPathPointInput: Encodable, Sendable, Equatable {
+    public let lat: Double
+    public let lng: Double
+    public let recordedAt: Date?
+
+    public init(lat: Double, lng: Double, recordedAt: Date? = nil) {
+        self.lat = lat
+        self.lng = lng
+        self.recordedAt = recordedAt
+    }
+}
+
+/// A badge the caller has earned (a UserBadge row joined with its Badge). Awarded automatically
+/// by POST /private/journey/{id}/complete for every Badge attached to a quest whose journey the
+/// caller just finished, skipping any they already have.
+public nonisolated struct EarnedBadge: Codable, Identifiable, Sendable, Equatable {
+    public let id: String
+    public let badgeId: String
+    public let badgeName: String
+    public let badgeCategory: String
+    public let badgeType: String
+    public let badgeImageUrl: String?
+    public let earnedAt: Date
+    public let questId: String?
+    public let questName: String?
+
+    public init(
+        id: String,
+        badgeId: String,
+        badgeName: String,
+        badgeCategory: String,
+        badgeType: String,
+        badgeImageUrl: String? = nil,
+        earnedAt: Date,
+        questId: String? = nil,
+        questName: String? = nil
+    ) {
+        self.id = id
+        self.badgeId = badgeId
+        self.badgeName = badgeName
+        self.badgeCategory = badgeCategory
+        self.badgeType = badgeType
+        self.badgeImageUrl = badgeImageUrl
+        self.earnedAt = earnedAt
+        self.questId = questId
+        self.questName = questName
     }
 }
 
@@ -545,6 +638,81 @@ public nonisolated struct JourneyAdvanceResult: Sendable, Equatable {
     public init(journeyAttempt: JourneyAttempt, steps: [JourneyAttemptStep]) {
         self.journeyAttempt = journeyAttempt
         self.steps = steps
+    }
+}
+
+/// Body for POST /private/journey/{id}/complete. Unlike /advance, this endpoint never marks
+/// steps done itself — it only finalizes an attempt whose steps are *already* all `"done"`,
+/// so the client assembles data the server can't derive on its own (device step count,
+/// distance/calories, and the walked breadcrumb) and submits it here.
+public nonisolated struct CompleteJourneyRequest: Encodable, Sendable {
+    public let stepsTaken: Int
+    public let distanceMeters: Double
+    public let calorie: Double
+    public let startPoint: String
+    public let finishPoint: String
+    public let path: [JourneyPathPointInput]
+
+    public init(
+        stepsTaken: Int,
+        distanceMeters: Double,
+        calorie: Double,
+        startPoint: String,
+        finishPoint: String,
+        path: [JourneyPathPointInput]
+    ) {
+        self.stepsTaken = stepsTaken
+        self.distanceMeters = distanceMeters
+        self.calorie = calorie
+        self.startPoint = startPoint
+        self.finishPoint = finishPoint
+        self.path = path
+    }
+}
+
+nonisolated struct CompleteJourneyResponse: Codable {
+    let journeyAttempt: JourneyAttempt
+    let steps: [JourneyAttemptStep]
+    // Documented as required, but the idempotent-no-op path (attempt already "completed" —
+    // notably including when /advance's own auto-completion beat this call to it) returns
+    // `null` in practice, since no JourneySummary row was ever created. Kept optional so
+    // decoding doesn't hard-fail on that.
+    let summary: JourneySummary?
+    let path: [JourneyPathPoint]
+    let xpAwarded: Int
+    let badgesAwarded: [EarnedBadge]
+    let profile: Profile
+}
+
+/// Result of POST /private/journey/{id}/complete: the now-`"completed"` attempt, the awarded
+/// XP/badges, and the caller's updated profile. Idempotent — calling this again on an
+/// already-completed attempt returns it unchanged with `xpAwarded: 0`, `badgesAwarded: []`,
+/// and `summary: nil` (no JourneySummary row exists for that path).
+public nonisolated struct JourneyCompleteResult: Sendable, Equatable {
+    public let journeyAttempt: JourneyAttempt
+    public let steps: [JourneyAttemptStep]
+    public let summary: JourneySummary?
+    public let path: [JourneyPathPoint]
+    public let xpAwarded: Int
+    public let badgesAwarded: [EarnedBadge]
+    public let profile: Profile
+
+    public init(
+        journeyAttempt: JourneyAttempt,
+        steps: [JourneyAttemptStep],
+        summary: JourneySummary?,
+        path: [JourneyPathPoint],
+        xpAwarded: Int,
+        badgesAwarded: [EarnedBadge],
+        profile: Profile
+    ) {
+        self.journeyAttempt = journeyAttempt
+        self.steps = steps
+        self.summary = summary
+        self.path = path
+        self.xpAwarded = xpAwarded
+        self.badgesAwarded = badgesAwarded
+        self.profile = profile
     }
 }
 
