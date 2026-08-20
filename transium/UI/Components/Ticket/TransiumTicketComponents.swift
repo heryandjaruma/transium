@@ -361,6 +361,13 @@ extension TransiumTicketCard where Stamp == TransiumStampCard<AnyView>, BodyCont
                                     img
                                         .resizable()
                                         .scaledToFill()
+                                case .empty:
+                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                        .fill(Color.white.opacity(0.18))
+                                        .transiumShimmer(
+                                            baseColor: Color.white.opacity(0.12),
+                                            highlightColor: Color.white.opacity(0.38)
+                                        )
                                 default:
                                     Image(fallbackImageName)
                                         .resizable()

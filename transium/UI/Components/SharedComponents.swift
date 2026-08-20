@@ -234,6 +234,13 @@ struct QuestRow: View {
                     image
                         .resizable()
                         .scaledToFill()
+                case .empty:
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.black.opacity(0.08))
+                        .transiumShimmer(
+                            baseColor: Color.black.opacity(0.06),
+                            highlightColor: Color.white.opacity(0.6)
+                        )
                 default:
                     Image(quest.fallbackImageName)
                         .resizable()
@@ -308,6 +315,13 @@ struct RecommendedQuestCard: View {
                                 image
                                     .resizable()
                                     .scaledToFill()
+                            case .empty:
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color.white.opacity(0.2))
+                                    .transiumShimmer(
+                                        baseColor: Color.white.opacity(0.15),
+                                        highlightColor: Color.white.opacity(0.45)
+                                    )
                             default:
                                 Image(fallbackImageName)
                                     .resizable()

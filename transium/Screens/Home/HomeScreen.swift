@@ -571,14 +571,24 @@ struct HomeScreen: View {
                         .id(index)
                     }
                 } else {
-                    // Fluid animated skeleton cards while fetching places from live API
-                    TransiumTicketSkeletonCard(variant: .blue)
-                        .frame(width: 336)
-                        .id(0)
+                    // Fluid animated skeleton cards matching the exact layout and height bounds
+                    ForEach(0..<2, id: \.self) { index in
+                        let isRecommended = (index == 0)
+                        let variant: TransiumTicketVariant = isRecommended ? .blue : .mint
 
-                    TransiumTicketSkeletonCard(variant: .mint)
+                        VStack(alignment: .leading, spacing: 0) {
+                            if isRecommended {
+                                recommendedBadge
+                                    .padding(.leading, 12)
+                                    .padding(.bottom, -1)
+                                    .zIndex(1)
+                            }
+
+                            TransiumTicketSkeletonCard(variant: variant)
+                        }
                         .frame(width: 336)
-                        .id(1)
+                        .id(index)
+                    }
                 }
             }
             .animation(.easeInOut(duration: 0.35), value: kelurahanGroups.isEmpty)

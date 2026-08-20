@@ -153,29 +153,14 @@ struct DetailPlaceScreen: View {
     private var imageCarousel: some View {
         ZStack(alignment: .bottom) {
             if isLoadingQuests && headerImageUrls.isEmpty {
-                // Header Carousel Skeleton Placeholder
-                ZStack {
-                    LinearGradient(
-                        colors: [TransiumColor.darkBlue.opacity(0.8), TransiumColor.primaryBlue.opacity(0.85)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                // Pure geometric header skeleton placeholder
+                Rectangle()
+                    .fill(Color(.systemGray5))
+                    .frame(height: 340)
+                    .transiumShimmer(
+                        baseColor: Color(.systemGray5),
+                        highlightColor: Color.white.opacity(0.7)
                     )
-                    
-                    VStack(spacing: 8) {
-                        Image(systemName: "photo.on.rectangle.angled")
-                            .font(.system(size: 38, weight: .light))
-                            .foregroundStyle(.white.opacity(0.4))
-                        
-                        Text("Loading Gallery...")
-                            .font(TransiumFont.body(13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.55))
-                    }
-                }
-                .frame(height: 340)
-                .transiumShimmer(
-                    baseColor: Color.white.opacity(0.08),
-                    highlightColor: Color.white.opacity(0.28)
-                )
             } else {
                 TabView(selection: $selectedImageIndex) {
                     if !headerImageUrls.isEmpty {
@@ -192,32 +177,26 @@ struct DetailPlaceScreen: View {
                                             .frame(width: proxy.size.width, height: proxy.size.height)
                                             .clipped()
                                     case .empty:
-                                        ZStack {
-                                            Color(.systemGray5)
-                                            ProgressView()
-                                                .progressViewStyle(CircularProgressViewStyle(tint: TransiumColor.primaryBlue))
-                                        }
-                                        .frame(width: proxy.size.width, height: proxy.size.height)
-                                    default:
-                                        Image("kintamani")
-                                            .resizable()
-                                            .scaledToFill()
+                                        Rectangle()
+                                            .fill(Color(.systemGray5))
                                             .frame(width: proxy.size.width, height: proxy.size.height)
-                                            .clipped()
+                                            .transiumShimmer(
+                                                baseColor: Color(.systemGray5),
+                                                highlightColor: Color.white.opacity(0.7)
+                                            )
+                                    default:
+                                        Rectangle()
+                                            .fill(Color(.systemGray4))
+                                            .frame(width: proxy.size.width, height: proxy.size.height)
                                     }
                                 }
                             }
                             .tag(index)
                         }
                     } else {
-                        GeometryReader { proxy in
-                            Image("kintamani")
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: proxy.size.width, height: proxy.size.height)
-                                .clipped()
-                        }
-                        .tag(0)
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .frame(height: 340)
                     }
                 }
                 .frame(height: 340)
@@ -305,22 +284,51 @@ struct DetailPlaceScreen: View {
                 
                 Spacer()
                 
-                HStack(spacing: 8) {
-                    Image(categoryBadgeImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 95, height: 30)
-                    
-                    Image("BusFee")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 95, height: 30)
+                if isLoadingQuests {
+                    HStack(spacing: 8) {
+                        TransiumSkeletonBlock(
+                            width: 80,
+                            height: 28,
+                            cornerRadius: 14,
+                            color: Color.black.opacity(0.08),
+                            shimmerHighlight: Color.white.opacity(0.6)
+                        )
+                        TransiumSkeletonBlock(
+                            width: 80,
+                            height: 28,
+                            cornerRadius: 14,
+                            color: Color.black.opacity(0.08),
+                            shimmerHighlight: Color.white.opacity(0.6)
+                        )
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        Image(categoryBadgeImage)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 95, height: 30)
+                        
+                        Image("BusFee")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 95, height: 30)
+                    }
                 }
             }
             
-            Text("\(kelurahan.kecamatanName) • \(kelurahanTagline)")
-                .font(TransiumFont.body(14))
-                .foregroundColor(.gray)
+            if isLoadingQuests {
+                TransiumSkeletonBlock(
+                    width: 190,
+                    height: 14,
+                    cornerRadius: 4,
+                    color: Color.black.opacity(0.07),
+                    shimmerHighlight: Color.white.opacity(0.55)
+                )
+            } else {
+                Text("\(kelurahan.kecamatanName) • \(kelurahanTagline)")
+                    .font(TransiumFont.body(14))
+                    .foregroundColor(.gray)
+            }
         }
     }
     
