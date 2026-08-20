@@ -375,9 +375,9 @@ struct RecommendedQuestCardSkeleton: View {
             VStack(alignment: .leading, spacing: 10) {
                 // "RECOMMENDED" badge skeleton
                 TransiumSkeletonBlock(
-                    width: 90,
-                    height: 20,
-                    cornerRadius: 10,
+                    width: 98,
+                    height: 22,
+                    cornerRadius: 11,
                     color: Color.white.opacity(0.2),
                     shimmerHighlight: Color.white.opacity(0.45)
                 )
@@ -385,7 +385,7 @@ struct RecommendedQuestCardSkeleton: View {
                 // Title skeleton
                 TransiumSkeletonBlock(
                     width: 140,
-                    height: 22,
+                    height: 24,
                     cornerRadius: 6,
                     color: Color.white.opacity(0.3),
                     shimmerHighlight: Color.white.opacity(0.6)
@@ -395,14 +395,14 @@ struct RecommendedQuestCardSkeleton: View {
                 VStack(alignment: .leading, spacing: 4) {
                     TransiumSkeletonBlock(
                         width: 160,
-                        height: 12,
+                        height: 14,
                         cornerRadius: 4,
                         color: Color.white.opacity(0.2),
                         shimmerHighlight: Color.white.opacity(0.45)
                     )
                     TransiumSkeletonBlock(
                         width: 110,
-                        height: 12,
+                        height: 14,
                         cornerRadius: 4,
                         color: Color.white.opacity(0.2),
                         shimmerHighlight: Color.white.opacity(0.45)
@@ -439,7 +439,7 @@ struct RecommendedQuestCardSkeleton: View {
 
                 // "Start Quest" button skeleton
                 TransiumSkeletonBlock(
-                    width: 108,
+                    width: 104,
                     height: 36,
                     cornerRadius: 18,
                     color: Color.white.opacity(0.35),
@@ -477,7 +477,7 @@ struct QuestRowSkeleton: View {
         }()
 
         HStack(alignment: .center, spacing: 14) {
-            TransiumStampCard(size: 58, tilt: .degrees(0), variant: stampVariant) {
+            TransiumStampCard(size: 74, tilt: .degrees(0), variant: stampVariant) {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(Color.black.opacity(0.06))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -486,39 +486,59 @@ struct QuestRowSkeleton: View {
                         highlightColor: Color.white.opacity(0.65)
                     )
             }
+            .frame(width: 74, height: 74)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 TransiumSkeletonBlock(
-                    width: 120,
-                    height: 16,
+                    width: 110,
+                    height: 18,
                     cornerRadius: 5,
                     color: Color.black.opacity(0.12),
                     shimmerHighlight: Color.white.opacity(0.7)
                 )
 
                 TransiumSkeletonBlock(
-                    width: 170,
-                    height: 11,
+                    width: 130,
+                    height: 13,
+                    cornerRadius: 4,
+                    color: Color.black.opacity(0.08),
+                    shimmerHighlight: Color.white.opacity(0.6)
+                )
+
+                TransiumSkeletonBlock(
+                    width: 90,
+                    height: 13,
                     cornerRadius: 4,
                     color: Color.black.opacity(0.08),
                     shimmerHighlight: Color.white.opacity(0.6)
                 )
             }
 
-            Spacer(minLength: 8)
+            Spacer()
 
-            TransiumSkeletonBlock(
-                width: 58,
-                height: 24,
-                cornerRadius: 12,
-                color: theme.accent.opacity(0.18),
-                shimmerHighlight: Color.white.opacity(0.6)
-            )
+            VStack(alignment: .center, spacing: 6) {
+                // "Start Quest" button skeleton
+                TransiumSkeletonBlock(
+                    width: 84,
+                    height: 31,
+                    cornerRadius: 15.5,
+                    color: theme.accent.opacity(0.35),
+                    shimmerHighlight: Color.white.opacity(0.6)
+                )
+
+                // Points badge skeleton
+                TransiumSkeletonBlock(
+                    width: 54,
+                    height: 14,
+                    cornerRadius: 7,
+                    color: Color.black.opacity(0.1),
+                    shimmerHighlight: Color.white.opacity(0.6)
+                )
+            }
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .background(theme.background)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 }
 

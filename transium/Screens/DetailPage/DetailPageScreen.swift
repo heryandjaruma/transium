@@ -221,17 +221,14 @@ struct DetailPlaceScreen: View {
             titleSection
             
             if isLoadingQuests && quests.isEmpty {
-                // Skeleton loading state for quests
-                VStack(spacing: 16) {
-                    RecommendedQuestCardSkeleton()
-                    
-                    VStack(spacing: 14) {
-                        QuestRowSkeleton(theme: .blue)
-                        QuestRowSkeleton(theme: .red)
-                        QuestRowSkeleton(theme: .green)
-                    }
+                // Skeleton loading state with identical spacing structure
+                RecommendedQuestCardSkeleton()
+                
+                VStack(spacing: 14) {
+                    QuestRowSkeleton(theme: .blue)
+                    QuestRowSkeleton(theme: .red)
+                    QuestRowSkeleton(theme: .green)
                 }
-                .transition(.opacity)
             } else {
                 if let firstQuest = quests.first {
                     RecommendedQuestCard(
@@ -254,7 +251,6 @@ struct DetailPlaceScreen: View {
                         }
                     }
                 }
-                .transition(.opacity)
             }
         }
         .padding(.horizontal, 20)
@@ -264,7 +260,6 @@ struct DetailPlaceScreen: View {
                 .clipShape(RoundedCorner(radius: 28, corners: [.topLeft, .topRight]))
         )
         .offset(y: -44)
-        .animation(.spring(response: 0.45, dampingFraction: 0.85), value: isLoadingQuests)
     }
 
     private var dragHandle: some View {
@@ -287,16 +282,16 @@ struct DetailPlaceScreen: View {
                 if isLoadingQuests {
                     HStack(spacing: 8) {
                         TransiumSkeletonBlock(
-                            width: 80,
-                            height: 28,
-                            cornerRadius: 14,
+                            width: 95,
+                            height: 30,
+                            cornerRadius: 15,
                             color: Color.black.opacity(0.08),
                             shimmerHighlight: Color.white.opacity(0.6)
                         )
                         TransiumSkeletonBlock(
-                            width: 80,
-                            height: 28,
-                            cornerRadius: 14,
+                            width: 95,
+                            height: 30,
+                            cornerRadius: 15,
                             color: Color.black.opacity(0.08),
                             shimmerHighlight: Color.white.opacity(0.6)
                         )
@@ -318,8 +313,8 @@ struct DetailPlaceScreen: View {
             
             if isLoadingQuests {
                 TransiumSkeletonBlock(
-                    width: 190,
-                    height: 14,
+                    width: 210,
+                    height: 18,
                     cornerRadius: 4,
                     color: Color.black.opacity(0.07),
                     shimmerHighlight: Color.white.opacity(0.55)
