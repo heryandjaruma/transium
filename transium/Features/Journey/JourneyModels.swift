@@ -396,6 +396,10 @@ public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, E
     public let name: String
     public let description: String
     public let type: String
+    /// The step's ActionDefinition.type — a free-text kind of action (e.g. "capture",
+    /// "checkin"), unrelated to `type`'s required/optional-ness. Null for an artificial
+    /// "takePicture" photo checkpoint, which has no backing ActionDefinition.
+    public let actionType: String?
     public let lat: Double?
     public let lng: Double?
     public let radiusMeters: Double?
@@ -408,6 +412,7 @@ public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, E
         name: String,
         description: String,
         type: String,
+        actionType: String? = nil,
         lat: Double? = nil,
         lng: Double? = nil,
         radiusMeters: Double? = nil,
@@ -419,17 +424,20 @@ public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, E
         self.name = name
         self.description = description
         self.type = type
+        self.actionType = actionType
         self.lat = lat
         self.lng = lng
         self.radiusMeters = radiusMeters
         self.status = status
     }
 
-    /// True for the artificial `type: "optional"` steps POST /private/journey/go interleaves
-    /// into the route (1-3 per journey) so the user is prompted to document the trip — `name`
-    /// is the literal string `"takePicture"` for these, per the API's own documented contract,
-    /// never a fuzzy label to pattern-match against.
-    public var isPhotoCheckpoint: Bool { name == "takePicture" }
+    /// True for any step that should pop the camera on arrival — either the artificial
+    /// `name: "takePicture"` checkpoints POST /private/journey/go interleaves into the route
+    /// (1-3 per journey, `actionType` null since they have no backing ActionDefinition), or a
+    /// real quest action whose own `actionType` is a capture-photo kind (contains "capture").
+    public var isPhotoCheckpoint: Bool {
+        name == "takePicture" || (actionType?.localizedCaseInsensitiveContains("capture") ?? false)
+    }
 }
 
 /// A location the client should register a `CLCircularRegion` (or equivalent) for.
