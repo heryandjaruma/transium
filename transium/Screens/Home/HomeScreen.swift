@@ -613,21 +613,7 @@ struct HomeScreen: View {
     }
     
     private var recommendedBadge: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "sparkle")
-                .font(.system(size: 10, weight: .black))
-                .foregroundStyle(TransiumColor.primaryYellow)
-            
-            Text("Recommended")
-                .font(TransiumFont.body(11, weight: .semibold))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(TransiumColor.ticketBlue)
-        .clipShape(.rect(topLeadingRadius: 9, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 9, style: .continuous))
-        .accessibilityElement(children: .combine)
+        TransiumRecommendedSeal(style: .ticketTab)
     }
     
     private var currentLocationPill: some View {

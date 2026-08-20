@@ -72,6 +72,122 @@ struct TransiumBadgeVariant: Equatable {
     )
 }
 
+// MARK: - Recommended Seal Badge
+
+struct TransiumRecommendedSeal: View {
+    enum Style {
+        case ticketTab      // Attached to top of ticket on home screen
+        case cardPill       // Floating pill on RecommendedQuestCard
+        case circularSeal   // Rosette / postal wax seal
+    }
+
+    var style: Style
+
+    init(style: Style = .ticketTab) {
+        self.style = style
+    }
+
+    var body: some View {
+        switch style {
+        case .ticketTab:
+            ticketTabBadge
+        case .cardPill:
+            cardPillBadge
+        case .circularSeal:
+            circularSealBadge
+        }
+    }
+
+    // 1. Vintage transit ticket tab with warm ivory paper, gold seal emblem & crisp ink typography
+    private var ticketTabBadge: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "seal.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color(red: 1.0, green: 0.82, blue: 0.28), Color(red: 0.92, green: 0.65, blue: 0.10)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            Text("RECOMMENDED")
+                .font(TransiumFont.body(10, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(TransiumColor.ticketInk)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(red: 1.0, green: 0.985, blue: 0.94), Color(red: 0.96, green: 0.93, blue: 0.86)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(Color(red: 0.82, green: 0.74, blue: 0.62).opacity(0.55), lineWidth: 0.75)
+                }
+        }
+        .clipShape(.rect(topLeadingRadius: 7, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 7, style: .continuous))
+        .shadow(color: Color.black.opacity(0.06), radius: 2, y: -1)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Recommended destination")
+    }
+
+    // 2. Subtle frosted seal pill for hero cards
+    private var cardPillBadge: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "seal.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color(red: 1.0, green: 0.85, blue: 0.35))
+
+            Text("RECOMMENDED")
+                .font(TransiumFont.body(10, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4.5)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.18))
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.25), lineWidth: 0.5)
+                )
+        )
+    }
+
+    // 3. Rosette / postal wax seal
+    private var circularSealBadge: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(red: 0.98, green: 0.86, blue: 0.45), Color(red: 0.88, green: 0.65, blue: 0.15)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 28, height: 28)
+                .shadow(color: Color.black.opacity(0.12), radius: 2, y: 1)
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(0.6), lineWidth: 1)
+                )
+
+            Image(systemName: "star.fill")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.white)
+        }
+    }
+}
+
 struct TransiumTicketVariant: Equatable {
     let backgroundColor: Color
     let foregroundColor: Color

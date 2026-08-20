@@ -269,13 +269,7 @@ struct RecommendedQuestCard: View {
  
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 10) {
-                Text("RECOMMENDED")
-                    .font(TransiumFont.body(10, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.white.opacity(0.2))
-                    .clipShape(Capsule())
+                TransiumRecommendedSeal(style: .cardPill)
  
                 Text(title)
                     .font(TransiumFont.body(20, weight: .bold))
@@ -373,9 +367,9 @@ struct RecommendedQuestCardSkeleton: View {
 
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 10) {
-                // "RECOMMENDED" badge skeleton
+                // "RECOMMENDED" seal badge skeleton
                 TransiumSkeletonBlock(
-                    width: 98,
+                    width: 112,
                     height: 22,
                     cornerRadius: 11,
                     color: Color.white.opacity(0.2),
