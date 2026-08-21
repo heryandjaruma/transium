@@ -205,70 +205,112 @@ struct SearchSheetView: View {
     }
 
     private var pinningContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                Image("location_red")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 44, height: 44)
+        VStack(spacing: 14) {
+            // Drag handle indicator
+            Capsule()
+                .fill(Color.white.opacity(0.35))
+                .frame(width: 38, height: 4.5)
+                .padding(.top, 10)
 
-                VStack(alignment: .leading, spacing: 4) {
+            // Location Info Card
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color(red: 0.98, green: 0.28, blue: 0.28).opacity(0.12))
+                        .frame(width: 48, height: 48)
+
+                    Image("location_red")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 30, height: 30)
+                }
+
+                VStack(alignment: .leading, spacing: 3) {
                     Text("Selected Starting Point")
-                        .font(TransiumFont.body(16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
+                        .font(TransiumFont.body(11, weight: .bold))
+                        .foregroundStyle(TransiumColor.primaryBlue)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
 
                     Text(pinnedAddressLabel)
-                        .font(TransiumFont.body(14))
-                        .foregroundStyle(.white.opacity(0.7))
-                        .lineLimit(1)
+                        .font(TransiumFont.body(15, weight: .bold))
+                        .foregroundStyle(.black)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Spacer()
+                Spacer(minLength: 8)
 
-                Button(action: {
+                Button {
                     state = .searching
-                }) {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(TransiumColor.primaryBlue)
+                        .frame(width: 38, height: 38)
+                        .background(TransiumColor.primaryBlue.opacity(0.1))
+                        .clipShape(Circle())
                 }
-                .background(TransiumColor.darkBlue)
-                .clipShape(Circle())
             }
-            .padding(.top, 25)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .shadow(color: Color.black.opacity(0.08), radius: 10, y: 4)
 
+            // Fine-tune map pin hint
+            HStack(spacing: 6) {
+                Image(systemName: "hand.draw.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                Text("Drag the map to fine-tune your starting pin")
+                    .font(TransiumFont.body(12, weight: .medium))
+            }
+            .foregroundStyle(Color.white.opacity(0.85))
+            .padding(.vertical, 2)
+
+            // Action Buttons
             VStack(spacing: 10) {
                 Button(action: onConfirmStartingPoint) {
-                    Text("Set Starting Point")
-                        .font(TransiumFont.body(16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(TransiumColor.darkBlue)
-                        .clipShape(Capsule())
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 16, weight: .bold))
+                        Text("Set Starting Point")
+                            .font(TransiumFont.body(16, weight: .bold))
+                    }
+                    .foregroundColor(TransiumColor.primaryBlue)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(Color.white)
+                    .clipShape(Capsule())
+                    .shadow(color: Color.black.opacity(0.12), radius: 8, y: 3)
                 }
 
                 Button(action: onUseCurrentLocation) {
                     HStack(spacing: 8) {
-                        Image(systemName: "location")
-                            .font(.system(size: 21, weight: .semibold))
-                            .foregroundStyle(TransiumColor.primaryBlue)
-                        Text("Use my Current Location")
-                            .font(TransiumFont.body(16, weight: .semibold))
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Text("Use My Current Location")
+                            .font(TransiumFont.body(15, weight: .semibold))
+                            .foregroundColor(.white)
                     }
-                    .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(.white)
+                    .padding(.vertical, 14)
+                    .background(Color.white.opacity(0.18))
                     .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                    )
                 }
             }
+
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 25)
-        .padding(.bottom, 20)
+        .padding(.top, 2)
+        .padding(.bottom, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 

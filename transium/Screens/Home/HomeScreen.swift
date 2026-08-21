@@ -403,7 +403,7 @@ struct HomeScreen: View {
                 },
                 onCancel: { isSearchPresented = false }
             )
-            .presentationDetents([.medium, .large], selection: $sheetDetent)
+            .presentationDetents([.fraction(0.38), .large], selection: $sheetDetent)
             .presentationDragIndicator(.hidden)
             .interactiveDismissDisabled(false)
             .onChange(of: sheetDetent) { _, newDetent in
@@ -1456,7 +1456,7 @@ struct HomeScreen: View {
     
     private func presentSearchSheet(in state: SearchSheetState) {
         sheetState = state
-        sheetDetent = (state == .searching) ? .large : .medium
+        sheetDetent = (state == .searching) ? .large : .fraction(0.38)
         isSearchPresented = true
     }
 
@@ -1478,7 +1478,7 @@ struct HomeScreen: View {
         pinFocusCoordinate = coordinate
         pinnedCoordinate = coordinate
         pinnedAddressLabel = label
-        sheetDetent = .medium
+        sheetDetent = .fraction(0.38)
         sheetState = .pinning
     }
 
