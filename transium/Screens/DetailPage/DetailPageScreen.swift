@@ -109,20 +109,28 @@ struct DetailPlaceScreen: View {
             }
             .ignoresSafeArea(edges: .top)
             
-            // Top Floating Back Button
-            Button {
-                dismissScreen()
-            } label: {
-                Image(systemName: "arrow.left")
-                    .foregroundColor(.black)
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 44, height: 44)
-                    .background(Color.white)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+            // Top Floating Back Button (aligned with HomeScreen toolbar buttons)
+            VStack {
+                HStack {
+                    Button {
+                        dismissScreen()
+                    } label: {
+                        Image(systemName: "arrow.left")
+                            .foregroundColor(.black)
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+                    }
+                    .padding(.leading, 20)
+                    .padding(.top, 6)
+                    
+                    Spacer()
+                }
+                
+                Spacer()
             }
-            .padding(.leading, 20)
-            .padding(.top, 56)
         }
         .background(Color.white)
         .navigationBarBackButtonHidden(true)
