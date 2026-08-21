@@ -1347,7 +1347,7 @@ struct HomeScreen: View {
                             if isRecommended {
                                 recommendedBadge
                                     .padding(.leading, 8)
-                                    .padding(.bottom, -10)
+                                    .padding(.bottom, -12)
                                     .zIndex(1)
                             }
                             
