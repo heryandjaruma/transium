@@ -454,6 +454,46 @@ public nonisolated struct JourneyAttemptStep: Codable, Identifiable, Sendable, E
     public var isPhotoCheckpoint: Bool {
         actionType?.localizedCaseInsensitiveContains("capture") ?? false
     }
+
+    /// Whether `location` is within this step's own geofence radius — the same radius
+    /// `HomeScreen.geofences(from:)` registers a `CLCircularRegion` for. Used to keep a located
+    /// step's manual "I'm here" confirmation from being offered before the user could
+    /// plausibly be there. No coordinates or radius on this step → true (nothing to gate
+    /// against — an unlocated step, or one missing its radius, shouldn't be blocked from its
+    /// only completion path by a check it has no way to satisfy). No `location` yet → false,
+    /// since Go Mode requires location access to run at all, so a fix should arrive within
+    /// moments.
+    public func isWithinConfirmationRange(of location: CLLocationCoordinate2D?) -> Bool {
+        guard let lat, let lng else { return true }
+        guard let radiusMeters else { return true }
+        guard let location else { return false }
+        let current = CLLocation(latitude: location.latitude, longitude: location.longitude)
+        let target = CLLocation(latitude: lat, longitude: lng)
+        return current.distance(from: target) <= radiusMeters
+    }
+}
+
+public extension Array where Element == JourneyAttemptStep {
+    /// The step matching a mission segment — this is how a mission surfaces its own manual
+    /// "I'm here" fallback. Exact via `stepId` now that GET /journey/real is attempt-scoped for
+    /// the whole Go Mode session; falls back to coordinate proximity (≤50m) only if this
+    /// mission has none (e.g. the attempt-scoped re-fetch failed and this session is still on
+    /// the earlier, un-scoped preview fetch).
+    func attemptStep(for mission: JourneySegment) -> JourneyAttemptStep? {
+        if let stepId = mission.stepId {
+            return first(where: { $0.id == stepId })
+        }
+
+        guard let coordinate = mission.coordinate else { return nil }
+        let missionLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+
+        return compactMap { step -> (step: JourneyAttemptStep, distance: CLLocationDistance)? in
+            guard let lat = step.lat, let lng = step.lng else { return nil }
+            return (step, CLLocation(latitude: lat, longitude: lng).distance(from: missionLocation))
+        }
+        .min { $0.distance < $1.distance }
+        .flatMap { $0.distance <= 50 ? $0.step : nil }
+    }
 }
 
 /// A location the client should register a `CLCircularRegion` (or equivalent) for.

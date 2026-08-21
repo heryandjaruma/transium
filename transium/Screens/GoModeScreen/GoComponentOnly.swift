@@ -215,6 +215,69 @@ struct GoStepCard: View {
     }
 }
 
+// MARK: - Go Mission Card
+// Blue-family floating card for a "mission" segment as the current step — instructions plus a
+// white "I'm here" confirm button, matching GoStepCard/GoBusAppCard's shape and typography but
+// in the yellow used everywhere else in Go Mode to mark a mission (vs. a travel leg).
+
+struct GoMissionCard: View {
+    let instructions: String
+    /// Whether the device is close enough to this mission's own location for the confirm
+    /// button to make sense — see `JourneyAttemptStep.isWithinConfirmationRange`. The button is
+    /// omitted (not just disabled) while out of range, same as the trip-details list used to do
+    /// before this card took over as the only place a mission gets confirmed from.
+    let isConfirmable: Bool
+    let onConfirm: () -> Void
+
+    var body: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 65 * 0.35, style: .continuous)
+                    .fill(.white)
+                    .frame(width: 65, height: 65)
+                Image(systemName: "questionmark.app.fill")
+                    .font(.system(size: 65 * 0.5, weight: .semibold))
+                    .foregroundStyle(TransiumColor.primaryYellow)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Mission")
+                    .font(TransiumFont.body(14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+
+                Text(instructions)
+                    .font(TransiumFont.body(19, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+
+                if isConfirmable {
+                    Button(action: onConfirm) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("I'm here")
+                                .font(TransiumFont.body(13, weight: .semibold))
+                        }
+                        .foregroundStyle(TransiumColor.primaryYellow)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.white)
+                        .clipShape(.capsule)
+                    }
+                    .buttonStyle(.transiumNoOpacity)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(TransiumColor.primaryYellow)
+        .clipShape(.rect(cornerRadius: 30))
+    }
+}
+
 // MARK: - Go Bus App Card
 // "Check bus live location on Trans Metro Dewata App [Download TMD App]"
 

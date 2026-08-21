@@ -119,32 +119,46 @@ struct GoComponentMode: View {
         .padding(.bottom, 8)
     }
 
-    // Blue Card showing current step going on in a trip
+    // Blue/Yellow card showing whatever's current in the trip — a travel leg, or a mission.
     @ViewBuilder
     private var currentStepCard: some View {
         if let segment = currentSegment {
-            switch variant {
-            case .walking:
-                walkCard(segment)
+            if segment.isMission {
+                // The mission's own manual "I'm here" confirmation lives here — GoTripDetailsPanel's
+                // mission cards are display-only now, so this is the only place it's pressable.
+                let matchedStep = steps.attemptStep(for: segment)
+                GoMissionCard(
+                    instructions: segment.instructions ?? "Complete the mission",
+                    isConfirmable: matchedStep.map { $0.status != .done && $0.isWithinConfirmationRange(of: currentLocation) } ?? false,
+                    onConfirm: {
+                        guard let matchedStep else { return }
+                        onManualAdvance(matchedStep.id)
+                    }
+                )
+            } else {
+                switch variant {
+                case .walking:
+                    walkCard(segment)
 
-            case .commuteOnGoing:
-                rideCard(segment)
+                case .commuteOnGoing:
+                    rideCard(segment)
 
-            case .commute:
-                VStack(alignment: .leading, spacing: 10) {
-                    GoBusLivePill(
-                        title: "Check Bus Live Location",
-                        subtitle: "Open \(segment.routeName ?? "Transit App")",
-                        action: openTMDApp
-                    )
+                case .commute:
+                    VStack(alignment: .leading, spacing: 10) {
+                        GoBusLivePill(
+                            title: "Check Bus Live Location",
+                            subtitle: "Open \(segment.routeName ?? "Transit App")",
+                            action: openTMDApp
+                        )
 
-                    GoBusAppCard(
-                        providerCode: segment.routeRef ?? "BUS",
-                        promptText: "Check bus live location on",
-                        appName: segment.routeName ?? "Transit App",
-                        downloadLabel: "Download App",
-                        onDownload: openTMDAppStorePage
-                    )
+                        GoBusAppCard(
+                            providerCode: segment.routeRef ?? "BUS",
+                            promptText: "Check bus live location on",
+                            appName: segment.routeName ?? "Transit App",
+                            downloadLabel: "Download App",
+                            onDownload: openTMDAppStorePage
+                        )
+                    }
                 }
             }
         } else {

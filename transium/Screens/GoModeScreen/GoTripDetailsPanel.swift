@@ -81,29 +81,6 @@ struct GoTripDetailsPanel: View {
         return assignments
     }
 
-    /// The JourneyAttemptStep (from POST /private/journey/go) matching a mission segment (from
-    /// GET /journey/real) — this is how a mission card offers its own manual "I'm here"
-    /// fallback. Exact via `stepId` now that GET /journey/real is attempt-scoped for the whole
-    /// Go Mode session; falls back to coordinate proximity only if this mission has none (e.g.
-    /// the attempt-scoped re-fetch failed and this session is still on the earlier, un-scoped
-    /// preview fetch).
-    private func attemptStep(for mission: JourneySegment) -> JourneyAttemptStep? {
-        if let stepId = mission.stepId {
-            return steps.first(where: { $0.id == stepId })
-        }
-
-        guard let coordinate = mission.coordinate else { return nil }
-        let missionLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-
-        return steps
-            .compactMap { step -> (step: JourneyAttemptStep, distance: CLLocationDistance)? in
-                guard let lat = step.lat, let lng = step.lng else { return nil }
-                return (step, CLLocation(latitude: lat, longitude: lng).distance(from: missionLocation))
-            }
-            .min { $0.distance < $1.distance }
-            .flatMap { $0.distance <= 50 ? $0.step : nil }
-    }
-
     /// Steps with no coordinates at all — no `missionCard` in `journey.segments` accounts for
     /// these (a located step's own route entry), so they'd otherwise never appear anywhere in
     /// this timeline. Shown via `manualActionCard` instead, each with its own "I've done it".
@@ -539,11 +516,11 @@ struct GoTripDetailsPanel: View {
 
     /// A quest step the user must actually do there — GET /journey/real's `mission`-typed
     /// segments, shown as their own card (never merged into a travel-leg card) right after
-    /// the leg that reaches it.
+    /// the leg that reaches it. Display-only here: the "I'm here" confirmation for whichever
+    /// mission is actually current lives on `GoComponentMode`'s floating current-step card
+    /// instead, so it can't be tapped ahead of time for a mission still further down the list.
     private func missionCard(_ mission: JourneySegment, isDone: Bool) -> some View {
-        let matchedStep = attemptStep(for: mission)
-
-        return VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 ZStack {
                     Circle().fill(isDone ? Self.doneAccent : TransiumColor.primaryYellow).frame(width: 36, height: 36)
@@ -562,14 +539,6 @@ struct GoTripDetailsPanel: View {
                 }
 
                 Spacer()
-            }
-
-            if let matchedStep, matchedStep.status != .done, isWithinConfirmationRange(of: matchedStep) {
-                Divider()
-                HStack {
-                    Spacer()
-                    markDoneButton(for: matchedStep, tint: TransiumColor.primaryYellow)
-                }
             }
         }
         .padding(14)
@@ -598,7 +567,7 @@ struct GoTripDetailsPanel: View {
                 Spacer()
             }
 
-            if step.status != .done, isWithinConfirmationRange(of: step) {
+            if step.status != .done, step.isWithinConfirmationRange(of: currentLocation) {
                 HStack {
                     Spacer()
                     markDoneButton(for: step, tint: tint)
@@ -606,23 +575,6 @@ struct GoTripDetailsPanel: View {
             }
         }
         .padding(.leading, 8)
-    }
-
-    /// Whether the device's current location is within this step's own geofence radius — the
-    /// same radius `HomeScreen.geofences(from:)` registers a `CLCircularRegion` for. Gates the
-    /// located-step "I'm here" button so it only appears once the user could plausibly be there,
-    /// instead of the moment the step becomes current. No location fix yet → hide (Go Mode
-    /// already requires location access to run at all, so one should arrive within moments).
-    /// Missing `radiusMeters` on an otherwise-located step → show, since that step isn't
-    /// geofenced either (see `geofences(from:)`'s own guard) and hiding its only other
-    /// completion path would strand it.
-    private func isWithinConfirmationRange(of step: JourneyAttemptStep) -> Bool {
-        guard let lat = step.lat, let lng = step.lng else { return true }
-        guard let radiusMeters = step.radiusMeters else { return true }
-        guard let currentLocation else { return false }
-        let current = CLLocation(latitude: currentLocation.latitude, longitude: currentLocation.longitude)
-        let target = CLLocation(latitude: lat, longitude: lng)
-        return current.distance(from: target) <= radiusMeters
     }
 
     /// A manual fallback for POST /private/journey/{id}/advance's own documented "manual

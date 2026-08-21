@@ -301,6 +301,10 @@ struct HomeScreen: View {
             recordPathPointIfNeeded()
             advanceGoSegmentIfNeeded()
         }
+        // A mission segment only advances once its matched step reaches `.done` (see
+        // `advanceGoSegmentIfNeeded`), which happens here — via `handleGeofenceEntered`
+        // updating `goJourneySteps` — rather than through a location change.
+        .onChange(of: goJourneySteps) { _, _ in advanceGoSegmentIfNeeded() }
         .preferredColorScheme(.light)
         .alert(
             "Journey Already in Progress",
@@ -459,20 +463,29 @@ struct HomeScreen: View {
     /// within whichever leg is already current.
     private static let segmentArrivalProximityMeters: Double = 69
 
-    /// Moves `goCurrentSegmentIndex` on to the next segment once the live position reaches the
-    /// current one's destination — e.g. reaching a bus's alighting stop, or a walk's endpoint.
-    /// This is the only place `goCurrentSegmentIndex` changes; there used to be a manual
-    /// tap-to-advance on the walking-leg card, but it only ever covered walk legs (bus legs were
-    /// never tappable) and was disabled outright, leaving the whole itinerary frozen on segment 0
-    /// for the rest of the trip once boarded. Mission segments have no `to` to arrive at — they
-    /// advance via their own backend step status instead (`handleGeofenceEntered`) — so one is
-    /// left in place as "current" rather than skipped.
+    /// Moves `goCurrentSegmentIndex` on to the next segment once the current one is reached —
+    /// live-position proximity to `to` for a travel leg (e.g. reaching a bus's alighting stop,
+    /// or a walk's endpoint), or the matched `JourneyAttemptStep` reaching `.done` for a mission
+    /// (missions have no `to` to arrive at; their own location is instead confirmed via
+    /// `GoMissionCard`'s "I'm here" → `handleGeofenceEntered`). This is the only place
+    /// `goCurrentSegmentIndex` changes; there used to be a manual tap-to-advance on the
+    /// walking-leg card, but it only ever covered walk legs (bus legs were never tappable) and
+    /// was disabled outright, leaving the whole itinerary frozen on segment 0 for the rest of
+    /// the trip once boarded.
     private func advanceGoSegmentIfNeeded() {
-        guard showGoMode, let journey = activeJourney, let coordinate = locationStore.currentLocation?.coordinate,
+        guard showGoMode, let journey = activeJourney,
               journey.segments.indices.contains(goCurrentSegmentIndex) else { return }
 
         let segment = journey.segments[goCurrentSegmentIndex]
-        guard !segment.isMission, let distance = segment.liveRemaining(from: coordinate).distanceMeters,
+
+        if segment.isMission {
+            guard goJourneySteps.attemptStep(for: segment)?.status == .done else { return }
+            goCurrentSegmentIndex += 1
+            return
+        }
+
+        guard let coordinate = locationStore.currentLocation?.coordinate,
+              let distance = segment.liveRemaining(from: coordinate).distanceMeters,
               distance <= Self.segmentArrivalProximityMeters else { return }
         goCurrentSegmentIndex += 1
     }
