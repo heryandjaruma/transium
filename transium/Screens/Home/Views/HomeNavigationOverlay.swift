@@ -1,5 +1,5 @@
 //
-//  HomeNavigationControls.swift
+//  HomeNavigationOverlay.swift
 //  transium
 //
 
@@ -78,7 +78,7 @@ struct HomeNavigationTopBar: View {
     }
 }
 
-struct HomeNavigationBottomStack: View {
+struct HomeNavigationActionSheet: View {
     let journey: JourneyResult
     var isStartingGoMode: Bool
     var onStartGo: () -> Void

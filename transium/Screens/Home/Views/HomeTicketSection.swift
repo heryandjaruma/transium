@@ -1,12 +1,12 @@
 //
-//  HomeBottomTicketCarousel.swift
+//  HomeTicketSection.swift
 //  transium
 //
 
 import CoreLocation
 import SwiftUI
 
-struct HomeBottomTicketCarousel: View {
+struct HomeTicketSection: View {
     let kelurahanGroups: [KelurahanQuestsGroup]
     @Binding var visibleTicketPage: Int?
     let currentLocationLabel: String
@@ -45,7 +45,7 @@ struct HomeBottomTicketCarousel: View {
                             TransiumTicketCard(
                                 title: group.kelurahan.kelurahanName,
                                 subtitle: group.kelurahan.description ?? group.quests.first?.description ?? "\(group.kelurahan.kecamatanName), Bali",
-                                distance: HomeLocationHelper.distanceText(for: group, currentLocation: currentLocation),
+                                distance: HomeLocationFormatter.distanceText(for: group, currentLocation: currentLocation),
                                 price: "Rp. 4,4k",
                                 imageUrl: group.kelurahan.thumbnails.first?.url ?? group.quests.first?.thumbnails.first?.url,
                                 fallbackImageName: isRecommended ? "kintamani" : "sanoored",

@@ -1,37 +1,37 @@
 //
-//  HomeQuickMenuView.swift
+//  HomeFloatingMenu.swift
 //  transium
 //
 
 import SwiftUI
 
-struct HomeQuickMenuView: View {
-    @Binding var isMenuExpanded: Bool
+struct HomeFloatingMenu: View {
+    @Binding var isExpanded: Bool
     var onSettings: () -> Void
     var onProfile: () -> Void
     var onSavedQuests: () -> Void
-    var onLocate: () -> Void
+    var onCenterMap: () -> Void
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 8) {
             TransiumIconButton(
-                systemName: isMenuExpanded ? "xmark" : "ellipsis",
+                systemName: isExpanded ? "xmark" : "ellipsis",
                 accessibilityLabel: "Menu",
                 size: 44
             ) {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                    isMenuExpanded.toggle()
+                    isExpanded.toggle()
                 }
             }
             .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
             
-            if isMenuExpanded {
+            if isExpanded {
                 TransiumIconButton(
                     systemName: "gearshape.fill",
                     accessibilityLabel: "Settings",
                     size: 44
                 ) {
-                    withAnimation { isMenuExpanded = false }
+                    withAnimation { isExpanded = false }
                     onSettings()
                 }
                 .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
@@ -42,7 +42,7 @@ struct HomeQuickMenuView: View {
                     accessibilityLabel: "Profile Button",
                     size: 44
                 ) {
-                    withAnimation { isMenuExpanded = false }
+                    withAnimation { isExpanded = false }
                     onProfile()
                 }
                 
@@ -51,7 +51,7 @@ struct HomeQuickMenuView: View {
                     accessibilityLabel: "Saved quests",
                     size: 44
                 ) {
-                    withAnimation { isMenuExpanded = false }
+                    withAnimation { isExpanded = false }
                     onSavedQuests()
                 }
                 .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
@@ -63,7 +63,7 @@ struct HomeQuickMenuView: View {
                 accessibilityLabel: "Center map on your location",
                 size: 44
             ) {
-                onLocate()
+                onCenterMap()
             }
             .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
         }

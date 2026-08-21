@@ -1,12 +1,12 @@
 //
-//  HomeLocationHelper.swift
+//  HomeLocationFormatter.swift
 //  transium
 //
 
 import CoreLocation
 import Foundation
 
-enum HomeLocationHelper {
+enum HomeLocationFormatter {
     static let baliFallbackLocation = CLLocation(latitude: -8.73704, longitude: 115.17570)
 
     static func coordinateForKelurahan(_ kelurahan: Kelurahan) -> CLLocation {

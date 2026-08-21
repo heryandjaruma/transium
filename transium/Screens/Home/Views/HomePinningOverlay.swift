@@ -1,12 +1,12 @@
 //
-//  HomePinningOverlayView.swift
+//  HomePinningOverlay.swift
 //  transium
 //
 
 import CoreLocation
 import SwiftUI
 
-struct HomePinningOverlayControls: View {
+struct HomePinningControls: View {
     var onBack: () -> Void
     var onLocate: () -> Void
 
@@ -57,7 +57,7 @@ struct HomePinningOverlayControls: View {
     }
 }
 
-struct HomeCenterPinIndicator: View {
+struct HomeCenterPinMarker: View {
     var body: some View {
         VStack(spacing: 0) {
             Image("location_red")
