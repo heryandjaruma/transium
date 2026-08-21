@@ -30,6 +30,10 @@ struct HomeScreen: View {
 
     // MARK: - Go Mode State
     @StateObject private var geofenceMonitor = JourneyGeofenceMonitor()
+    /// Backs the real step count/calories submitted to POST /private/journey/{id}/complete —
+    /// see `finishJourneyIfNeeded`. Held here (rather than constructed inline) so its
+    /// `HKHealthStore` is created once per Go Mode session instead of on every view update.
+    @State private var healthKitStepService = HealthKitStepService()
     @State private var isStartingGoMode = false
     @State private var showGoMode = false
     @State private var goJourneyAttempt: JourneyAttempt? = nil
@@ -747,6 +751,7 @@ struct HomeScreen: View {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             isResumingOngoingTrip = true
         }
+        Task { await healthKitStepService.requestAuthorization() }
 
         Task {
             do {
@@ -805,6 +810,7 @@ struct HomeScreen: View {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             isStartingGoMode = true
         }
+        Task { await healthKitStepService.requestAuthorization() }
 
         Task {
             do {
@@ -883,6 +889,7 @@ struct HomeScreen: View {
     private func resumeCachedGoMode() {
         guard let attempt = goJourneyAttempt else { return }
         journeyConflict = nil
+        Task { await healthKitStepService.requestAuthorization() }
 
         geofenceMonitor.onRegionEntered = { [attemptId = attempt.id] stepId in
             handleGeofenceEntered(stepId: stepId, attemptId: attemptId)
@@ -1063,21 +1070,28 @@ struct HomeScreen: View {
         hasSubmittedJourneyCompletion = true
 
         let distanceMeters = activeJourney?.summary.distanceMeters ?? 0
-        // No HealthKit/CMPedometer integration yet — these are rough distance-based estimates,
-        // not real device measurements.
-        let estimatedSteps = Int((distanceMeters / 0.75).rounded())
-        let estimatedCalories = distanceMeters * 0.05
-
-        let request = CompleteJourneyRequest(
-            stepsTaken: estimatedSteps,
-            distanceMeters: distanceMeters,
-            calorie: estimatedCalories,
-            startPoint: activeJourney?.segments.first?.from?.name ?? "Start",
-            finishPoint: activeJourney?.destinationName ?? "Destination",
-            path: goPathBreadcrumb
-        )
+        let tripStartedAt = goJourneyAttempt?.startedAt ?? goJourneyAttempt?.createdAt ?? Date()
+        let startPoint = activeJourney?.segments.first?.from?.name ?? "Start"
+        let finishPoint = activeJourney?.destinationName ?? "Destination"
+        let path = goPathBreadcrumb
 
         Task {
+            // HealthKit records steps/energy passively in the background regardless of when
+            // this app requested read access, so one statistics query spanning the whole trip
+            // at completion time — rather than a live running total kept throughout — is
+            // enough to capture everything, including time spent backgrounded. Falls back to
+            // the old distance-based estimate (rather than failing the request) if HealthKit
+            // is unavailable, unauthorized, or the query errors for any reason.
+            let healthKitStats = await healthKitStepService.stats(from: tripStartedAt, to: Date())
+            let request = CompleteJourneyRequest(
+                stepsTaken: healthKitStats?.steps ?? Int((distanceMeters / 0.75).rounded()),
+                distanceMeters: distanceMeters,
+                calorie: healthKitStats?.calories ?? distanceMeters * 0.05,
+                startPoint: startPoint,
+                finishPoint: finishPoint,
+                path: path
+            )
+
             do {
                 let result = try await journeyService.completeJourney(attemptId: attemptId, request: request)
                 await MainActor.run {
