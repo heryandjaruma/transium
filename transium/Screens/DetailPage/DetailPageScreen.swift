@@ -359,11 +359,12 @@ struct DetailPlaceScreen: View {
             let detail = try await QuestService.shared.getKelurahanQuests(id: kelurahan.id)
             self.activeKelurahan = detail.kelurahan
             
+            // Prioritize kelurahan's own thumbnails for carousel, followed by quest thumbnails
+            let kelurahanThumbs = detail.kelurahan.thumbnails.map(\.url)
+            let questThumbs = detail.quests.flatMap { $0.thumbnails.map(\.url) }
+            headerImageUrls = !kelurahanThumbs.isEmpty ? kelurahanThumbs : questThumbs
+            
             if !detail.quests.isEmpty {
-                // Collect header carousel thumbnails from all quests in this kelurahan
-                let allThumbUrls = detail.quests.flatMap { $0.thumbnails.map { $0.url } }
-                headerImageUrls = allThumbUrls
-                
                 var loaded: [Quest] = []
                 for (index, q) in detail.quests.enumerated() {
                     let theme: QuestTheme = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .red : .green)

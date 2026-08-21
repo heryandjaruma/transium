@@ -14,6 +14,7 @@ public nonisolated struct Quest: Codable, Identifiable, Sendable, Equatable {
     public let xp: Int?
     public let label: String?
     public let thumbnails: [MediaAsset]
+    public let distanceMeters: Double?
 
     public init(
         id: String,
@@ -22,7 +23,8 @@ public nonisolated struct Quest: Codable, Identifiable, Sendable, Equatable {
         description: String,
         xp: Int? = nil,
         label: String? = nil,
-        thumbnails: [MediaAsset] = []
+        thumbnails: [MediaAsset] = [],
+        distanceMeters: Double? = nil
     ) {
         self.id = id
         self.name = name
@@ -31,6 +33,7 @@ public nonisolated struct Quest: Codable, Identifiable, Sendable, Equatable {
         self.xp = xp
         self.label = label
         self.thumbnails = thumbnails
+        self.distanceMeters = distanceMeters
     }
 }
 

@@ -16,10 +16,20 @@ public protocol QuestServiceProtocol: Sendable {
     func listQuestBadges(id: String) async throws -> [QuestBadgeEntry]
     
     /// Returns each kelurahan that has at least one reachable quest paired with those quests.
-    func listKelurahanQuests() async throws -> [KelurahanQuestsGroup]
+    func listKelurahanQuests(origin: String?) async throws -> [KelurahanQuestsGroup]
     
     /// Returns the quests reachable in a specific kelurahan with badges.
-    func getKelurahanQuests(id: String) async throws -> KelurahanDetailQuestsResponse
+    func getKelurahanQuests(id: String, origin: String?) async throws -> KelurahanDetailQuestsResponse
+}
+
+extension QuestServiceProtocol {
+    public func listKelurahanQuests() async throws -> [KelurahanQuestsGroup] {
+        try await listKelurahanQuests(origin: nil)
+    }
+
+    public func getKelurahanQuests(id: String) async throws -> KelurahanDetailQuestsResponse {
+        try await getKelurahanQuests(id: id, origin: nil)
+    }
 }
 
 public final class QuestService: QuestServiceProtocol, Sendable {
@@ -64,24 +74,32 @@ public final class QuestService: QuestServiceProtocol, Sendable {
         return response.questBadges
     }
 
-    public func listKelurahanQuests() async throws -> [KelurahanQuestsGroup] {
+    public func listKelurahanQuests(origin: String? = nil) async throws -> [KelurahanQuestsGroup] {
+        var queryItems: [URLQueryItem]? = nil
+        if let origin, !origin.isEmpty {
+            queryItems = [URLQueryItem(name: "origin", value: origin)]
+        }
         let response: KelurahanQuestGroupsResponse = try await apiClient.request(
-            path: "/kelurahan/quests",
+            path: "/private/kelurahan/quest",
             method: .get,
-            queryItems: nil,
+            queryItems: queryItems,
             body: nil,
-            requiresAuth: false
+            requiresAuth: true
         )
         return response.groups
     }
 
-    public func getKelurahanQuests(id: String) async throws -> KelurahanDetailQuestsResponse {
+    public func getKelurahanQuests(id: String, origin: String? = nil) async throws -> KelurahanDetailQuestsResponse {
+        var queryItems: [URLQueryItem]? = nil
+        if let origin, !origin.isEmpty {
+            queryItems = [URLQueryItem(name: "origin", value: origin)]
+        }
         return try await apiClient.request(
-            path: "/kelurahan/\(id)/quests",
+            path: "/private/kelurahan/\(id)/quest",
             method: .get,
-            queryItems: nil,
+            queryItems: queryItems,
             body: nil,
-            requiresAuth: false
+            requiresAuth: true
         )
     }
 }

@@ -482,7 +482,8 @@ struct HomeScreen: View {
     
     private func fetchKelurahanGroups() async {
         do {
-            let groups = try await QuestService.shared.listKelurahanQuests()
+            let originParam = "\(resolvedCurrentLocation.coordinate.latitude),\(resolvedCurrentLocation.coordinate.longitude)"
+            let groups = try await QuestService.shared.listKelurahanQuests(origin: originParam)
             let validGroups = groups.filter { !$0.quests.isEmpty }
             if !validGroups.isEmpty {
                 kelurahanGroups = validGroups
@@ -542,8 +543,13 @@ struct HomeScreen: View {
     }
 
     private func distanceText(for group: KelurahanQuestsGroup) -> String {
-        let destination = coordinateForKelurahan(group.kelurahan)
-        let distanceInMeters = resolvedCurrentLocation.distance(from: destination)
+        let distanceInMeters: Double
+        if let dist = group.quests.first?.distanceMeters {
+            distanceInMeters = dist
+        } else {
+            let destination = coordinateForKelurahan(group.kelurahan)
+            distanceInMeters = resolvedCurrentLocation.distance(from: destination)
+        }
         let km = distanceInMeters / 1000.0
         
         if km < 1.0 {
@@ -1353,10 +1359,10 @@ struct HomeScreen: View {
                             
                             TransiumTicketCard(
                                 title: group.kelurahan.kelurahanName,
-                                subtitle: group.quests.first?.description ?? "\(group.kelurahan.kecamatanName), Bali",
+                                subtitle: group.kelurahan.description ?? group.quests.first?.description ?? "\(group.kelurahan.kecamatanName), Bali",
                                 distance: distanceText(for: group),
                                 price: "Rp. 4,4k",
-                                imageUrl: group.quests.first?.thumbnails.first?.url,
+                                imageUrl: group.kelurahan.thumbnails.first?.url ?? group.quests.first?.thumbnails.first?.url,
                                 fallbackImageName: isRecommended ? "kintamani" : "sanoored",
                                 variant: variant
                             )
