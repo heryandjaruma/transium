@@ -113,18 +113,23 @@ struct LocalBaliMapView: UIViewRepresentable {
             abs($0.latitude - displayLocation.coordinate.latitude) > 0.0001 ||
             abs($0.longitude - displayLocation.coordinate.longitude) > 0.0001
         } ?? true
-        
-        // Only auto-center if no active journey path is present
-        if activeJourney == nil {
-            if shouldCenterForNewLocation || context.coordinator.lastCenterRequestID != centerRequestID {
-                context.coordinator.lastCenterRequestID = centerRequestID
-                context.coordinator.lastCenteredCoordinate = displayLocation.coordinate
-                mapView.setCenter(
-                    displayLocation.coordinate,
-                    zoomLevel: 15.5,
-                    animated: true
-                )
-            }
+
+        let isExplicitFocusRequest = context.coordinator.lastCenterRequestID != centerRequestID
+
+        // Passive re-centering (tracking the user's dot as it moves) is suppressed once a
+        // journey is active, so the camera doesn't keep fighting a manual pan/zoom while
+        // reviewing the route/trip. An explicit tap on the "focus"/"locate" button
+        // (`centerRequestID` bump, from Navigation Mode's journey overview or Go Mode's own
+        // top bar) is a direct request, not passive tracking, so it should always recenter on
+        // the user regardless of whether a journey is active.
+        if isExplicitFocusRequest || (activeJourney == nil && shouldCenterForNewLocation) {
+            context.coordinator.lastCenterRequestID = centerRequestID
+            context.coordinator.lastCenteredCoordinate = displayLocation.coordinate
+            mapView.setCenter(
+                displayLocation.coordinate,
+                zoomLevel: 15.5,
+                animated: true
+            )
         }
     }
     
