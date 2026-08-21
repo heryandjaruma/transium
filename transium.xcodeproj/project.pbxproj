@@ -290,7 +290,7 @@
 				CODE_SIGN_ENTITLEMENTS = transium/transium.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 9VBW89A4U3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -299,6 +299,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Transium needs camera access to capture memories throughout your Journey.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Transium reads your steps count and calories from Health to summarize your journey.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Transium does not use Health data. This description is required because a linked library references HealthKit APIs.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Transium needs background location access to detect when you arrive at a quest checkpoint, even while the app isn't open.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Transium uses your location to show where you are on the Bali transit map.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Transium needs Galery access to import images.";
@@ -338,7 +339,7 @@
 				CODE_SIGN_ENTITLEMENTS = transium/transium.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 9VBW89A4U3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -347,6 +348,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Transium needs camera access to capture memories throughout your Journey.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Transium reads your steps count and calories from Health to summarize your journey.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Transium does not use Health data. This description is required because a linked library references HealthKit APIs.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Transium needs background location access to detect when you arrive at a quest checkpoint, even while the app isn't open.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Transium uses your location to show where you are on the Bali transit map.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Transium needs Galery access to import images.";
