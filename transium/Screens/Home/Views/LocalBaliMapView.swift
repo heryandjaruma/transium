@@ -353,7 +353,7 @@ struct LocalBaliMapView: UIViewRepresentable {
             if let previousLoc = lastRenderedLocation {
                 let distance = previousLoc.distance(from: location)
                 if distance < 5.0 {
-                    // Update only compass heading, avoid coordinate jitter
+                    // Update only compass heading smoothly, avoid coordinate jitter
                     userAnnotation.heading = heading
                     if let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView {
                         userView.updateHeading(heading, animated: true)
@@ -363,13 +363,18 @@ struct LocalBaliMapView: UIViewRepresentable {
             }
             
             lastRenderedLocation = location
-            userAnnotation.coordinate = location.coordinate
             userAnnotation.heading = heading
             
             if mapView.annotations?.contains(where: { $0 === userAnnotation }) != true {
+                userAnnotation.coordinate = location.coordinate
                 mapView.addAnnotation(userAnnotation)
-            } else if let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView {
-                userView.updateHeading(heading, animated: true)
+            } else {
+                UIView.animate(withDuration: 0.6, delay: 0, options: [.beginFromCurrentState, .curveEaseInOut]) {
+                    self.userAnnotation.coordinate = location.coordinate
+                }
+                if let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView {
+                    userView.updateHeading(heading, animated: true)
+                }
             }
         }
         
@@ -930,7 +935,9 @@ struct LocalBaliMapView: UIViewRepresentable {
         private let outerPulseView = UIView()
         private let innerPulseView = UIView()
         private let coreView = UIView()
+        private let arrowContainerView = UIView()
         private let arrowLayer = CAShapeLayer()
+        private var currentHeadingAngle: CGFloat = 0
         
         override init(reuseIdentifier: String?) {
             super.init(reuseIdentifier: reuseIdentifier)
@@ -963,12 +970,16 @@ struct LocalBaliMapView: UIViewRepresentable {
             coreView.layer.shadowOffset = CGSize(width: 0, height: 2)
             addSubview(coreView)
             
+            arrowContainerView.frame = CGRect(x: 0, y: 0, width: 30, height: 30)
+            arrowContainerView.backgroundColor = .clear
+            coreView.addSubview(arrowContainerView)
+            
             arrowLayer.fillColor = UIColor.white.cgColor
             arrowLayer.path = Self.arrowPath(in: CGRect(x: 0, y: 0, width: 14, height: 14)).cgPath
             arrowLayer.bounds = CGRect(x: 0, y: 0, width: 14, height: 14)
             arrowLayer.position = CGPoint(x: 15, y: 15)
             arrowLayer.contentsScale = traitCollection.displayScale > 0 ? traitCollection.displayScale : 2.0
-            coreView.layer.addSublayer(arrowLayer)
+            arrowContainerView.layer.addSublayer(arrowLayer)
             startPulseIfNeeded()
         }
         
@@ -988,13 +999,25 @@ struct LocalBaliMapView: UIViewRepresentable {
         }
         
         func updateHeading(_ heading: CLLocationDirection, animated: Bool = true) {
-            let radians = CGFloat(heading * .pi / 180)
+            let targetRadians = CGFloat(heading * .pi / 180)
+            var delta = (targetRadians - currentHeadingAngle).truncatingRemainder(dividingBy: 2 * .pi)
+            if delta > .pi { delta -= 2 * .pi }
+            if delta < -.pi { delta += 2 * .pi }
+            
+            // Ignore micro-tremors under ~2 degrees (0.035 rad)
+            if abs(delta) < 0.035 { return }
+            
+            currentHeadingAngle += delta
             if animated {
-                UIView.animate(withDuration: 0.25, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
-                    self.arrowLayer.setAffineTransform(CGAffineTransform(rotationAngle: radians))
+                UIView.animate(
+                    withDuration: 0.35,
+                    delay: 0,
+                    options: [.beginFromCurrentState, .curveEaseOut, .allowUserInteraction]
+                ) {
+                    self.arrowContainerView.transform = CGAffineTransform(rotationAngle: self.currentHeadingAngle)
                 }
             } else {
-                arrowLayer.setAffineTransform(CGAffineTransform(rotationAngle: radians))
+                arrowContainerView.transform = CGAffineTransform(rotationAngle: currentHeadingAngle)
             }
         }
         

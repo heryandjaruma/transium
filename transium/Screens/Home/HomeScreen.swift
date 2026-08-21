@@ -495,7 +495,7 @@ struct HomeScreen: View {
         }
     }
     
-    private var resolvedCurrentLocation: CLLocation? {
+    private var resolvedCurrentLocation: CLLocation {
         if let previewLocation {
             return previewLocation
         }
@@ -689,7 +689,7 @@ struct HomeScreen: View {
         
         Task {
             do {
-                let originCoordinate = resolvedCurrentLocation?.coordinate ?? CLLocationCoordinate2D(latitude: -8.702105, longitude: 115.176189)
+                let originCoordinate = resolvedCurrentLocation.coordinate
                 
                 let targetQuestId: String? = {
                     if let questId { return questId }
@@ -1298,15 +1298,15 @@ struct HomeScreen: View {
                         VStack(alignment: .leading, spacing: 0) {
                             if isRecommended {
                                 recommendedBadge
-                                    .padding(.leading, 12)
-                                    .padding(.bottom, -1)
+                                    .padding(.leading, 10)
+                                    .padding(.bottom, -8)
                                     .zIndex(1)
                             }
                             
                             TransiumTicketCard(
                                 title: group.kelurahan.kelurahanName,
                                 subtitle: group.quests.first?.description ?? "\(group.kelurahan.kecamatanName), Bali",
-                                distance: "11 km",
+                                distance: distanceText(for: group),
                                 price: "Rp. 4,4k",
                                 imageUrl: group.quests.first?.thumbnails.first?.url,
                                 fallbackImageName: isRecommended ? "kintamani" : "Beach",
@@ -1332,8 +1332,8 @@ struct HomeScreen: View {
                         VStack(alignment: .leading, spacing: 0) {
                             if isRecommended {
                                 recommendedBadge
-                                    .padding(.leading, 12)
-                                    .padding(.bottom, -1)
+                                    .padding(.leading, 10)
+                                    .padding(.bottom, -8)
                                     .zIndex(1)
                             }
 
