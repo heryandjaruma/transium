@@ -13,14 +13,13 @@ struct HomeScreen: View {
     @State private var mapCenterRequestID = 0
     @Environment(\.scenePhase) private var scenePhase
     private let previewLocation: CLLocation?
-    private let baliFallbackLocation = CLLocation(latitude: -8.73704, longitude: 115.17570)
+    private let journeyService = JourneyService.shared
 
-    // MARK: - Journey State
+    // MARK: - Journey & Navigation State
     @State private var activeJourney: JourneyResult? = nil
     @State private var activeQuestId: String? = nil
     @State private var isFetchingJourney = false
     @State private var showNavigationSheet = false
-    private let journeyService = JourneyService.shared
 
     // MARK: - Ongoing Trip State
     @State private var ongoingJourneyAttempt: JourneyAttempt? = nil
@@ -30,9 +29,7 @@ struct HomeScreen: View {
 
     // MARK: - Go Mode State
     @StateObject private var geofenceMonitor = JourneyGeofenceMonitor()
-    /// Backs the real step count/calories submitted to POST /private/journey/{id}/complete —
-    /// see `finishJourneyIfNeeded`. Held here (rather than constructed inline) so its
-    /// `HKHealthStore` is created once per Go Mode session instead of on every view update.
+    @StateObject private var randomPhotoOpMonitor = JourneyGeofenceMonitor()
     @State private var healthKitStepService = HealthKitStepService()
     @State private var isStartingGoMode = false
     @State private var showGoMode = false
@@ -43,36 +40,14 @@ struct HomeScreen: View {
     @State private var isCancelingJourney = false
     @State private var journeyConflict: JourneyStartConflictError? = nil
     @State private var isJourneyConflictPresented = false
-    /// The raw POST /private/journey/go response, kept only when this Go Mode session actually
-    /// started that way — nil when it was entered via `resumeOngoingTrip()` instead, since that
-    /// path never hits /go. Backs GoTripDetailsPanel's debug "show /go response" button.
     @State private var goStartDebugResult: JourneyGoResult? = nil
-    /// Set the instant a geofence fires for a photo-capture step (see `handleGeofenceEntered`,
-    /// `JourneyAttemptStep.isPhotoCheckpoint`) — drives `CameraScreen`'s
-    /// `.fullScreenCover(item:)` so the camera pops up immediately, including while the app was
-    /// backgrounded when the region trigger came in (UIKit defers the presentation itself
-    /// until the app is foreground again). `advanceJourney` still fires independently of this
-    /// — arrival alone marks the step done regardless of whether a photo actually gets taken.
     @State private var pendingPhotoStep: JourneyAttemptStep? = nil
-    /// The device's recorded breadcrumb for the current Go Mode session — submitted as `path`
-    /// in POST /private/journey/{id}/complete. Appended to on every live location update while
-    /// Go Mode is active (LocationStore already throttles those to real ~5m movement), reset at
-    /// the start of a fresh/replanned session, left alone across a same-session conflict-resume.
     @State private var goPathBreadcrumb: [JourneyPathPointInput] = []
-    /// Guards against submitting POST /private/journey/{id}/complete more than once per attempt
-    /// — every step reaching "done" is detected from each /advance response, which can fire
-    /// more than once in a row (e.g. two geofences resolving close together).
     @State private var hasSubmittedJourneyCompletion = false
-    /// Set once POST /private/journey/{id}/complete succeeds — drives
-    /// JourneyCompletionSummaryScreen's `.fullScreenCover(item:)`.
     @State private var journeyCompletionResult: JourneyCompleteResult? = nil
-    /// A second, independent geofence layer for `RandomPhotoOpPlanner`'s spontaneous keepsake
-    /// points — deliberately separate from `geofenceMonitor` so this purely-cosmetic feature
-    /// can never call `advanceJourney` or otherwise touch real quest-step progress.
-    @StateObject private var randomPhotoOpMonitor = JourneyGeofenceMonitor()
     @State private var isRandomPhotoOpPresented = false
 
-    // MARK: - Search & Profile State
+    // MARK: - Search, Sheet & Menu State
     @State private var isSearchPresented = false
     @State private var isProfilePresented = false
     @State private var isDetailPresented = false
@@ -82,28 +57,14 @@ struct HomeScreen: View {
     @State private var sheetState: SearchSheetState = .searching
     @State private var sheetDetent: PresentationDetent = .large
     @State private var searchText = ""
-    /// A manually chosen "current location" — from the search sheet's pinning flow — that
-    /// `resolvedCurrentLocation` prefers over real GPS everywhere (map display, journey
-    /// planning). `nil` means "use real GPS," the default. Deliberately app-wide per product
-    /// intent, but Go Mode itself refuses to start while this is set (see `startGoMode`) since
-    /// its whole geofence-tracking mechanism assumes the user is actually where they say they
-    /// are.
+
+    // MARK: - Pinning & Location Override State
     @State private var manualLocationOverride: CLLocationCoordinate2D?
     @State private var manualLocationOverrideLabel: String?
-    /// Drives the "Go requires your real location" alert `startGoMode` shows when
-    /// `manualLocationOverride` is set.
     @State private var isLocationOverrideBlockingGoPresented = false
-    /// A coordinate to animate the map's pin-drop camera to once — set when entering pinning
-    /// mode (a picked search result, or the pinning overlay's own locate button), read by
-    /// `LocalBaliMapView.pinFocusCoordinate`.
     @State private var pinFocusCoordinate: CLLocationCoordinate2D?
-    /// The map's live center coordinate while pinning, reported by
-    /// `LocalBaliMapView.onPinCenterChanged` as the user drags — what "Set Starting Point"
-    /// actually captures.
     @State private var pinnedCoordinate: CLLocationCoordinate2D?
     @State private var pinnedAddressLabel = "Locating address..."
-    /// Debounces `pinnedCoordinate` changes into a GET /maps/reverse-geocode call — cancelled
-    /// and restarted on every drag update rather than firing one per frame.
     @State private var reverseGeocodeTask: Task<Void, Never>?
     @State private var resolvedAddressLabel: String? = nil
 
@@ -112,122 +73,32 @@ struct HomeScreen: View {
     @State private var isTogglingBookmark: Bool = false
     @State private var kelurahanGroups: [KelurahanQuestsGroup] = []
     @State private var selectedKelurahan: Kelurahan = Kelurahan(id: "7760985", kelurahanName: "Benoa", kecamatanName: "Kuta Selatan")
-    
+
+    private static let segmentArrivalProximityMeters: Double = 69
+    private static let autoCameraGracePeriodSeconds: Double = 5
+
     init(previewLocation: CLLocation? = nil) {
         self.previewLocation = previewLocation
     }
-    
+
     var body: some View {
         ZStack(alignment: .bottom) {
-            LocalBaliMapView(
-                displayLocation: resolvedCurrentLocation,
-                markerHeading: previewLocation == nil ? locationStore.currentHeading : 22,
-                centerRequestID: mapCenterRequestID,
-                activeJourney: activeJourney,
-                checkpoints: goGeofences,
-                isGoMode: showGoMode,
-                isPinning: isSearchPresented && sheetState == .pinning,
-                pinFocusCoordinate: pinFocusCoordinate,
-                onPinCenterChanged: { coordinate in
-                    pinnedCoordinate = coordinate
-                    scheduleReverseGeocode(for: coordinate)
-                }
-            )
-            .ignoresSafeArea()
+            mapLayer
             
             if isMenuExpanded {
-                Color.clear
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isMenuExpanded = false
-                        }
-                    }
+                menuDismissBackdrop
             }
             
             if let journey = activeJourney, showGoMode {
-                // MARK: - Go Mode (real journey in progress)
-                GoComponentMode(
-                    journey: journey,
-                    currentSegmentIndex: goCurrentSegmentIndex,
-                    steps: goJourneySteps,
-                    currentLocation: locationStore.currentLocation?.coordinate,
-                    geofenceMonitor: geofenceMonitor,
-                    goStartResult: goStartDebugResult,
-                    onBack: { endGoMode() },
-                    onEnd: { endGoMode(cancelAttempt: true) },
-                    onLocate: { mapCenterRequestID += 1 },
-                    onManualAdvance: { stepId in
-                        guard let attemptId = goJourneyAttempt?.id else { return }
-                        handleGeofenceEntered(stepId: stepId, attemptId: attemptId, isManualConfirmation: true)
-                    }
-                )
-                .transition(.opacity)
+                goModeLayer(journey: journey)
             } else if let journey = activeJourney, showNavigationSheet {
-                // MARK: - Navigation Mode
-                VStack {
-                    navigationTopBar
-                    Spacer()
-                }
-                
-                navigationBottomStack(journey: journey)
+                navigationModeLayer(journey: journey)
             } else {
-                // MARK: - Explore Mode
-                VStack(spacing: 0) {
-                    // Top Search Bar, Locate, Quick Menu & Profile Controls
-                    HStack(spacing: 10) {
-//                        searchBarTrigger
-                        quickMenu
-                    }
-                    .padding(.top, 6)
-                    .padding(.horizontal, 20)
-
-                    if showOngoingTripCard, let attempt = ongoingJourneyAttempt {
-                        HStack {
-                            OngoingTripCard(questName: attempt.questName ?? "Ongoing Trip") {
-                                resumeOngoingTrip()
-                            }
-                            Spacer()
-                        }
-                        .padding(.top, 14)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                        .disabled(isResumingOngoingTrip)
-                    }
-
-                    Spacer()
-                    
-                    if !isSearchPresented {
-                        bottomMapContent
-                            .ignoresSafeArea(edges: .bottom)
-                    }
-                }
-                
-                // Pinning mode overlay controls
-                if isSearchPresented && sheetState == .pinning {
-                    pinningOverlayControls
-                    centerPinIndicator
-                }
+                exploreModeLayer
             }
             
             if isDetailPresented {
-                DetailPlaceScreen(
-                    kelurahan: selectedKelurahan,
-                    initialQuests: [],
-                    onBack: {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            isDetailPresented = false
-                        }
-                    },
-                    onStartQuest: { questId in
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            isDetailPresented = false
-                        }
-                        doQuest(questId: questId)
-                    }
-                )
-                .transition(.move(edge: .trailing))
-                .zIndex(100)
+                detailOverlay
             }
 
             if isStartingGoMode || isFetchingJourney || isResumingOngoingTrip {
@@ -256,16 +127,9 @@ struct HomeScreen: View {
             advanceGoSegmentIfNeeded()
             reverseGeocodeCurrentLocation()
         }
-        // A mission segment only advances once its matched step reaches `.done` (see
-        // `advanceGoSegmentIfNeeded`), which happens here — via `handleGeofenceEntered`
-        // updating `goJourneySteps` — rather than through a location change.
         .onChange(of: goJourneySteps) { _, _ in advanceGoSegmentIfNeeded() }
         .preferredColorScheme(.light)
-        .alert(
-            "Journey Already in Progress",
-            isPresented: $isJourneyConflictPresented,
-            presenting: journeyConflict
-        ) { conflict in
+        .alert("Journey Already in Progress", isPresented: $isJourneyConflictPresented, presenting: journeyConflict) { conflict in
             if canResumeLocally(conflict) {
                 Button("Resume Journey") { resumeCachedGoMode() }
             }
@@ -276,10 +140,7 @@ struct HomeScreen: View {
         } message: { conflict in
             Text(conflict.message)
         }
-        .alert(
-            "Go Requires Your Real Location",
-            isPresented: $isLocationOverrideBlockingGoPresented
-        ) {
+        .alert("Go Requires Your Real Location", isPresented: $isLocationOverrideBlockingGoPresented) {
             Button("Use My Current Location") {
                 manualLocationOverride = nil
                 manualLocationOverrideLabel = nil
@@ -305,31 +166,7 @@ struct HomeScreen: View {
             })
         }
         .sheet(isPresented: $isSearchPresented, onDismiss: resetSheetState) {
-            SearchSheetView(
-                state: $sheetState,
-                searchText: $searchText,
-                pinnedAddressLabel: pinnedAddressLabel,
-                onSelectLocation: { coordinate, label in
-                    beginPinning(at: coordinate, label: label)
-                },
-                onConfirmStartingPoint: {
-                    manualLocationOverride = pinnedCoordinate
-                    manualLocationOverrideLabel = pinnedAddressLabel
-                    isSearchPresented = false
-                },
-                onUseCurrentLocation: {
-                    manualLocationOverride = nil
-                    manualLocationOverrideLabel = nil
-                    isSearchPresented = false
-                },
-                onCancel: { isSearchPresented = false }
-            )
-            .presentationDetents([.fraction(0.38), .large], selection: $sheetDetent)
-            .presentationDragIndicator(.hidden)
-            .interactiveDismissDisabled(false)
-            .onChange(of: sheetDetent) { _, newDetent in
-                sheetState = (newDetent == .large) ? .searching : .pinning
-            }
+            searchSheetContent
         }
         .sheet(isPresented: $isProfilePresented) {
             ProfileScreen()
@@ -341,158 +178,204 @@ struct HomeScreen: View {
             SavedQuestScreen()
         }
     }
-    
-    // MARK: - Three Dots
-    
-    private var quickMenu: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            TransiumIconButton(
-                systemName: isMenuExpanded ? "xmark" : "ellipsis",
-                accessibilityLabel: "Menu",
-                size: 44
-            ) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                    isMenuExpanded.toggle()
-                }
+
+    // MARK: - View Layers
+
+    private var mapLayer: some View {
+        LocalBaliMapView(
+            displayLocation: resolvedCurrentLocation,
+            markerHeading: previewLocation == nil ? locationStore.currentHeading : 22,
+            centerRequestID: mapCenterRequestID,
+            activeJourney: activeJourney,
+            checkpoints: goGeofences,
+            isGoMode: showGoMode,
+            isPinning: isSearchPresented && sheetState == .pinning,
+            pinFocusCoordinate: pinFocusCoordinate,
+            onPinCenterChanged: { coordinate in
+                pinnedCoordinate = coordinate
+                scheduleReverseGeocode(for: coordinate)
             }
-            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-            
-            if isMenuExpanded {
-                TransiumIconButton(
-                    systemName: "gearshape.fill",
-                    accessibilityLabel: "Settings",
-                    size: 44
-                ) {
-                    withAnimation { isMenuExpanded = false }
-                    isSettingsPresented = true
-                }
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                .transition(.scale.combined(with: .opacity))
-                
-                TransiumIconButton(
-                    systemName: "person.crop.circle.fill",
-                    accessibilityLabel: "Profile Button",
-                    size: 44
-                ) {
-                    isProfilePresented = true
-                }
-                
-                TransiumIconButton(
-                    systemName: "bookmark.fill",
-                    accessibilityLabel: "Saved quests",
-                    size: 44
-                ) {
-                    withAnimation { isMenuExpanded = false }
-                    isSavedQuestPresented = true
-                }
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                .transition(.scale.combined(with: .opacity))
-            }
-            
-            TransiumIconButton(
-                icon: .asset("focus"),
-                accessibilityLabel: "Center map on your location",
-                size: 44
-            ) {
-                mapCenterRequestID += 1
-            }
-            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-        }
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        )
+        .ignoresSafeArea()
     }
 
-    private var navigationTopBar: some View {
-        HStack {
-            TransiumIconButton(
-                systemName: "arrow.left",
-                accessibilityLabel: "Back",
-                size: 44
-            ) {
-                exitToExploreMode()
+    private var menuDismissBackdrop: some View {
+        Color.clear
+            .ignoresSafeArea()
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isMenuExpanded = false
+                }
             }
-            
-            Spacer()
-
-            HStack(spacing: 12) {
-                if goJourneyAttempt != nil {
-                    TransiumIconButton(
-                        systemName: "xmark",
-                        accessibilityLabel: "Cancel journey",
-                        backgroundColor: TransiumColor.lightRed,
-                        foregroundColor: .white,
-                        size: 44
-                    ) {
-                        cancelActiveJourneyAttempt()
-                    }
-                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                    .disabled(isCancelingJourney)
-                }
-
-                TransiumIconButton(
-                    systemName: isCurrentJourneyBookmarked ? "bookmark.fill" : "bookmark",
-                    accessibilityLabel: isCurrentJourneyBookmarked ? "Remove bookmark" : "Save route",
-                    foregroundColor: isCurrentJourneyBookmarked ? TransiumColor.primaryBlue : .black,
-                    size: 44
-                ) {
-                    toggleBookmarkForCurrentJourney()
-                }
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                .disabled(isTogglingBookmark)
-
-                TransiumIconButton(
-                    systemName: "square.and.arrow.up",
-                    accessibilityLabel: "Share route",
-                    size: 44
-                ) {
-                    AppToastCenter.shared.showSuccess(title: "Shared", message: "Route link copied.")
-                }
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                
-                TransiumIconButton(
-                    icon: .asset("focus"),
-                    accessibilityLabel: "Center map on route",
-                    size: 44
-                ) {
-                    mapCenterRequestID += 1
-                }
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-            }
-        }
-        .padding(.top, 6)
-        .padding(.horizontal, 20)
     }
 
-    private func navigationBottomStack(journey: JourneyResult) -> some View {
-        VStack(spacing: 0) {
-            HStack {
+    private func goModeLayer(journey: JourneyResult) -> some View {
+        GoComponentMode(
+            journey: journey,
+            currentSegmentIndex: goCurrentSegmentIndex,
+            steps: goJourneySteps,
+            currentLocation: locationStore.currentLocation?.coordinate,
+            geofenceMonitor: geofenceMonitor,
+            goStartResult: goStartDebugResult,
+            onBack: { endGoMode() },
+            onEnd: { endGoMode(cancelAttempt: true) },
+            onLocate: { mapCenterRequestID += 1 },
+            onManualAdvance: { stepId in
+                guard let attemptId = goJourneyAttempt?.id else { return }
+                handleGeofenceEntered(stepId: stepId, attemptId: attemptId, isManualConfirmation: true)
+            }
+        )
+        .transition(.opacity)
+    }
+
+    private func navigationModeLayer(journey: JourneyResult) -> some View {
+        ZStack(alignment: .bottom) {
+            VStack {
+                HomeNavigationTopBar(
+                    hasActiveAttempt: goJourneyAttempt != nil,
+                    isCancelingJourney: isCancelingJourney,
+                    isBookmarked: isCurrentJourneyBookmarked,
+                    isTogglingBookmark: isTogglingBookmark,
+                    onBack: { exitToExploreMode() },
+                    onCancelAttempt: { cancelActiveJourneyAttempt() },
+                    onToggleBookmark: { toggleBookmarkForCurrentJourney() },
+                    onShare: {
+                        AppToastCenter.shared.showSuccess(title: "Shared", message: "Route link copied.")
+                    },
+                    onLocate: { mapCenterRequestID += 1 }
+                )
                 Spacer()
-                Button(action: { startGoMode() }) {
-                    HStack(spacing: 8) {
-                        Text("Go")
-                            .font(TransiumFont.body(17, weight: .bold))
-                        Image(systemName: "chevron.right.2")
-                            .font(.system(size: 14, weight: .bold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 14)
-                    .background(Color(red: 0.24, green: 0.65, blue: 0.44))
-                    .cornerRadius(28)
-                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                }
-                .disabled(isStartingGoMode)
-                .padding(.trailing, 20)
-                .padding(.bottom, 16)
             }
             
-            NavigationBottomSheet(journey: journey, onBack: {
-                exitToExploreMode()
-            })
+            HomeNavigationBottomStack(
+                journey: journey,
+                isStartingGoMode: isStartingGoMode,
+                onStartGo: { startGoMode() },
+                onBack: { exitToExploreMode() }
+            )
         }
-        .ignoresSafeArea(edges: .bottom)
-        .transition(.move(edge: .bottom))
     }
-    
+
+    private var exploreModeLayer: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                HomeQuickMenuView(
+                    isMenuExpanded: $isMenuExpanded,
+                    onSettings: { isSettingsPresented = true },
+                    onProfile: { isProfilePresented = true },
+                    onSavedQuests: { isSavedQuestPresented = true },
+                    onLocate: { mapCenterRequestID += 1 }
+                )
+            }
+            .padding(.top, 6)
+            .padding(.horizontal, 20)
+
+            if showOngoingTripCard, let attempt = ongoingJourneyAttempt {
+                HStack {
+                    OngoingTripCard(questName: attempt.questName ?? "Ongoing Trip") {
+                        resumeOngoingTrip()
+                    }
+                    Spacer()
+                }
+                .padding(.top, 14)
+                .transition(.move(edge: .leading).combined(with: .opacity))
+                .disabled(isResumingOngoingTrip)
+            }
+
+            Spacer()
+            
+            if !isSearchPresented {
+                HomeBottomTicketCarousel(
+                    kelurahanGroups: kelurahanGroups,
+                    visibleTicketPage: $visibleTicketPage,
+                    currentLocationLabel: currentLocationText,
+                    currentLocation: resolvedCurrentLocation,
+                    onSelectKelurahan: { kelurahan in
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            selectedKelurahan = kelurahan
+                            isDetailPresented = true
+                        }
+                    },
+                    onEditLocation: { presentSearchSheet(in: .searching) }
+                )
+                .ignoresSafeArea(edges: .bottom)
+            }
+            
+            if isSearchPresented && sheetState == .pinning {
+                HomePinningOverlayControls(
+                    onBack: { isSearchPresented = false },
+                    onLocate: {
+                        guard let coordinate = locationStore.currentLocation?.coordinate else { return }
+                        pinFocusCoordinate = coordinate
+                    }
+                )
+                HomeCenterPinIndicator()
+            }
+        }
+    }
+
+    private var detailOverlay: some View {
+        DetailPlaceScreen(
+            kelurahan: selectedKelurahan,
+            initialQuests: [],
+            onBack: {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    isDetailPresented = false
+                }
+            },
+            onStartQuest: { questId in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    isDetailPresented = false
+                }
+                doQuest(questId: questId)
+            }
+        )
+        .transition(.move(edge: .trailing))
+        .zIndex(100)
+    }
+
+    private var searchSheetContent: some View {
+        SearchSheetView(
+            state: $sheetState,
+            searchText: $searchText,
+            pinnedAddressLabel: pinnedAddressLabel,
+            onSelectLocation: { coordinate, label in
+                beginPinning(at: coordinate, label: label)
+            },
+            onConfirmStartingPoint: {
+                manualLocationOverride = pinnedCoordinate
+                manualLocationOverrideLabel = pinnedAddressLabel
+                isSearchPresented = false
+            },
+            onUseCurrentLocation: {
+                manualLocationOverride = nil
+                manualLocationOverrideLabel = nil
+                isSearchPresented = false
+            },
+            onCancel: { isSearchPresented = false }
+        )
+        .presentationDetents([.fraction(0.38), .large], selection: $sheetDetent)
+        .presentationDragIndicator(.hidden)
+        .interactiveDismissDisabled(false)
+        .onChange(of: sheetDetent) { _, newDetent in
+            sheetState = (newDetent == .large) ? .searching : .pinning
+        }
+    }
+
+    // MARK: - Location & Kelurahan Logistics
+
+    private var resolvedCurrentLocation: CLLocation {
+        if let previewLocation { return previewLocation }
+        if let manualLocationOverride {
+            return CLLocation(latitude: manualLocationOverride.latitude, longitude: manualLocationOverride.longitude)
+        }
+        if let currentLocation = locationStore.currentLocation, currentLocation.coordinate.isWithinBaliRegion {
+            return currentLocation
+        }
+        return HomeLocationHelper.baliFallbackLocation
+    }
+
     private func fetchKelurahanGroups() async {
         do {
             let originParam = "\(resolvedCurrentLocation.coordinate.latitude),\(resolvedCurrentLocation.coordinate.longitude)"
@@ -508,235 +391,27 @@ struct HomeScreen: View {
             print("Failed to fetch kelurahan quests: \(error)")
         }
     }
-    
-    private var resolvedCurrentLocation: CLLocation {
-        if let previewLocation {
-            return previewLocation
-        }
-        if let manualLocationOverride {
-            return CLLocation(latitude: manualLocationOverride.latitude, longitude: manualLocationOverride.longitude)
-        }
-        if let currentLocation = locationStore.currentLocation, currentLocation.coordinate.isWithinBaliRegion {
-            return currentLocation
-        }
-        return baliFallbackLocation
-    }
 
-    private func coordinateForKelurahan(_ kelurahan: Kelurahan) -> CLLocation {
-        switch kelurahan.id {
-        case "7760985": // Benoa / Nusa Dua
-            return CLLocation(latitude: -8.7981, longitude: 115.2185)
-        case "20447626": // Ubud
-            return CLLocation(latitude: -8.5069, longitude: 115.2625)
-        case "20447290": // Panjer
-            return CLLocation(latitude: -8.6783, longitude: 115.2312)
-        case "20447300": // Dauh Puri Kaja
-            return CLLocation(latitude: -8.6425, longitude: 115.2120)
-        case "20447299": // Dauh Puri Kangin
-            return CLLocation(latitude: -8.6578, longitude: 115.2185)
-        case "20447275": // Sanur Kauh
-            return CLLocation(latitude: -8.7050, longitude: 115.2500)
-        case "20447277": // Sanur
-            return CLLocation(latitude: -8.6882, longitude: 115.2635)
-        default:
-            let name = kelurahan.kelurahanName.lowercased()
-            if name.contains("ubud") {
-                return CLLocation(latitude: -8.5069, longitude: 115.2625)
-            } else if name.contains("sanur") {
-                return CLLocation(latitude: -8.6882, longitude: 115.2635)
-            } else if name.contains("benoa") || name.contains("nusa dua") {
-                return CLLocation(latitude: -8.7981, longitude: 115.2185)
-            } else if name.contains("kuta") {
-                return CLLocation(latitude: -8.7210, longitude: 115.1700)
-            } else if name.contains("denpasar") || name.contains("panjer") || name.contains("dauh puri") {
-                return CLLocation(latitude: -8.6705, longitude: 115.2126)
-            }
-            return CLLocation(latitude: -8.7021, longitude: 115.1762)
-        }
-    }
-
-    private func distanceText(for group: KelurahanQuestsGroup) -> String {
-        let distanceInMeters: Double
-        if let dist = group.quests.first?.distanceMeters {
-            distanceInMeters = dist
-        } else {
-            let destination = coordinateForKelurahan(group.kelurahan)
-            distanceInMeters = resolvedCurrentLocation.distance(from: destination)
-        }
-        let km = distanceInMeters / 1000.0
-        
-        if km < 1.0 {
-            let roundedMeters = max(50, Int(round(distanceInMeters / 50.0)) * 50)
-            return "\(roundedMeters) m"
-        } else if km < 10.0 {
-            return String(format: "%.1f km", km)
-        } else {
-            return "\(Int(round(km))) km"
-        }
-    }
-
-    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
-        guard newPhase == .active && oldPhase == .background else { return }
+    private func reverseGeocodeCurrentLocation() {
+        let loc = resolvedCurrentLocation
         Task {
-            await loadUserBookmarks()
-            await checkOngoingJourney()
-        }
-    }
-
-    /// Appends the device's live position to `goPathBreadcrumb` while Go Mode is active —
-    /// LocationStore already throttles updates to real ~5m movement, so no extra dedup is
-    /// needed here. Submitted as `path` in POST /private/journey/{id}/complete.
-    private func recordPathPointIfNeeded() {
-        guard showGoMode, let coordinate = locationStore.currentLocation?.coordinate else { return }
-        goPathBreadcrumb.append(JourneyPathPointInput(lat: coordinate.latitude, lng: coordinate.longitude, recordedAt: Date()))
-        // Defensive cap — a very long or backtracking session shouldn't grow this unboundedly.
-        if goPathBreadcrumb.count > 2000 {
-            goPathBreadcrumb.removeFirst(goPathBreadcrumb.count - 2000)
-        }
-    }
-
-    /// How close the live position needs to be to a travel leg's destination before Go Mode
-    /// treats it as reached — matches `GoComponentMode.busStopProximityMeters`, which uses the
-    /// same distance for the symmetric "still at the boarding stop, or already riding" check
-    /// within whichever leg is already current.
-    private static let segmentArrivalProximityMeters: Double = 69
-
-    /// Moves `goCurrentSegmentIndex` on to the next segment once the current one is reached —
-    /// live-position proximity to `to` for a travel leg (e.g. reaching a bus's alighting stop,
-    /// or a walk's endpoint), or the matched `JourneyAttemptStep` reaching `.done` for a mission
-    /// (missions have no `to` to arrive at; their own location is instead confirmed via
-    /// `GoMissionCard`'s "I'm here" → `handleGeofenceEntered`). This is the only place
-    /// `goCurrentSegmentIndex` changes; there used to be a manual tap-to-advance on the
-    /// walking-leg card, but it only ever covered walk legs (bus legs were never tappable) and
-    /// was disabled outright, leaving the whole itinerary frozen on segment 0 for the rest of
-    /// the trip once boarded.
-    private func advanceGoSegmentIfNeeded() {
-        guard showGoMode, let journey = activeJourney,
-              journey.segments.indices.contains(goCurrentSegmentIndex) else { return }
-
-        let segment = journey.segments[goCurrentSegmentIndex]
-
-        if segment.isMission {
-            guard goJourneySteps.attemptStep(for: segment)?.status == .done else { return }
-            goCurrentSegmentIndex += 1
-            return
-        }
-
-        guard let coordinate = locationStore.currentLocation?.coordinate,
-              let distance = segment.liveRemaining(from: coordinate).distanceMeters,
-              distance <= Self.segmentArrivalProximityMeters else { return }
-        goCurrentSegmentIndex += 1
-    }
-
-    // MARK: - Search Trigger
-    
-//    private var searchBarTrigger: some View {
-//        Button(action: {
-//            presentSearchSheet(in: .searching)
-//        }) {
-//            HStack(spacing: 12) {
-//                Image(systemName: "magnifyingglass")
-//                    .foregroundColor(.gray)
-//                    .font(.system(size: 16, weight: .medium))
-//                
-//                Text(searchText.isEmpty ? "Where to?" : searchText)
-//                    .font(TransiumFont.body(15))
-//                    .foregroundColor(searchText.isEmpty ? .gray : .black)
-//                    .lineLimit(1)
-//                
-//                Spacer()
-//            }
-//            .padding(.horizontal, 16)
-//            .frame(height: 48)
-//            .background(Color.white)
-//            .cornerRadius(24)
-//            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-//        }
-//        .accessibilityLabel("Search destinations")
-//    }
-    
-    // MARK: - Pinning Overlay
-
-    private var pinningOverlayControls: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Button(action: { isSearchPresented = false }) {
-                    Image(systemName: "arrow.left")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.black)
-                        .frame(width: 44, height: 44)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
-                }
-
-                Spacer()
-
-                Button(action: {
-                    guard let coordinate = locationStore.currentLocation?.coordinate else { return }
-                    pinFocusCoordinate = coordinate
-                }) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.black)
-                        .frame(width: 44, height: 44)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+            if let result = try? await LocationService.shared.reverseGeocode(lat: loc.coordinate.latitude, lng: loc.coordinate.longitude),
+               let first = result.results.first, !first.label.isEmpty {
+                await MainActor.run {
+                    self.resolvedAddressLabel = first.label
                 }
             }
-            .padding(.horizontal, 20)
-
-            HStack(spacing: 8) {
-                Image(systemName: "hand.draw.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("Drag the point anywhere on the map.")
-                    .font(TransiumFont.body(13, weight: .semibold))
-            }
-            .foregroundColor(TransiumColor.primaryBlue)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color.white.opacity(0.95))
-            .clipShape(Capsule())
-            .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
-
-            Spacer()
         }
-        .padding(.top, 6)
-        .transition(.opacity)
     }
-    
-    private var centerPinIndicator: some View {
-        VStack(spacing: 0) {
-            Image("location_red")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 40, height: 40)
-                .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
 
-            Ellipse()
-                .fill(Color.black.opacity(0.2))
-                .frame(width: 14, height: 4)
-                .offset(y: -4)
-        }
-        .allowsHitTesting(false)
-        .transition(.opacity)
+    private var currentLocationText: String {
+        if let manualLocationOverrideLabel { return manualLocationOverrideLabel }
+        if let resolvedAddressLabel, !resolvedAddressLabel.isEmpty { return resolvedAddressLabel }
+        return "Current Location, Bali"
     }
-    
-    // MARK: - Bottom Ticket & Action Content
-    
-    private var bottomMapContent: some View {
-        VStack(spacing: 16) {
-            ticketRail
-            
-            ticketPageIndicator
-                .padding(.bottom, 6)
-            
-            currentLocationPill
-        }
-        .padding(.bottom, 24)
-    }
-    
+
+    // MARK: - Journey Planning Flow
+
     private func doQuest(questId: String? = nil) {
         guard !isFetchingJourney else { return }
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -746,7 +421,6 @@ struct HomeScreen: View {
         Task {
             do {
                 let originCoordinate = resolvedCurrentLocation.coordinate
-                
                 let targetQuestId: String? = {
                     if let questId { return questId }
                     let page = visibleTicketPage ?? 0
@@ -757,26 +431,18 @@ struct HomeScreen: View {
                 }()
                 
                 var response: JourneyResponse?
-                
-                // 1. Try real journey by questId if provided or discovered from kelurahan group
                 if let targetQuestId {
                     response = try? await journeyService.fetchRealJourney(questId: targetQuestId, origin: originCoordinate)
                 }
-                
-                // 2. Fallback to overview calculation if real journey failed
                 if response == nil {
                     let destinationCoordinate = CLLocationCoordinate2D(latitude: -8.67368, longitude: 115.26337)
-                    response = try await journeyService.fetchJourneyOverview(
-                        origin: originCoordinate,
-                        destination: destinationCoordinate
-                    )
+                    response = try await journeyService.fetchJourneyOverview(origin: originCoordinate, destination: destinationCoordinate)
                 }
                 
                 guard let validResponse = response else {
                     throw TransiumAPIError.serviceUnavailable("Unable to calculate route")
                 }
                 
-                // Pre-resolve all road geometries concurrently before transitioning
                 let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(validResponse.best)
                 
                 await MainActor.run {
@@ -803,12 +469,6 @@ struct HomeScreen: View {
         }
     }
 
-    // MARK: - Ongoing Trip
-
-    /// Leaves Navigation Mode back to Explore Mode (the actual home screen), then re-checks
-    /// for an ongoing trip so the tab is showing again if one is still active — e.g. after
-    /// backing all the way out from Go Mode's own "Back" (which only steps out to Navigation
-    /// Mode, not Explore) without ending the trip.
     private func exitToExploreMode() {
         withAnimation(.spring()) {
             activeJourney = nil
@@ -817,12 +477,8 @@ struct HomeScreen: View {
         Task { await checkOngoingJourney() }
     }
 
-    /// Looks up GET /private/journey/current and shows/hides the ongoing-trip tab accordingly.
-    /// Called on cold launch (via `.task`), whenever the app returns from the background
-    /// (via `.onChange(of: scenePhase)`), and whenever the user navigates back to Explore Mode
-    /// (via `exitToExploreMode`), so a trip started elsewhere (or left running in the
-    /// background) is always picked back up. Skipped while already inside Go Mode or
-    /// mid-resume, since in both cases the caller already knows about the active attempt.
+    // MARK: - Ongoing Trip Checks
+
     private func checkOngoingJourney() async {
         guard !showGoMode, !isResumingOngoingTrip else { return }
 
@@ -841,8 +497,6 @@ struct HomeScreen: View {
                 ongoingJourneyAttempt = attempt
                 ongoingJourneySteps = current.steps
                 if !showOngoingTripCard {
-                    // Spring the tab in from off-screen left — the motion itself is the cue
-                    // that the fetch just resolved and found something worth surfacing.
                     withAnimation(.spring(response: 0.55, dampingFraction: 0.78)) {
                         showOngoingTripCard = true
                     }
@@ -853,10 +507,6 @@ struct HomeScreen: View {
         }
     }
 
-    /// Resumes the trip surfaced by the ongoing-trip tab straight into Go Mode: replans the
-    /// real path from the user's current position to the quest's destination, then re-registers
-    /// geofences for whichever steps are still outstanding (built from the steps' own
-    /// lat/lng/radius, since GET /current only returns steps, not the /go geofence list).
     private func resumeOngoingTrip() {
         guard !isResumingOngoingTrip, let attempt = ongoingJourneyAttempt, let questId = attempt.questId else { return }
         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -867,11 +517,8 @@ struct HomeScreen: View {
         Task {
             do {
                 let originCoordinate = resolvedCurrentLocation.coordinate
-                // Authenticated + scoped to this attempt, so mission segments/steps come back
-                // with an exact `stepId` join key instead of none at all.
                 let response = try await journeyService.fetchRealJourney(questId: questId, origin: originCoordinate, journeyAttemptId: attempt.id)
                 let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(response.best)
-
                 let geofences = geofences(from: ongoingJourneySteps)
 
                 await MainActor.run {
@@ -914,13 +561,10 @@ struct HomeScreen: View {
         }
     }
 
-    // MARK: - Go Mode
+    // MARK: - Go Mode Execution
 
     private func startGoMode() {
         guard !isStartingGoMode, let questId = activeQuestId else { return }
-        // Go Mode's whole geofence-tracking mechanism assumes the device's real GPS position
-        // is where the journey actually is — starting it from a manually overridden "current
-        // location" would plan (and try to track) a trip the user was never physically on.
         guard manualLocationOverride == nil else {
             isLocationOverrideBlockingGoPresented = true
             return
@@ -939,11 +583,6 @@ struct HomeScreen: View {
                 }
                 geofenceMonitor.startMonitoring(geofences: result.geofences)
 
-                // `activeJourney` so far is from the pre-/go preview fetch (no attempt existed
-                // yet, so mission segments/steps came back with no `stepId`). Re-fetch now that
-                // an attempt exists, so the rest of the session has the exact join key instead
-                // of relying on coordinate-matching. Best-effort — if it fails, Go Mode still
-                // works fine off the existing `activeJourney`, just without `stepId` on missions.
                 let originCoordinate = resolvedCurrentLocation.coordinate
                 if let response = try? await journeyService.fetchRealJourney(
                     questId: questId,
@@ -963,9 +602,6 @@ struct HomeScreen: View {
                     goStartDebugResult = result
                     goPathBreadcrumb = []
                     hasSubmittedJourneyCompletion = false
-                    // Whichever journey ended up in `activeJourney` — the fresh re-fetch above,
-                    // or the original pre-/go preview if that failed — has valid route
-                    // geometry either way, which is all this needs.
                     if let activeJourney {
                         setupRandomPhotoOps(for: activeJourney)
                     }
@@ -998,8 +634,6 @@ struct HomeScreen: View {
         }
     }
 
-    /// True when the conflicting attempt is the one this screen already has cached
-    /// (steps + geofences), so "Resume Journey" can re-enter Go Mode without a network call.
     private func canResumeLocally(_ conflict: JourneyStartConflictError) -> Bool {
         activeJourney != nil && goJourneyAttempt?.id == conflict.activeJourneyAttemptId
     }
@@ -1046,8 +680,6 @@ struct HomeScreen: View {
         }
     }
 
-    /// Leaves the live Go Mode UI, returning to the Navigation Mode overview of the same
-    /// journey (the attempt keeps running server-side unless `cancelAttempt` is set).
     private func endGoMode(cancelAttempt: Bool = false) {
         geofenceMonitor.stopMonitoring()
         geofenceMonitor.onRegionEntered = nil
@@ -1068,9 +700,6 @@ struct HomeScreen: View {
         }
     }
 
-    /// Cancels the caller's in-progress journey attempt, if any — reachable from Go Mode's
-    /// "End" button and from the cancel button in the Navigation Mode bar (e.g. after backing
-    /// out of Go Mode without ending the attempt).
     private func cancelActiveJourneyAttempt() {
         guard let attempt = goJourneyAttempt, !isCancelingJourney else { return }
         isCancelingJourney = true
@@ -1102,29 +731,9 @@ struct HomeScreen: View {
         }
     }
 
-    /// Grace period before an *automatic* geofence trigger pops the camera — a real region
-    /// crossing, or `JourneyGeofenceMonitor`'s "already inside" check firing the instant a
-    /// mission gets registered right where the user is already standing (e.g. finishing one
-    /// mission puts them inside the next one's radius). Without this, the camera could cover
-    /// the screen before the current-step card even has a chance to render what the new
-    /// mission is. A manual tap on this exact mission's own "Take a Photo" button skips the
-    /// delay entirely — the user already saw the card, that's why they tapped.
-    private static let autoCameraGracePeriodSeconds: Double = 5
-
-    /// `isManualConfirmation` is set only when this came from a user tap (the mission "I'm
-    /// here" button, or an unlocated step's "I've done it"/"Take a Photo" card) rather than a
-    /// real geofence trigger — it shows a small acknowledgement toast so tapping the button
-    /// visibly does something, since the step itself may have no other on-screen change (an
-    /// unlocated step's card simply disappears once `.done`). Skipped when this call is also
-    /// the one that finishes the whole journey — the completion summary screen is
-    /// acknowledgement enough there.
     private func handleGeofenceEntered(stepId: String, attemptId: String, isManualConfirmation: Bool = false) {
         let coordinate = locationStore.currentLocation?.coordinate ?? resolvedCurrentLocation.coordinate
 
-        // A photo-capture step is a moment-in-time prompt, not something that should wait on
-        // `advance` below — so the camera pops independently of (and before) that network round
-        // trip. Skipped if this step is already done (a re-firing region, or a previous
-        // catch-up advance already covered it) so the user isn't nagged for the same spot twice.
         if let step = goJourneySteps.first(where: { $0.id == stepId }),
            step.isPhotoCheckpoint, step.status != .done {
             if isManualConfirmation {
@@ -1152,8 +761,6 @@ struct HomeScreen: View {
                 goJourneyAttempt = result.journeyAttempt
                 goJourneySteps = result.steps
 
-                // Drop any step that just became done from active monitoring — once its
-                // action is fulfilled there's no reason to keep watching that region.
                 let remaining = geofences(from: result.steps)
                 goGeofences = remaining
                 geofenceMonitor.startMonitoring(geofences: remaining)
@@ -1166,10 +773,6 @@ struct HomeScreen: View {
         }
     }
 
-    /// Geofences for whichever of `steps` are still outstanding — used both to (re)register
-    /// monitoring after every /advance response (so a step that just became done drops out)
-    /// and when resuming a trip from GET /current, which only returns steps, not the /go
-    /// geofence list.
     private func geofences(from steps: [JourneyAttemptStep]) -> [JourneyGeofence] {
         steps.compactMap { step in
             guard step.status == .waiting, let lat = step.lat, let lng = step.lng, let radius = step.radiusMeters else { return nil }
@@ -1177,11 +780,6 @@ struct HomeScreen: View {
         }
     }
 
-    /// POST /private/journey/{id}/advance never finalizes an attempt by itself — once every
-    /// step reaches "done", POST /private/journey/{id}/complete is what actually awards XP/
-    /// badges and records the summary + breadcrumb, so that's called here to make the journey
-    /// actually finish. Must be called from a MainActor context (it touches @State directly,
-    /// not through `MainActor.run`, since every caller already is one).
     @discardableResult
     private func finishJourneyIfNeeded(steps: [JourneyAttemptStep], attemptId: String) -> Bool {
         guard !hasSubmittedJourneyCompletion, !steps.isEmpty, steps.allSatisfy({ $0.status == .done }) else { return false }
@@ -1194,12 +792,6 @@ struct HomeScreen: View {
         let path = goPathBreadcrumb
 
         Task {
-            // HealthKit records steps/energy passively in the background regardless of when
-            // this app requested read access, so one statistics query spanning the whole trip
-            // at completion time — rather than a live running total kept throughout — is
-            // enough to capture everything, including time spent backgrounded. Falls back to
-            // the old distance-based estimate (rather than failing the request) if HealthKit
-            // is unavailable, unauthorized, or the query errors for any reason.
             let healthKitStats = await healthKitStepService.stats(from: tripStartedAt, to: Date())
             let request = CompleteJourneyRequest(
                 stepsTaken: healthKitStats?.steps ?? Int((distanceMeters / 0.75).rounded()),
@@ -1219,8 +811,6 @@ struct HomeScreen: View {
                 }
             } catch {
                 await MainActor.run {
-                    // Let a retry happen — the next /advance response that still finds every
-                    // step done (e.g. a stray re-fired region) will attempt this again.
                     hasSubmittedJourneyCompletion = false
                     AppToastCenter.shared.showError(
                         title: "Couldn't Finish Journey",
@@ -1233,10 +823,6 @@ struct HomeScreen: View {
         return true
     }
 
-    /// `CameraScreen`'s `onCaptured` for a photo-capture step — uploads via POST
-    /// /private/journey/media and closes the whole camera flow (`pendingPhotoStep = nil` tears
-    /// down `CameraScreen` and its nested `PhotoPreviewScreen` cover together). On failure the
-    /// flow is left open so the user can retry from the still-visible preview.
     private func handlePhotoCaptured(image: UIImage, step: JourneyAttemptStep) async {
         guard let data = image.jpegData(compressionQuality: 0.85) else {
             AppToastCenter.shared.showError(title: "Upload Failed", message: "Couldn't process that photo. Please try again.")
@@ -1267,10 +853,6 @@ struct HomeScreen: View {
         }
     }
 
-    /// Registers `RandomPhotoOpPlanner`'s 0-2 spontaneous keepsake points on the dedicated
-    /// `randomPhotoOpMonitor` — separate from the real quest geofences so this can never touch
-    /// step progress. Called once per fresh/replanned Go Mode session (`startGoMode`,
-    /// `resumeOngoingTrip`); a short trip yields no points, which is a no-op here.
     private func setupRandomPhotoOps(for journey: JourneyResult) {
         let points = RandomPhotoOpPlanner.planPoints(for: journey)
         guard !points.isEmpty else {
@@ -1295,20 +877,11 @@ struct HomeScreen: View {
     }
 
     private func handleRandomPhotoOpEntered(markerId: String) {
-        // A real quest-action photo prompt always wins — never stack a spontaneous keepsake
-        // prompt on top of one, and don't present a second keepsake prompt over itself if the
-        // other point (if any) fires again before this one's flow finishes.
         guard pendingPhotoStep == nil, !isRandomPhotoOpPresented else { return }
-
-        // Stop watching just this point so it can't nag again if the user lingers/backtracks
-        // nearby — the other point (if any) stays independently active.
         randomPhotoOpMonitor.stopMonitoring(identifier: markerId)
         isRandomPhotoOpPresented = true
     }
 
-    /// `CameraScreen`'s `onCaptured` for a spontaneous keepsake photo — uploads attached to the
-    /// attempt itself (not any one step, since it isn't tied to a quest action) and never calls
-    /// `advanceJourney`, unlike `handlePhotoCaptured`.
     private func handleRandomPhotoOpCaptured(image: UIImage) async {
         guard let attemptId = goJourneyAttempt?.id else {
             await MainActor.run { isRandomPhotoOpPresented = false }
@@ -1343,116 +916,41 @@ struct HomeScreen: View {
         }
     }
 
-    private var ticketRail: some View {
-        ScrollView(.horizontal) {
-            HStack(alignment: .bottom, spacing: 14) {
-                if !kelurahanGroups.isEmpty {
-                    ForEach(Array(kelurahanGroups.enumerated()), id: \.offset) { index, group in
-                        let variant: TransiumTicketVariant = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .mint : .coral)
-                        let isRecommended = (index == 0)
-                        
-                        VStack(alignment: .leading, spacing: 0) {
-                            if isRecommended {
-                                recommendedBadge
-                                    .padding(.leading, 8)
-                                    .padding(.bottom, -12)
-                                    .zIndex(1)
-                            }
-                            
-                            TransiumTicketCard(
-                                title: group.kelurahan.kelurahanName,
-                                subtitle: group.kelurahan.description ?? group.quests.first?.description ?? "\(group.kelurahan.kecamatanName), Bali",
-                                distance: distanceText(for: group),
-                                price: "Rp. 4,4k",
-                                imageUrl: group.kelurahan.thumbnails.first?.url ?? group.quests.first?.thumbnails.first?.url,
-                                fallbackImageName: isRecommended ? "kintamani" : "sanoored",
-                                variant: variant
-                            )
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                    selectedKelurahan = group.kelurahan
-                                    isDetailPresented = true
-                                }
-                            }
-                        }
-                        .frame(width: 336)
-                        .id(index)
-                    }
-                } else {
-                    // Fluid animated skeleton cards matching the exact layout and height bounds
-                    ForEach(0..<2, id: \.self) { index in
-                        let isRecommended = (index == 0)
-                        let variant: TransiumTicketVariant = isRecommended ? .blue : .mint
-
-                        VStack(alignment: .leading, spacing: 0) {
-                            if isRecommended {
-                                recommendedBadge
-                                    .padding(.leading, 10)
-                                    .padding(.bottom, -8)
-                                    .zIndex(1)
-                            }
-
-                            TransiumTicketSkeletonCard(variant: variant)
-                        }
-                        .frame(width: 336)
-                        .id(index)
-                    }
-                }
-            }
-            .animation(.easeInOut(duration: 0.35), value: kelurahanGroups.isEmpty)
-            .scrollTargetLayout()
-            .padding(.horizontal, 20)
+    private func recordPathPointIfNeeded() {
+        guard showGoMode, let coordinate = locationStore.currentLocation?.coordinate else { return }
+        goPathBreadcrumb.append(JourneyPathPointInput(lat: coordinate.latitude, lng: coordinate.longitude, recordedAt: Date()))
+        if goPathBreadcrumb.count > 2000 {
+            goPathBreadcrumb.removeFirst(goPathBreadcrumb.count - 2000)
         }
-        .frame(height: 190)
-        .scrollIndicators(.hidden)
-        .scrollTargetBehavior(.viewAligned)
-        .scrollPosition(id: $visibleTicketPage)
-        .accessibilityLabel("Recommended destinations")
     }
-    
-    private var ticketPageIndicator: some View {
-        PageIndicator(
-            currentPage: visibleTicketPage ?? 0,
-            totalPages: max(kelurahanGroups.count, 2),
-            activeColor: TransiumColor.primaryBlue,
-            inactiveColor: TransiumColor.ticketInk.opacity(0.26)
-        )
-        .accessibilityLabel("Ticket \(min((visibleTicketPage ?? 0) + 1, max(kelurahanGroups.count, 2))) of \(max(kelurahanGroups.count, 2))")
-    }
-    
-    private var recommendedBadge: some View {
-        TransiumRecommendedSeal(style: .ticketTab)
-    }
-    
-    private var currentLocationPill: some View {
-        Button(action: { presentSearchSheet(in: .searching) }) {
-            HStack(spacing: 10) {
-                Image(systemName: "location.fill")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(TransiumColor.primaryBlue)
 
-                Text(currentLocationText)
-                    .font(TransiumFont.body(14, weight: .semibold))
-                    .foregroundStyle(TransiumColor.ticketInk)
-                    .lineLimit(1)
+    private func advanceGoSegmentIfNeeded() {
+        guard showGoMode, let journey = activeJourney,
+              journey.segments.indices.contains(goCurrentSegmentIndex) else { return }
 
-                Spacer()
+        let segment = journey.segments[goCurrentSegmentIndex]
 
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(TransiumColor.primaryBlue)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity)
-            .background(Color.white.opacity(0.92))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+        if segment.isMission {
+            guard goJourneySteps.attemptStep(for: segment)?.status == .done else { return }
+            goCurrentSegmentIndex += 1
+            return
         }
-        .buttonStyle(.transiumNoOpacity)
-        .padding(.horizontal, 20)
+
+        guard let coordinate = locationStore.currentLocation?.coordinate,
+              let distance = segment.liveRemaining(from: coordinate).distanceMeters,
+              distance <= Self.segmentArrivalProximityMeters else { return }
+        goCurrentSegmentIndex += 1
     }
+
+    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
+        guard newPhase == .active && oldPhase == .background else { return }
+        Task {
+            await loadUserBookmarks()
+            await checkOngoingJourney()
+        }
+    }
+
+    // MARK: - Bookmarking
 
     private var isCurrentJourneyBookmarked: Bool {
         guard let questId = activeQuestId ?? ongoingJourneyAttempt?.questId else { return false }
@@ -1499,28 +997,8 @@ struct HomeScreen: View {
         }
     }
 
-    private func reverseGeocodeCurrentLocation() {
-        let loc = resolvedCurrentLocation
-        Task {
-            if let result = try? await LocationService.shared.reverseGeocode(lat: loc.coordinate.latitude, lng: loc.coordinate.longitude),
-               let first = result.results.first, !first.label.isEmpty {
-                await MainActor.run {
-                    self.resolvedAddressLabel = first.label
-                }
-            }
-        }
-    }
+    // MARK: - Pinning / Search Helpers
 
-    private var currentLocationText: String {
-        if let manualLocationOverrideLabel {
-            return manualLocationOverrideLabel
-        }
-        if let resolvedAddressLabel, !resolvedAddressLabel.isEmpty {
-            return resolvedAddressLabel
-        }
-        return "Current Location, Bali"
-    }
-    
     private func presentSearchSheet(in state: SearchSheetState) {
         sheetState = state
         sheetDetent = (state == .searching) ? .large : .fraction(0.38)
@@ -1537,10 +1015,6 @@ struct HomeScreen: View {
         reverseGeocodeTask?.cancel()
     }
 
-    /// A search result was picked — moves the sheet into pin-drop mode centered on it. Seeds
-    /// `pinnedAddressLabel` with the result's own label so there's no blank/loading flash
-    /// before the map settles there and the first live reverse-geocode (`onPinCenterChanged` →
-    /// `scheduleReverseGeocode`) confirms it.
     private func beginPinning(at coordinate: CLLocationCoordinate2D, label: String) {
         pinFocusCoordinate = coordinate
         pinnedCoordinate = coordinate
@@ -1549,8 +1023,6 @@ struct HomeScreen: View {
         sheetState = .pinning
     }
 
-    /// Debounces `pinnedCoordinate` updates (fired on every drag) into a single GET
-    /// /maps/reverse-geocode call once the map settles, rather than one request per frame.
     private func scheduleReverseGeocode(for coordinate: CLLocationCoordinate2D) {
         reverseGeocodeTask?.cancel()
         reverseGeocodeTask = Task {
