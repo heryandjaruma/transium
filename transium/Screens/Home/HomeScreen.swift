@@ -1357,7 +1357,7 @@ struct HomeScreen: View {
                                 distance: distanceText(for: group),
                                 price: "Rp. 4,4k",
                                 imageUrl: group.quests.first?.thumbnails.first?.url,
-                                fallbackImageName: isRecommended ? "kintamani" : "Beach",
+                                fallbackImageName: isRecommended ? "kintamani" : "sanoored",
                                 variant: variant
                             )
                             .contentShape(Rectangle())
