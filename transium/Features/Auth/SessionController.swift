@@ -48,6 +48,7 @@ final class SessionController {
 
         do {
             phase = .signedIn(try await backend.fetchPrivateProfile(accessToken: token))
+            await syncPushNotifications()
         } catch BackendError.unauthorized {
             // Remove tokens that the server no longer accepts.
             SessionTokenStore.clear()
@@ -79,9 +80,36 @@ final class SessionController {
             )
 
             phase = .signedIn(session.profile)
+            await syncPushNotifications()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // Request notification permission and sync any pending or fresh device token.
+    private func syncPushNotifications() async {
+        await PushNotificationManager.shared.retryPendingRegistration()
+        await PushNotificationManager.shared.requestAuthorizationAndRegister()
+    }
+
+    // MARK: Important Flow - DEV_MODE Preview Sign In
+
+    // TODO: Remove before production. This keeps previews/simulator UI work
+    // unblocked when Apple Sign In cannot present or complete.
+    func signInForDevelopmentPreview() {
+        guard AppEnvironment.DEV_MODE else {
+            return
+        }
+
+        let profile = BackendProfile(
+            id: "dev-preview-user",
+            firstName: "Transium",
+            method: AuthMethod.apple.rawValue,
+            level: ProfileLevel.standard.rawValue
+        )
+
+        errorMessage = nil
+        phase = .signedIn(profile)
     }
 
     // End both the server and local session.
@@ -97,6 +125,7 @@ final class SessionController {
 
         if let token = SessionTokenStore.read() {
             // Local sign-out should still succeed if the server request fails.
+            await PushNotificationManager.shared.unregisterCurrentDevice()
             try? await backend.signOut(accessToken: token)
         }
 

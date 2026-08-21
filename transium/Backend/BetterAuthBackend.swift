@@ -111,13 +111,6 @@ nonisolated struct BetterAuthBackend: AuthBackend {
         )
     }
 
-    func deleteAccount(accessToken: String) async throws {
-        // Account deletion is not enabled on the backend yet.
-        throw BackendError.unsupported(
-            "Account deletion is not enabled on the server yet."
-        )
-    }
-
     // MARK: - Transport
 
     private func perform(
@@ -146,7 +139,7 @@ nonisolated struct BetterAuthBackend: AuthBackend {
         }
 
         guard (200..<300).contains(httpResponse.statusCode) else {
-            let message = try? JSONDecoder().decode(APIErrorResponse.self, from: data).message
+            let message = try? JSONDecoder().decode(BetterAuthErrorResponse.self, from: data).message
 
             throw httpResponse.statusCode == 401 || httpResponse.statusCode == 403
                 ? BackendError.unauthorized(message)
@@ -212,7 +205,7 @@ nonisolated private struct UpdateUserRequest: Encodable {
     let name: String
 }
 
-nonisolated private struct APIErrorResponse: Decodable {
+nonisolated private struct BetterAuthErrorResponse: Decodable {
     let message: String?
     let code: String?
 }

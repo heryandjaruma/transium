@@ -78,6 +78,15 @@ struct OnboardingScreen: View {
             }
     }
 
+    private func rubberBandedDragOffset(_ horizontalTranslation: CGFloat) -> CGFloat {
+        let isDraggingBeforeFirstPage = currentPage == 0 && horizontalTranslation > 0
+        let isDraggingAfterLastPage = currentPage == pages.count - 1 && horizontalTranslation < 0
+
+        return isDraggingBeforeFirstPage || isDraggingAfterLastPage
+            ? horizontalTranslation * 0.22
+            : horizontalTranslation
+    }
+
     private func handleSwipe(_ horizontalTranslation: CGFloat) {
         let threshold: CGFloat = 54
 
@@ -121,19 +130,10 @@ struct OnboardingScreen: View {
         reduceMotion ? .linear(duration: 0.12) : .smooth(duration: 0.34, extraBounce: 0)
     }
 
-    private func rubberBandedDragOffset(_ horizontalTranslation: CGFloat) -> CGFloat {
-        let isDraggingBeforeFirstPage = currentPage == 0 && horizontalTranslation > 0
-        let isDraggingAfterLastPage = currentPage == pages.count - 1 && horizontalTranslation < 0
-
-        return isDraggingBeforeFirstPage || isDraggingAfterLastPage
-            ? horizontalTranslation * 0.22
-            : horizontalTranslation
-    }
-
     private var navigationBar: some View {
         HStack {
             if currentPage > 0 {
-                TransiumIconButton(systemName: "arrow.left", accessibilityLabel: "Previous onboarding page", action: goBack)
+                TransiumIconButton(icon: .system("arrow.left"), accessibilityLabel: "Previous onboarding page", action: goBack)
                     .transition(.opacity.combined(with: .scale))
             }
 

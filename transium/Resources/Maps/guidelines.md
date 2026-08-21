@@ -26,3 +26,15 @@ This file acts as transit network for our map. It contains these layers:
 
 - `bus_stops` : All bus stops points
 - `bus_routes` : All bus routes linestring
+
+## Rendering Bus Routes & Active Journeys
+
+Active journey route lines and bus stop indicators are rendered dynamically from the `JourneyResult` payload received from `GET /journey/overview`:
+
+- **Bus Route Lines**: For each `bus` segment, polyline features are constructed directly from the segment's `stops` array (`lat` & `lng` coordinates). This ensures line segments strictly span the user's traversed path (boarding stop → intermediate passed stops → alighting stop), rather than drawing the full route across the island.
+- **Walk & Transfer Lines**: Walk and transfer segments use parsed `geometry` coordinates to render dashed green or gray connecting lines.
+- **Stop Markers**: Only bus stops relevant to the active journey are rendered as point annotations:
+  - **Boarding Stop (Use)**: Distinct entrance node where the user boards the bus.
+  - **Intermediate Stops (Pass)**: Subtle stop nodes rendered along the traversed bus line.
+  - **Alighting Stop (Exit)**: Distinct exit node where the user gets off the bus.
+- **User & Destination Indicators**: User location features a pulsing blue puck with direction indicator, while destination uses a high-visibility drop pin marker.

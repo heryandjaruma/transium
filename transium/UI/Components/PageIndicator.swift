@@ -8,6 +8,20 @@ import SwiftUI
 struct PageIndicator: View {
     let currentPage: Int
     let totalPages: Int
+    let activeColor: Color
+    let inactiveColor: Color
+
+    init(
+        currentPage: Int,
+        totalPages: Int,
+        activeColor: Color = .white,
+        inactiveColor: Color = .white.opacity(0.25)
+    ) {
+        self.currentPage = currentPage
+        self.totalPages = totalPages
+        self.activeColor = activeColor
+        self.inactiveColor = inactiveColor
+    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -15,7 +29,7 @@ struct PageIndicator: View {
                 let isCurrentPage = page == currentPage
 
                 Capsule()
-                    .fill(isCurrentPage ? Color.white : Color.white.opacity(0.25))
+                    .fill(isCurrentPage ? activeColor : inactiveColor)
                     .frame(width: page == currentPage ? 16 : 8, height: 8)
                     .scaleEffect(isCurrentPage ? 1 : 0.92)
                     .animation(pageAnimation(for: page), value: currentPage)

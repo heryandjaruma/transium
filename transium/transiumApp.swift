@@ -10,6 +10,7 @@ import SwiftData
 
 @main
 struct transiumApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var session = SessionController()
 
     init() {

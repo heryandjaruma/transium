@@ -13,6 +13,7 @@ struct AuthScreen: View {
     @Environment(SessionController.self) private var session
     @Environment(\.modelContext) private var modelContext
     @State private var appleSignInService = AppleSignInService()
+    @State private var signInError: String?
 
     let onBackToOnboarding: (() -> Void)?
 
@@ -30,18 +31,26 @@ struct AuthScreen: View {
 
                 heroArt(metrics)
 
+                Color.authPanelBase
+                    .frame(width: proxy.size.width, height: metrics.bottomSafeAreaFillHeight)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .ignoresSafeArea(edges: .bottom)
+
                 AuthBottomPanel(
                     metrics: metrics,
                     isVerifying: session.isBusy,
                     onRequest: configureAppleSignIn,
-                    onCompletion: handleAppleSignIn
+                    onCompletion: handleAppleSignIn,
+                    onDeveloperSignIn: completeDeveloperSignIn
                 )
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
+                .ignoresSafeArea(edges: .bottom)
 
                 if let onBackToOnboarding {
                     VStack {
                         HStack {
                             TransiumIconButton(
-                                systemName: "arrow.left",
+                                icon: .system("arrow.left"),
                                 accessibilityLabel: "Back to onboarding",
                                 action: onBackToOnboarding
                             )
@@ -53,6 +62,23 @@ struct AuthScreen: View {
 
                         Spacer()
                     }
+                }
+
+                if let signInError {
+                    VStack {
+                        Spacer()
+
+                        AuthErrorBanner(message: signInError) {
+                            withAnimation(.easeIn(duration: 0.2)) {
+                                self.signInError = nil
+                            }
+                        }
+                        .padding(.horizontal, metrics.panelHorizontalPadding)
+                        .padding(.bottom, metrics.panelHeight + 16)
+                    }
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(50)
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
@@ -87,10 +113,9 @@ struct AuthScreen: View {
         do {
             try appleSignInService.configure(request)
         } catch {
-            AppToastCenter.shared.showError(
-                title: "Sign in could not start",
-                message: "Please try again in a moment."
-            )
+            withAnimation(.easeOut(duration: 0.25)) {
+                signInError = "Sign in could not start. Please try again in a moment."
+            }
         }
     }
 
@@ -109,16 +134,35 @@ struct AuthScreen: View {
                 )
 
                 if let errorMessage = session.errorMessage {
-                    AppToastCenter.shared.showError(title: "Sign in failed", message: errorMessage)
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        signInError = errorMessage
+                    }
+                    session.errorMessage = nil
                 }
             }
         } catch let error as ASAuthorizationError where error.code == .canceled {
             // Closing the Apple sign-in sheet is not an error.
         } catch let error as AuthError {
-            AppToastCenter.shared.showError(title: "Sign in failed", message: error.userFacingMessage)
+            withAnimation(.easeOut(duration: 0.25)) {
+                signInError = error.userFacingMessage
+            }
         } catch {
-            AppToastCenter.shared.showError(title: "Sign in failed", message: error.localizedDescription)
+            withAnimation(.easeOut(duration: 0.25)) {
+                signInError = error.localizedDescription
+            }
         }
+    }
+
+    // MARK: Important Flow - DEV_MODE Preview Auth Bypass
+
+    // TODO: Remove before production. This is only for SwiftUI previews and
+    // local UI iteration where Apple's auth sheet cannot complete reliably.
+    private func completeDeveloperSignIn() {
+        session.signInForDevelopmentPreview()
+        AppToastCenter.shared.showSuccess(
+            title: "Preview signed in",
+            message: "Opened the development home screen."
+        )
     }
 
     // MARK: Important Flow - Guard Stored Apple Sessions
@@ -149,6 +193,7 @@ private struct AuthBottomPanel: View {
     let isVerifying: Bool
     let onRequest: (ASAuthorizationAppleIDRequest) -> Void
     let onCompletion: (Result<ASAuthorization, Error>) -> Void
+    let onDeveloperSignIn: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -158,23 +203,7 @@ private struct AuthBottomPanel: View {
             Spacer()
                 .frame(height: 30)
 
-            SignInWithAppleButton(.continue, onRequest: onRequest, onCompletion: onCompletion)
-                .signInWithAppleButtonStyle(.black)
-                .frame(maxWidth: metrics.buttonMaxWidth)
-                .frame(height: metrics.buttonHeight)
-                .clipShape(.capsule)
-                .accessibilityLabel("Continue with Apple")
-                .accessibilityHint("Signs in to Transium using your Apple Account.")
-                // The server round trip is short but not instant, and a second
-                // tap would start a competing sign-in.
-                .disabled(isVerifying)
-                .opacity(isVerifying ? 0.55 : 1)
-                .overlay {
-                    if isVerifying {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                }
+            authButton
                 .padding(.bottom, metrics.buttonBottomSpacing)
 
             Text(termsText)
@@ -193,6 +222,42 @@ private struct AuthBottomPanel: View {
         .frame(width: metrics.panelWidth, height: metrics.panelHeight, alignment: .top)
         .background(alignment: .top) {
             AuthPanelBackground(metrics: metrics)
+        }
+    }
+
+    @ViewBuilder
+    private var authButton: some View {
+        if AppEnvironment.DEV_MODE {
+            Button(action: onDeveloperSignIn) {
+                Label("Continue with Apple", systemImage: "apple.logo")
+                    .font(TransiumFont.body(21, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: metrics.buttonMaxWidth)
+                    .frame(height: metrics.buttonHeight)
+                    .background(.black)
+                    .clipShape(.capsule)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Continue with Apple")
+            .accessibilityHint("Signs in with a development preview session.")
+        } else {
+            SignInWithAppleButton(.continue, onRequest: onRequest, onCompletion: onCompletion)
+                .signInWithAppleButtonStyle(.black)
+                .frame(maxWidth: metrics.buttonMaxWidth)
+                .frame(height: metrics.buttonHeight)
+                .clipShape(.capsule)
+                .accessibilityLabel("Continue with Apple")
+                .accessibilityHint("Signs in to Transium using your Apple Account.")
+                // The server round trip is short but not instant, and a second
+                // tap would start a competing sign-in.
+                .disabled(isVerifying)
+                .opacity(isVerifying ? 0.55 : 1)
+                .overlay {
+                    if isVerifying {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                }
         }
     }
 
@@ -233,6 +298,54 @@ private struct AuthBottomPanel: View {
     }
 }
 
+private struct AuthErrorBanner: View {
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "xmark.octagon.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color(red: 0.82, green: 0.16, blue: 0.18))
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Sign in failed")
+                    .font(TransiumFont.body(15, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Text(message)
+                    .font(TransiumFont.body(13))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 28)
+                    .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss error")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+        .background(.ultraThinMaterial)
+        .background(.white.opacity(0.92))
+        .clipShape(.rect(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(.white.opacity(0.72), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.14), radius: 20, y: 8)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct AuthPanelBackground: View {
     let metrics: AuthScreenMetrics
 
@@ -259,7 +372,6 @@ private struct AuthPanelBackground: View {
 
             Color.authPanelBase
                 .frame(width: metrics.panelWidth, height: metrics.bottomSafeAreaFillHeight)
-                .ignoresSafeArea(edges: .bottom)
         }
     }
 

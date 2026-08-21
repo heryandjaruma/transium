@@ -11,6 +11,7 @@ import Foundation
 final class LocationStore: NSObject, ObservableObject {
     @Published private(set) var authorizationStatus: CLAuthorizationStatus
     @Published private(set) var currentLocation: CLLocation?
+    @Published private(set) var currentHeading: CLLocationDirection = 0
 
     private let locationManager = CLLocationManager()
 
@@ -20,8 +21,14 @@ final class LocationStore: NSObject, ObservableObject {
         super.init()
 
         locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 20
+        locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        locationManager.distanceFilter = 5.0
+        locationManager.headingFilter = 3.0
+        
+        if authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse {
+            locationManager.startUpdatingLocation()
+            locationManager.startUpdatingHeading()
+        }
     }
 
     // MARK: Important Flow - Request User Location
@@ -32,6 +39,7 @@ final class LocationStore: NSObject, ObservableObject {
             locationManager.requestWhenInUseAuthorization()
         case .authorizedAlways, .authorizedWhenInUse:
             locationManager.startUpdatingLocation()
+            locationManager.startUpdatingHeading()
             locationManager.requestLocation()
         case .denied, .restricted:
             AppToastCenter.shared.showWarning(
@@ -54,6 +62,7 @@ extension LocationStore: CLLocationManagerDelegate {
 
             if authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse {
                 manager.startUpdatingLocation()
+                manager.startUpdatingHeading()
                 manager.requestLocation()
             }
         }
@@ -65,7 +74,28 @@ extension LocationStore: CLLocationManagerDelegate {
         }
 
         Task { @MainActor in
-            currentLocation = location
+            if let current = self.currentLocation {
+                let distance = current.distance(from: location)
+                guard distance >= 5.0 else { return }
+            }
+            self.currentLocation = location
+        }
+    }
+    
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        guard newHeading.headingAccuracy >= 0 else { return }
+        let heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+        Task { @MainActor in
+            var diff = (heading - currentHeading).truncatingRemainder(dividingBy: 360)
+            if diff > 180 { diff -= 360 }
+            if diff < -180 { diff += 360 }
+            
+            // Ignore small compass jitter (< 2.5 degrees)
+            guard abs(diff) >= 2.5 else { return }
+            
+            var target = currentHeading + diff
+            if target < 0 { target += 360 }
+            currentHeading = target.truncatingRemainder(dividingBy: 360)
         }
     }
 
