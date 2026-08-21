@@ -27,36 +27,71 @@ struct NavigationBottomSheet: View {
             HStack(alignment: .center, spacing: 0) {
                 // Horizontal timeline chips
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        // Mission steps aren't a travel mode — GET /journey/overview never
-                        // sends them anyway, but skip defensively since they share this model.
-                        ForEach(Array(journey.steps.filter { !$0.isMission }.enumerated()), id: \.offset) { index, step in
+                    HStack(spacing: 5) {
+                        ForEach(Array(timelineChips.enumerated()), id: \.offset) { index, chip in
                             if index > 0 {
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 8, weight: .bold))
-                                    .foregroundColor(.gray.opacity(0.5))
+                                    .foregroundColor(.gray.opacity(0.45))
                             }
 
-                            if step.type == "walk" {
-                                HStack(spacing: 3) {
-                                    Image(systemName: "figure.walk")
-                                        .font(.system(size: 13))
-                                    Text("\(Int(step.durationMinutes ?? 0)) m")
-                                        .font(TransiumFont.body(11, weight: .medium))
+                            switch chip {
+                            case .walk(let minutes, let isMissionWalk):
+                                if isMissionWalk {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "figure.walk")
+                                            .font(.system(size: 12, weight: .semibold))
+                                        Text("\(minutes) m")
+                                            .font(TransiumFont.body(11, weight: .bold))
+                                    }
+                                    .foregroundColor(Color(red: 0.05, green: 0.62, blue: 0.42))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3.5)
+                                    .background(Color(red: 0.05, green: 0.62, blue: 0.42).opacity(0.12))
+                                    .clipShape(Capsule())
+                                } else {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "figure.walk")
+                                            .font(.system(size: 13))
+                                        Text("\(minutes) m")
+                                            .font(TransiumFont.body(11, weight: .medium))
+                                    }
+                                    .foregroundColor(.gray)
                                 }
-                                .foregroundColor(.gray)
-                            } else {
+
+                            case .bus(let routeRef):
                                 HStack(spacing: 4) {
                                     Image(systemName: "bus.fill")
                                         .font(.system(size: 11))
-                                    Text((step.routeRef ?? "Bus").truncatedAtDash)
+                                    Text(routeRef.truncatedAtDash)
                                         .font(TransiumFont.body(11, weight: .bold))
                                 }
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 5)
-                                .background(TransiumTransitColor.color(for: step.routeRef))
+                                .background(TransiumTransitColor.color(for: routeRef))
                                 .cornerRadius(6)
+
+                            case .missionPoint(let name, let number):
+                                HStack(spacing: 4) {
+                                    // Milestone point dot (like a transit stop point)
+                                    Circle()
+                                        .fill(Color(red: 0.98, green: 0.72, blue: 0.12))
+                                        .frame(width: 6, height: 6)
+
+                                    Image(systemName: "flag.fill")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(Color(red: 0.85, green: 0.55, blue: 0.05))
+
+                                    Text(name.count > 16 ? "Mission \(number)" : name)
+                                        .font(TransiumFont.body(11, weight: .bold))
+                                        .foregroundColor(Color(red: 0.82, green: 0.52, blue: 0.04))
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 4)
+                                .background(Color(red: 0.98, green: 0.72, blue: 0.12).opacity(0.15))
+                                .clipShape(Capsule())
                             }
                         }
                     }
@@ -159,6 +194,73 @@ struct NavigationBottomSheet: View {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: arrivalDate)
+    }
+
+    private var timelineChips: [JourneyTimelineChip] {
+        var chips: [JourneyTimelineChip] = []
+        var missionCount = 0
+        var hasSeenBus = false
+
+        let hasMissions = journey.steps.contains { $0.isMission } || journey.segments.contains { $0.isMission }
+
+        for step in journey.steps {
+            if step.isMission {
+                missionCount += 1
+                chips.append(.missionPoint(name: step.instructions ?? "Mission \(missionCount)", number: missionCount))
+            } else if step.type == "ride" || step.type == "bus" {
+                hasSeenBus = true
+                chips.append(.bus(routeRef: step.routeRef ?? "Bus"))
+            } else if step.type == "walk" {
+                let mins = Int(step.durationMinutes ?? 0)
+                // If duration is 0 and we are adjacent to a mission point, prune redundant 0m walk chip
+                if mins == 0 && (chips.last?.isMission ?? false) {
+                    continue
+                }
+                let isMissionWalk = hasMissions && (hasSeenBus || missionCount > 0)
+                chips.append(.walk(minutes: mins, isMissionWalk: isMissionWalk))
+            }
+        }
+
+        // Fallback to segments if journey.steps was empty
+        if chips.isEmpty {
+            for segment in journey.segments {
+                if segment.isMission {
+                    missionCount += 1
+                    chips.append(.missionPoint(name: segment.instructions ?? "Mission \(missionCount)", number: missionCount))
+                } else if segment.type == "bus" {
+                    chips.append(.bus(routeRef: segment.routeRef ?? "Bus"))
+                } else {
+                    let mins = Int(round((segment.durationSeconds ?? 0) / 60))
+                    chips.append(.walk(minutes: mins, isMissionWalk: false))
+                }
+            }
+        }
+
+        return chips
+    }
+}
+
+// MARK: - Timeline Chip Model
+
+enum JourneyTimelineChip: Identifiable, Equatable {
+    case walk(minutes: Int, isMissionWalk: Bool)
+    case bus(routeRef: String)
+    case missionPoint(name: String, number: Int)
+
+    var id: String {
+        switch self {
+        case .walk(let minutes, let isMission):
+            return "walk-\(minutes)-\(isMission)"
+        case .bus(let ref):
+            return "bus-\(ref)"
+        case .missionPoint(let name, let num):
+            return "mission-\(num)-\(name)"
+        }
+    }
+
+    var isMission: Bool {
+        if case .missionPoint = self { return true }
+        return false
     }
 }
 
