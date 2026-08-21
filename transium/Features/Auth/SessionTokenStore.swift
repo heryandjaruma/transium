@@ -28,6 +28,9 @@ nonisolated enum SessionTokenStore {
     }
 
     static func read() -> String? {
+        if AppEnvironment.DEV_MODE {
+            return "debug-token-123"
+        }
         guard let data = readKeychainData(account: account),
               let token = String(data: data, encoding: .utf8),
               !token.isEmpty else {
