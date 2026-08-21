@@ -121,11 +121,6 @@ struct HomeScreen: View {
                     onBack: { endGoMode() },
                     onEnd: { endGoMode(cancelAttempt: true) },
                     onLocate: { mapCenterRequestID += 1 },
-                    onAdvanceSegment: {
-//                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-//                            goCurrentSegmentIndex = min(goCurrentSegmentIndex + 1, journey.segments.count)
-//                        }
-                    },
                     onManualAdvance: { stepId in
                         guard let attemptId = goJourneyAttempt?.id else { return }
                         handleGeofenceEntered(stepId: stepId, attemptId: attemptId, isManualConfirmation: true)
@@ -298,8 +293,14 @@ struct HomeScreen: View {
             guard newPhase == .active, oldPhase == .background else { return }
             Task { await checkOngoingJourney() }
         }
-        .onChange(of: locationStore.currentLocation?.coordinate.latitude) { _, _ in recordPathPointIfNeeded() }
-        .onChange(of: locationStore.currentLocation?.coordinate.longitude) { _, _ in recordPathPointIfNeeded() }
+        .onChange(of: locationStore.currentLocation?.coordinate.latitude) { _, _ in
+            recordPathPointIfNeeded()
+            advanceGoSegmentIfNeeded()
+        }
+        .onChange(of: locationStore.currentLocation?.coordinate.longitude) { _, _ in
+            recordPathPointIfNeeded()
+            advanceGoSegmentIfNeeded()
+        }
         .preferredColorScheme(.light)
         .alert(
             "Journey Already in Progress",
@@ -450,6 +451,30 @@ struct HomeScreen: View {
         if goPathBreadcrumb.count > 2000 {
             goPathBreadcrumb.removeFirst(goPathBreadcrumb.count - 2000)
         }
+    }
+
+    /// How close the live position needs to be to a travel leg's destination before Go Mode
+    /// treats it as reached — matches `GoComponentMode.busStopProximityMeters`, which uses the
+    /// same distance for the symmetric "still at the boarding stop, or already riding" check
+    /// within whichever leg is already current.
+    private static let segmentArrivalProximityMeters: Double = 69
+
+    /// Moves `goCurrentSegmentIndex` on to the next segment once the live position reaches the
+    /// current one's destination — e.g. reaching a bus's alighting stop, or a walk's endpoint.
+    /// This is the only place `goCurrentSegmentIndex` changes; there used to be a manual
+    /// tap-to-advance on the walking-leg card, but it only ever covered walk legs (bus legs were
+    /// never tappable) and was disabled outright, leaving the whole itinerary frozen on segment 0
+    /// for the rest of the trip once boarded. Mission segments have no `to` to arrive at — they
+    /// advance via their own backend step status instead (`handleGeofenceEntered`) — so one is
+    /// left in place as "current" rather than skipped.
+    private func advanceGoSegmentIfNeeded() {
+        guard showGoMode, let journey = activeJourney, let coordinate = locationStore.currentLocation?.coordinate,
+              journey.segments.indices.contains(goCurrentSegmentIndex) else { return }
+
+        let segment = journey.segments[goCurrentSegmentIndex]
+        guard !segment.isMission, let distance = segment.liveRemaining(from: coordinate).distanceMeters,
+              distance <= Self.segmentArrivalProximityMeters else { return }
+        goCurrentSegmentIndex += 1
     }
 
     // MARK: - Search Trigger

@@ -44,101 +44,38 @@ struct GoComponentMode: View {
     var onEnd: () -> Void = {}
     var onLocate: () -> Void = {}
     var onToggleMute: () -> Void = {}
-    /// Tapped the current step's card — advances to the next leg of the trip.
-    /// Only offered on walking legs; bus legs are display-only (their card already hosts
-    /// the "Download App" action).
-    var onAdvanceSegment: () -> Void = {}
     /// Manual "I'm here" fallback for a specific quest step (mission/photo-checkpoint), passed
     /// straight through to GoTripDetailsPanel — see its own doc comment for why this exists.
     var onManualAdvance: (String) -> Void = { _ in }
 
     @State private var isTripDetailsExpanded = false
 
-    /// Segment ids the live position has ever come within `busStopProximityMeters` of.
-    /// `currentSegmentIndex` only advances on a manual tap (see `onAdvanceSegment`), so while
-    /// still nominally on the walk-to-stop leg, this is what lets us tell "far from the stop
-    /// because we haven't arrived yet" apart from "far because we boarded and it pulled away" —
-    /// a bare distance check alone can't distinguish those without remembering having been close.
-    @State private var everNearStopSegmentIds: Set<String> = []
-
+    /// Matches `HomeScreen.segmentArrivalProximityMeters`, which owns the actual leg-to-leg
+    /// advance (this view only reads `currentSegmentIndex`, it doesn't change it) — used here
+    /// just for the sub-state within an already-current bus leg: still at the boarding stop, or
+    /// already riding.
     private static let busStopProximityMeters: Double = 69
 
     private var currentSegment: JourneySegment? {
         journey.segments.indices.contains(currentSegmentIndex) ? journey.segments[currentSegmentIndex] : nil
     }
 
-    /// The upcoming bus leg, when the current segment is the walk leading straight to its stop.
-    private var upcomingBusSegment: JourneySegment? {
-        guard let segment = currentSegment, segment.type != "bus",
-              journey.segments.indices.contains(currentSegmentIndex + 1) else { return nil }
-        let next = journey.segments[currentSegmentIndex + 1]
-        return next.type == "bus" ? next : nil
-    }
-
-    /// Live distance from the current position to `segment`'s destination, when both are known.
-    private func liveDistance(to segment: JourneySegment) -> Double? {
-        segment.liveRemaining(from: currentLocation).distanceMeters
-    }
-
-    /// True while still near the current bus leg's *boarding* stop — i.e., still waiting.
-    /// Defaults to true (still waiting) with no live position yet, so we don't jump to
-    /// "riding" without real GPS evidence.
-    private var isNearBoardingStop: Bool {
-        guard let segment = currentSegment, segment.type == "bus", let currentLocation, let from = segment.from else { return true }
+    /// True while still near a bus leg's *boarding* stop — i.e., still waiting to board rather
+    /// than already riding. Defaults to true (still waiting) with no live position yet, so we
+    /// don't jump to "riding" without real GPS evidence. `currentSegmentIndex` only lands on
+    /// this bus leg once the walk leg before it already registered arrival at this same stop
+    /// (see `HomeScreen.advanceGoSegmentIfNeeded`), so "far from the boarding stop" here can
+    /// only mean "moved on since boarding" — no separate road-alignment signal needed.
+    private func isNearBoardingStop(_ segment: JourneySegment) -> Bool {
+        guard let currentLocation, let from = segment.from else { return true }
         let distance = CLLocation(latitude: currentLocation.latitude, longitude: currentLocation.longitude)
             .distance(from: CLLocation(latitude: from.lat, longitude: from.lng))
         return distance <= Self.busStopProximityMeters
     }
 
     private var variant: Variant {
-        if let segment = currentSegment, segment.type == "bus" {
-            return isNearBoardingStop ? .commute : .commuteOnGoing
-        }
-
-        guard let segment = currentSegment, let busSegment = upcomingBusSegment else {
-            return .walking
-        }
-
-        // Primary signal: precise distance to the boarding stop. Checked before road-alignment
-        // below because the stop itself typically sits right on the bus's own road — so
-        // `isAligned` (100m tolerance) can trip the moment we're merely near the stop, before
-        // ever boarding, which would wrongly skip straight past `.commute` to `.commuteOnGoing`.
-        if let distance = liveDistance(to: segment), distance <= Self.busStopProximityMeters {
-            return .commute
-        }
-
-        // Secondary signal: the live position is on/near the bus's own road, once we're no
-        // longer within range of the boarding stop — this still catches "riding" when the walk
-        // to the stop was never observed close (GPS noise, boarding slightly off the marked
-        // stop coordinate, or a missed update near the stop can all mean that moment is never
-        // observed).
-        if busSegment.isAligned(with: currentLocation) {
-            return .commuteOnGoing
-        }
-
-        // Far from the stop, not aligned to the route road (e.g. geometry resolution fell back
-        // to a straight line): fall back to "was ever close, now far" as a secondary signal.
-        return everNearStopSegmentIds.contains(segment.id) ? .commuteOnGoing : .walking
-    }
-
-    /// The segment whose route info (name, ref, color) the commute/ride card should show —
-    /// either the current bus leg itself, or the upcoming one when near its stop (or riding
-    /// away from it) on the walk leading into it.
-    private var busInfoSegment: JourneySegment? {
-        currentSegment?.type == "bus" ? currentSegment : upcomingBusSegment
-    }
-
-    /// Segment index passed to `GoTripDetailsPanel` for its active/done highlighting. Mirrors
-    /// `currentSegmentIndex`, except once `variant` has already switched the floating card to
-    /// the ride card (live position shows we boarded) it jumps ahead to that bus leg too —
-    /// otherwise the panel would keep showing "Walk to <stop>" as active and the bus leg as
-    /// not-yet-started until a manual tap-to-advance, which walking legs into a bus stop don't
-    /// offer (see `onAdvanceSegment`).
-    private var effectiveSegmentIndex: Int {
-        guard case .commuteOnGoing = variant, upcomingBusSegment != nil else {
-            return currentSegmentIndex
-        }
-        return currentSegmentIndex + 1
+        guard let segment = currentSegment, segment.type == "bus" else { return .walking }
+        return isNearBoardingStop(segment) ? .commute : .commuteOnGoing
     }
 
     var body: some View {
@@ -156,15 +93,6 @@ struct GoComponentMode: View {
 
             bottomPanel
         }
-        .onAppear { recordProximityIfNeeded() }
-        .onChange(of: currentLocation?.latitude) { _, _ in recordProximityIfNeeded() }
-        .onChange(of: currentLocation?.longitude) { _, _ in recordProximityIfNeeded() }
-    }
-
-    private func recordProximityIfNeeded() {
-        guard let segment = currentSegment, segment.type != "bus", upcomingBusSegment != nil,
-              let distance = liveDistance(to: segment), distance <= Self.busStopProximityMeters else { return }
-        everNearStopSegmentIds.insert(segment.id)
     }
 
     private var bottomPanel: some View {
@@ -179,7 +107,7 @@ struct GoComponentMode: View {
             // its own content is padded internally instead.
             GoTripDetailsPanel(
                 journey: journey,
-                currentSegmentIndex: effectiveSegmentIndex,
+                currentSegmentIndex: currentSegmentIndex,
                 steps: steps,
                 currentLocation: currentLocation,
                 isExpanded: $isTripDetailsExpanded,
@@ -200,27 +128,23 @@ struct GoComponentMode: View {
                 walkCard(segment)
 
             case .commuteOnGoing:
-                if let busSegment = busInfoSegment {
-                    rideCard(busSegment)
-                }
+                rideCard(segment)
 
             case .commute:
-                if let busSegment = busInfoSegment {
-                    VStack(alignment: .leading, spacing: 10) {
-                        GoBusLivePill(
-                            title: "Check Bus Live Location",
-                            subtitle: "Open \(busSegment.routeName ?? "Transit App")",
-                            action: openTMDApp
-                        )
+                VStack(alignment: .leading, spacing: 10) {
+                    GoBusLivePill(
+                        title: "Check Bus Live Location",
+                        subtitle: "Open \(segment.routeName ?? "Transit App")",
+                        action: openTMDApp
+                    )
 
-                        GoBusAppCard(
-                            providerCode: busSegment.routeRef ?? "BUS",
-                            promptText: "Check bus live location on",
-                            appName: busSegment.routeName ?? "Transit App",
-                            downloadLabel: "Download App",
-                            onDownload: openTMDAppStorePage
-                        )
-                    }
+                    GoBusAppCard(
+                        providerCode: segment.routeRef ?? "BUS",
+                        promptText: "Check bus live location on",
+                        appName: segment.routeName ?? "Transit App",
+                        downloadLabel: "Download App",
+                        onDownload: openTMDAppStorePage
+                    )
                 }
             }
         } else {
@@ -241,15 +165,12 @@ struct GoComponentMode: View {
     }
 
     private func walkCard(_ segment: JourneySegment) -> some View {
-        Button(action: onAdvanceSegment) {
-            GoStepCard(
-                mode: .walking,
-                verb: "Walk to",
-                destination: segment.to?.name ?? "your destination",
-                metrics: metrics(for: segment)
-            )
-        }
-        .buttonStyle(.transiumNoOpacity)
+        GoStepCard(
+            mode: .walking,
+            verb: "Walk to",
+            destination: segment.to?.name ?? "your destination",
+            metrics: metrics(for: segment)
+        )
     }
 
     /// Shown once the user is assumed to have boarded (see `isNearBoardingStop`) — the
