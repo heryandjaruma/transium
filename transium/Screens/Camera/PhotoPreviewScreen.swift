@@ -8,10 +8,14 @@ import SwiftUI
 struct PhotoPreviewScreen: View {
     let image: UIImage
     var onRetake: () -> Void
-    var onSave: () -> Void
+    /// Async so the caller can upload the photo (e.g. a journey photo-checkpoint) before this
+    /// screen's flow closes. This view only reflects "in flight" locally (disabling its
+    /// buttons) — deciding when to dismiss and showing any success/failure feedback is the
+    /// caller's job, since only it knows whether the save actually succeeded.
+    var onSave: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var showSavedToast: Bool = false
+    @State private var isSaving: Bool = false
 
     var body: some View {
         ZStack {
@@ -32,17 +36,21 @@ struct PhotoPreviewScreen: View {
             }
             .padding(.top, 20)
 
-            if showSavedToast {
+            if isSaving {
                 VStack {
                     Spacer()
-                    Text("Saved to your gallery")
-                        .font(TransiumFont.body(13, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(Color.black.opacity(0.75))
-                        .clipShape(Capsule())
-                        .padding(.bottom, 60)
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .tint(.white)
+                        Text("Uploading…")
+                            .font(TransiumFont.body(13, weight: .medium))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(Color.black.opacity(0.75))
+                    .clipShape(Capsule())
+                    .padding(.bottom, 60)
                 }
                 .transition(.opacity)
             }
@@ -116,14 +124,18 @@ struct PhotoPreviewScreen: View {
     // MARK: - Buttons
     private var actionButtons: some View {
         HStack(spacing: 40) {
-            controlButton(icon: "square.and.arrow.down.fill", label: "Save") {
-                saveToGallery()
+            controlButton(icon: "square.and.arrow.up.fill", label: "Save") {
+                handleSave()
             }
+            .disabled(isSaving)
+            .opacity(isSaving ? 0.5 : 1)
 
             controlButton(icon: "arrow.triangle.2.circlepath", label: "Retake") {
                 onRetake()
                 dismiss()
             }
+            .disabled(isSaving)
+            .opacity(isSaving ? 0.5 : 1)
         }
     }
 
@@ -144,15 +156,16 @@ struct PhotoPreviewScreen: View {
         }
     }
 
-    private func saveToGallery() {
-        onSave()
-        withAnimation {
-            showSavedToast = true
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            withAnimation {
-                showSavedToast = false
-            }
+    private func handleSave() {
+        guard !isSaving else { return }
+        withAnimation { isSaving = true }
+        Task {
+            await onSave()
+            // On success the caller has already dismissed this whole flow (its `item`/
+            // `isPresented` binding went nil) by the time we get here, tearing this view down —
+            // this only matters for the failure case, where the caller left the flow open so
+            // the user can retry.
+            withAnimation { isSaving = false }
         }
     }
 }

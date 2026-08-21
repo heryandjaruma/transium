@@ -8,8 +8,11 @@
 import SwiftUI
 
 struct Summary: View {
-    
+
     let cards: [StatCardData]
+    var locationLabel: String = "Sanur Street"
+    var calorieMessage: String = "This trip burned 250 calories. That's like doing 1,000 jumping jacks 🥵"
+    var badgeImageUrl: String? = nil
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
     
     var body: some View {
@@ -49,16 +52,15 @@ struct Summary: View {
                     VStack (spacing: 10){
                         Spacer()
                         
-                        Image("SampleBadge")
-                            .resizable()
+                        BadgeArtworkImage(urlString: badgeImageUrl)
                             .frame(width: 200, height: 200)
-                        
+
                         HStack{
                             Image("WhitePoint")
                                 .resizable()
                                 .frame(width: 10, height: 13)
-                            
-                            Text("Sanur Street")
+
+                            Text(locationLabel)
                                 .font(TransiumFont.body(12).bold())
                                 .foregroundStyle(.white)
                         }
@@ -82,7 +84,7 @@ struct Summary: View {
                                     .resizable()
                                     .frame(width: 65, height: 65)
                                 
-                                Text("This trip burned 250 calories. That’s like doing 1,000 jumping jacks 🥵")
+                                Text(calorieMessage)
                                     .font(TransiumFont.body(14))
                             }
                             

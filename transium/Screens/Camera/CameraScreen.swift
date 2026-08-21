@@ -9,12 +9,23 @@ struct CameraScreen: View {
     @StateObject private var camera = CameraModel()
     @Environment(\.dismiss) private var dismiss
 
+    /// Called with the captured photo once the user confirms it in the preview step. Defaults
+    /// to saving straight to the device's Photos library; pass a custom closure (e.g. to upload
+    /// a journey photo-checkpoint) to override that. This screen doesn't dismiss itself on
+    /// success — closing the flow once `onCaptured` finishes is the presenter's job (e.g. via
+    /// the `item`/`isPresented` binding it used to present this screen).
+    var onCaptured: (UIImage) async -> Void = { image in
+        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+    }
+
     var body: some View {
         ZStack {
             TransiumColor.primaryBlue
                 .ignoresSafeArea()
 
             VStack(spacing: 24) {
+                closeButton
+
                 header
 
                 cameraPreview
@@ -27,7 +38,7 @@ struct CameraScreen: View {
 
                 Spacer(minLength: 12)
             }
-            .padding(.top, 20)
+            .padding(.top, 8)
         }
         .onAppear {
             camera.checkPermission()
@@ -56,12 +67,30 @@ struct CameraScreen: View {
                         camera.retake()
                     },
                     onSave: {
-                        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-                        dismiss()
+                        await onCaptured(image)
                     }
                 )
             }
         }
+    }
+
+    // MARK: - Close
+
+    /// This is presented over an optional (skippable) step, so the user always has a way out
+    /// without taking a photo — `.fullScreenCover` offers no swipe-to-dismiss of its own.
+    private var closeButton: some View {
+        HStack {
+            Button(action: { dismiss() }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Color.white.opacity(0.2))
+                    .clipShape(Circle())
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Header
@@ -69,7 +98,7 @@ struct CameraScreen: View {
         VStack(spacing: 6) {
             Text("📸")
                 .font(.system(size: 48))
-            
+
             ZStack {
                 Image("Splash")
                     .resizable()

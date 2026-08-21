@@ -386,7 +386,6 @@ extension ButtonStyle where Self == TransiumNoOpacityButtonStyle {
                     size: 56
                 ) {}
 
-                // Contoh pakai custom asset (bukan SF Symbol), mis. "focus"
                 TransiumIconButton(
                     icon: .asset("focus"),
                     accessibilityLabel: "Recenter",

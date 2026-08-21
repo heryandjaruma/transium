@@ -14,6 +14,10 @@ public protocol LocationServiceProtocol: Sendable {
     
     /// Resolve a full address or place name to coordinates (tries Apple Maps first, falls back to OSM).
     func geocode(query: String) async throws -> GeocodeResult
+
+    /// Resolve coordinates to a readable address (tries Apple Maps first, falls back to OSM) —
+    /// the inverse of `geocode(query:)`, used to show a live address while dragging a pin.
+    func reverseGeocode(lat: Double, lng: Double) async throws -> GeocodeResult
 }
 
 public final class LocationService: LocationServiceProtocol, Sendable {
@@ -64,6 +68,20 @@ public final class LocationService: LocationServiceProtocol, Sendable {
         let queryItems = [URLQueryItem(name: "q", value: trimmed)]
         return try await apiClient.request(
             path: "/maps/geocode",
+            method: .get,
+            queryItems: queryItems,
+            body: nil,
+            requiresAuth: false
+        )
+    }
+
+    public func reverseGeocode(lat: Double, lng: Double) async throws -> GeocodeResult {
+        let queryItems = [
+            URLQueryItem(name: "lat", value: String(lat)),
+            URLQueryItem(name: "lng", value: String(lng))
+        ]
+        return try await apiClient.request(
+            path: "/maps/reverse-geocode",
             method: .get,
             queryItems: queryItems,
             body: nil,

@@ -10,6 +10,7 @@ enum RoutePointType {
     case intermediate   // User passes on bus ("Pass")
     case alighting      // User exits bus ("Exit")
     case destination
+    case checkpoint     // A geofenced quest/photo step the app is actively watching for arrival
 }
 
 final class RoutePointAnnotation: NSObject, MLNAnnotation {
@@ -41,7 +42,27 @@ struct LocalBaliMapView: UIViewRepresentable {
     let markerHeading: CLLocationDirection
     let centerRequestID: Int
     let activeJourney: JourneyResult?
-    
+    /// The geofences POST /private/journey/go registered for this attempt — shown as subtle
+    /// checkpoint markers so the user can see where the app is actively watching for arrival.
+    /// Empty outside Go Mode.
+    var checkpoints: [JourneyGeofence] = []
+    /// True only for the live Go Mode session (not Navigation Mode's pre-Go route overview,
+    /// even though both have `activeJourney != nil`) — switches the camera to a tilted,
+    /// heading-oriented "third person" view that continuously follows the user along the
+    /// route, instead of the flat top-down centering used everywhere else.
+    var isGoMode: Bool = false
+    /// True while the search sheet's pin-drop flow is active. The caller draws its own fixed
+    /// pin at screen center (`centerPinIndicator`); this just reports the map's own center
+    /// coordinate back via `onPinCenterChanged` as the user drags the map underneath it.
+    var isPinning: Bool = false
+    /// A specific coordinate to animate the camera to once — set when entering pinning mode
+    /// (a picked search result, or "use my current location"), unlike `centerRequestID` this
+    /// doesn't track continuous GPS updates, just a one-shot jump to wherever this points.
+    var pinFocusCoordinate: CLLocationCoordinate2D?
+    /// The map's live center coordinate, reported whenever it settles while `isPinning` is
+    /// true — the caller debounces this into a reverse-geocode lookup.
+    var onPinCenterChanged: ((CLLocationCoordinate2D) -> Void)?
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
@@ -85,7 +106,9 @@ struct LocalBaliMapView: UIViewRepresentable {
         if mapView.contentInset.bottom != bottomInset {
             mapView.contentInset = UIEdgeInsets(top: 90, left: 0, bottom: bottomInset, right: 0)
         }
-        
+
+        context.coordinator.attachFollowGestureObserversIfNeeded(to: mapView)
+
         context.coordinator.syncUserAnnotation(
             on: mapView,
             location: displayLocation,
@@ -95,10 +118,29 @@ struct LocalBaliMapView: UIViewRepresentable {
         context.coordinator.syncRouteOverlays(
             on: mapView,
             activeJourney: activeJourney,
+            checkpoints: checkpoints,
             displayLocation: displayLocation,
             context: context
         )
-        
+
+        // Keep the Coordinator's delegate callback in sync every refresh — mirrors how
+        // `geofenceMonitor.onRegionEntered` gets reassigned on the HomeScreen side elsewhere in
+        // this app, since a UIViewRepresentable's closures aren't otherwise reachable from the
+        // Coordinator's own delegate methods.
+        context.coordinator.isPinningActive = isPinning
+        context.coordinator.onPinCenterChanged = onPinCenterChanged
+
+        if isPinning, let pinFocusCoordinate {
+            let changed = context.coordinator.lastPinFocusCoordinate.map {
+                abs($0.latitude - pinFocusCoordinate.latitude) > 0.00001 ||
+                abs($0.longitude - pinFocusCoordinate.longitude) > 0.00001
+            } ?? true
+            if changed {
+                context.coordinator.lastPinFocusCoordinate = pinFocusCoordinate
+                mapView.setCenter(pinFocusCoordinate, zoomLevel: 16.5, animated: true)
+            }
+        }
+
         guard let displayLocation else {
             return
         }
@@ -107,22 +149,46 @@ struct LocalBaliMapView: UIViewRepresentable {
             abs($0.latitude - displayLocation.coordinate.latitude) > 0.0001 ||
             abs($0.longitude - displayLocation.coordinate.longitude) > 0.0001
         } ?? true
-        
-        // Only auto-center if no active journey path is present
-        if activeJourney == nil {
-            if shouldCenterForNewLocation || context.coordinator.lastCenterRequestID != centerRequestID {
-                context.coordinator.lastCenterRequestID = centerRequestID
-                context.coordinator.lastCenteredCoordinate = displayLocation.coordinate
-                mapView.setCenter(
-                    displayLocation.coordinate,
-                    zoomLevel: 15.5,
-                    animated: true
-                )
+
+        let isExplicitFocusRequest = context.coordinator.lastCenterRequestID != centerRequestID
+
+        // Entering Go Mode always starts in third-person follow, regardless of whatever
+        // free-wander state (see below) was left over from an earlier trip.
+        if isGoMode, !context.coordinator.wasGoMode {
+            context.coordinator.isFollowing = true
+        }
+        context.coordinator.wasGoMode = isGoMode
+
+        if isGoMode {
+            context.coordinator.lastCenterRequestID = centerRequestID
+            context.coordinator.lastCenteredCoordinate = displayLocation.coordinate
+            // An explicit focus tap always re-engages following, overriding a manual wander.
+            if isExplicitFocusRequest {
+                context.coordinator.isFollowing = true
             }
+            guard context.coordinator.isFollowing else { return }
+            context.coordinator.applyThirdPersonCamera(on: mapView, location: displayLocation, deviceHeading: markerHeading)
+            return
+        }
+
+        // Passive re-centering (tracking the user's dot as it moves) is suppressed once a
+        // journey is active, so the camera doesn't keep fighting a manual pan/zoom while
+        // reviewing the route/trip. An explicit tap on the "focus"/"locate" button
+        // (`centerRequestID` bump, from Navigation Mode's journey overview) is a direct
+        // request, not passive tracking, so it should always recenter on the user regardless
+        // of whether a journey is active.
+        if isExplicitFocusRequest || (activeJourney == nil && shouldCenterForNewLocation) {
+            context.coordinator.lastCenterRequestID = centerRequestID
+            context.coordinator.lastCenteredCoordinate = displayLocation.coordinate
+            mapView.setCenter(
+                displayLocation.coordinate,
+                zoomLevel: 15.5,
+                animated: true
+            )
         }
     }
     
-    final class Coordinator: NSObject, MLNMapViewDelegate {
+    final class Coordinator: NSObject, MLNMapViewDelegate, UIGestureRecognizerDelegate {
         var lastCenterRequestID = 0
         var lastCenteredCoordinate: CLLocationCoordinate2D?
         var existingRouteSourceIds: [String] = []
@@ -130,7 +196,147 @@ struct LocalBaliMapView: UIViewRepresentable {
         var roadPolylineCache: [String: [CLLocationCoordinate2D]] = [:]
         private let userAnnotation = PreviewUserPointAnnotation()
         private var lastRenderedLocation: CLLocation?
-        
+
+        // MARK: - Pin-drop (search sheet)
+
+        var isPinningActive = false
+        var onPinCenterChanged: ((CLLocationCoordinate2D) -> Void)?
+        var lastPinFocusCoordinate: CLLocationCoordinate2D?
+
+        func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
+            guard isPinningActive else { return }
+            onPinCenterChanged?(mapView.centerCoordinate)
+        }
+
+        // MARK: - Go Mode third-person camera
+
+        /// Whether the camera should keep chasing the user (Go Mode's default). Cleared the
+        /// instant the user pans/pinches/rotates the map by hand — see
+        /// `attachFollowGestureObserversIfNeeded` — and re-armed either by a fresh Go Mode
+        /// entry or an explicit focus-button tap (`updateUIView`).
+        var isFollowing = true
+        /// Tracks the isGoMode → isGoMode transition so a *fresh* entry into Go Mode always
+        /// resets `isFollowing`, instead of inheriting whatever free-wander state a previous
+        /// trip left behind (the Coordinator itself outlives any single trip).
+        var wasGoMode = false
+        /// The active route's full geometry, in travel order — used to orient the third-person
+        /// camera along the road ahead rather than the device's raw compass. Rebuilt by
+        /// `syncRouteOverlays` whenever the journey identity changes.
+        private var routePathCoordinates: [CLLocationCoordinate2D] = []
+        private var didAttachFollowGestureObservers = false
+
+        // Matches `MLNMapView.maximumZoomLevel` (set in `makeUIView`) — anything higher would
+        // just get silently clamped there anyway.
+        private static let thirdPersonZoomLevel: Double = 16.5
+        private static let thirdPersonPitch: CGFloat = 55
+        /// How far ahead along the route to look when computing the camera's heading — short
+        /// enough to hug tight turns, long enough not to jitter on GPS noise between updates.
+        private static let headingLookaheadMeters: CLLocationDistance = 25
+
+        /// Adds gesture recognizers purely to *observe* the start of a manual pan/pinch/rotate
+        /// (never consuming the touch — `cancelsTouchesInView = false` plus always allowing
+        /// simultaneous recognition — so MapLibre's own built-in gesture handling is untouched)
+        /// and use that as the signal that the user has taken over from the follow camera.
+        /// Idempotent since `updateUIView` calls this on every refresh.
+        func attachFollowGestureObserversIfNeeded(to mapView: MLNMapView) {
+            guard !didAttachFollowGestureObservers else { return }
+            didAttachFollowGestureObservers = true
+
+            let recognizers: [UIGestureRecognizer] = [UIPanGestureRecognizer(), UIPinchGestureRecognizer(), UIRotationGestureRecognizer()]
+            for recognizer in recognizers {
+                recognizer.delegate = self
+                recognizer.cancelsTouchesInView = false
+                recognizer.addTarget(self, action: #selector(handleUserMapGesture(_:)))
+                mapView.addGestureRecognizer(recognizer)
+            }
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            true
+        }
+
+        @objc private func handleUserMapGesture(_ recognizer: UIGestureRecognizer) {
+            guard recognizer.state == .began else { return }
+            isFollowing = false
+        }
+
+        /// Moves the camera to a tilted, heading-oriented view centered on the user — Go
+        /// Mode's own following camera, distinct from the flat top-down centering used
+        /// everywhere else. Heading follows the route path ahead of the user rather than the
+        /// device's raw compass: steadier (compass jitters, especially standing still) and
+        /// answers "which way does the route go from here" rather than "which way is the
+        /// phone physically pointed."
+        func applyThirdPersonCamera(on mapView: MLNMapView, location: CLLocation, deviceHeading: CLLocationDirection) {
+            let heading: CLLocationDirection
+            if let ahead = pointAhead(of: location, on: routePathCoordinates, lookahead: Self.headingLookaheadMeters) {
+                heading = bearing(from: location.coordinate, to: ahead)
+            } else {
+                heading = deviceHeading
+            }
+
+            if abs(mapView.zoomLevel - Self.thirdPersonZoomLevel) > 0.3 {
+                mapView.setZoomLevel(Self.thirdPersonZoomLevel, animated: false)
+            }
+
+            let camera = mapView.camera
+            camera.centerCoordinate = location.coordinate
+            camera.heading = heading
+            camera.pitch = Self.thirdPersonPitch
+            mapView.setCamera(camera, withDuration: 0.6, animationTimingFunction: CAMediaTimingFunction(name: .linear), completionHandler: nil)
+        }
+
+        /// A point `lookahead` meters ahead of `location` along `path`: finds the nearest
+        /// vertex on the path, then walks forward summing segment lengths until `lookahead` is
+        /// covered (interpolating within the final segment), falling back to the path's last
+        /// point if it runs out of road. Returns nil for a path too short to have a direction.
+        private func pointAhead(of location: CLLocation, on path: [CLLocationCoordinate2D], lookahead: CLLocationDistance) -> CLLocationCoordinate2D? {
+            guard path.count >= 2 else { return nil }
+
+            var nearestIndex = 0
+            var nearestDistance = CLLocationDistance.greatestFiniteMagnitude
+            for (index, coordinate) in path.enumerated() {
+                let distance = location.distance(from: CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude))
+                if distance < nearestDistance {
+                    nearestDistance = distance
+                    nearestIndex = index
+                }
+            }
+            // Already at (or past) the path's last vertex — nothing ahead to point toward.
+            guard nearestIndex < path.count - 1 else { return nil }
+
+            var remaining = lookahead
+            var previous = CLLocation(latitude: path[nearestIndex].latitude, longitude: path[nearestIndex].longitude)
+            var index = nearestIndex + 1
+            while index < path.count {
+                let next = CLLocation(latitude: path[index].latitude, longitude: path[index].longitude)
+                let segmentDistance = previous.distance(from: next)
+                if segmentDistance >= remaining {
+                    let fraction = segmentDistance > 0 ? remaining / segmentDistance : 0
+                    let lat = previous.coordinate.latitude + (next.coordinate.latitude - previous.coordinate.latitude) * fraction
+                    let lon = previous.coordinate.longitude + (next.coordinate.longitude - previous.coordinate.longitude) * fraction
+                    return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                }
+                remaining -= segmentDistance
+                previous = next
+                index += 1
+            }
+            // Ran out of road before covering the full lookahead — the guard above already
+            // confirmed `nearestIndex` isn't the last vertex, so this is still a genuine point
+            // ahead, just closer than `lookahead`.
+            return path.last
+        }
+
+        /// Great-circle initial bearing (0-360°, clockwise from true north) from `from` to `to`.
+        private func bearing(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> CLLocationDirection {
+            let lat1 = from.latitude * .pi / 180
+            let lat2 = to.latitude * .pi / 180
+            let deltaLon = (to.longitude - from.longitude) * .pi / 180
+            let y = sin(deltaLon) * cos(lat2)
+            let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(deltaLon)
+            let radiansBearing = atan2(y, x)
+            return (radiansBearing * 180 / .pi + 360).truncatingRemainder(dividingBy: 360)
+        }
+
         func syncUserAnnotation(
             on mapView: MLNMapView,
             location: CLLocation?,
@@ -175,11 +381,13 @@ struct LocalBaliMapView: UIViewRepresentable {
         func syncRouteOverlays(
             on mapView: MLNMapView,
             activeJourney: JourneyResult?,
+            checkpoints: [JourneyGeofence],
             displayLocation: CLLocation?,
             context: LocalBaliMapView.Context
         ) {
-            // Compute identity for current journey
-            let currentId = activeJourney.map { "\($0.origin.lat),\($0.origin.lng)-\($0.destination.lat),\($0.destination.lng)-\($0.segments.count)" }
+            // Compute identity for current journey — checkpoints included since they can arrive
+            // (or clear, on cancel) independently of the route/segment shape itself.
+            let currentId = activeJourney.map { "\($0.origin.lat),\($0.origin.lng)-\($0.destination.lat),\($0.destination.lng)-\($0.segments.count)-\(checkpoints.count)" }
             
             // Skip if nothing changed
             if currentId == lastSyncedJourneyId { return }
@@ -203,7 +411,8 @@ struct LocalBaliMapView: UIViewRepresentable {
                 }
             }
             existingRouteSourceIds.removeAll()
-            
+            routePathCoordinates.removeAll()
+
             guard let activeJourney, let style = mapView.style else { return }
             
             let startCoord = CLLocationCoordinate2D(latitude: activeJourney.origin.lat, longitude: activeJourney.origin.lng)
@@ -222,16 +431,27 @@ struct LocalBaliMapView: UIViewRepresentable {
             // 2. Add Destination point annotation
             let destCoord = CLLocationCoordinate2D(latitude: activeJourney.destination.lat, longitude: activeJourney.destination.lng)
             mapView.addAnnotation(RoutePointAnnotation(coordinate: destCoord, type: .destination, title: "Destination"))
-            
+
+            // 2.5. Add subtle checkpoint markers for every geofence the app is actively
+            // watching for arrival.
+            for geofence in checkpoints {
+                mapView.addAnnotation(RoutePointAnnotation(coordinate: geofence.coordinate, type: .checkpoint, title: "Checkpoint"))
+            }
+
             var addedStopCoords = Set<String>()
             
             // 3. Add segment route lines and compact stop annotations
             for (index, segment) in activeJourney.segments.enumerated() {
+                // Mission entries are a quest step, not a travel leg — no from/to/geometry to
+                // draw a route line for, so they're skipped on the map (they still get their
+                // own card in the trip details panel).
+                guard let from = segment.from, let to = segment.to else { continue }
+
                 let sourceId = "route-source-\(index)"
                 let busColor = resolveRouteColor(routeColor: segment.routeColor, routeRef: segment.routeRef)
-                let fromCoord = CLLocationCoordinate2D(latitude: segment.from.lat, longitude: segment.from.lng)
-                let toCoord = CLLocationCoordinate2D(latitude: segment.to.lat, longitude: segment.to.lng)
-                
+                let fromCoord = CLLocationCoordinate2D(latitude: from.lat, longitude: from.lng)
+                let toCoord = CLLocationCoordinate2D(latitude: to.lat, longitude: to.lng)
+
                 if segment.type == "bus" {
                     // Add compact stop annotations for boarding, intermediate, alighting stops
                     if let stops = segment.stops, !stops.isEmpty {
@@ -245,19 +465,19 @@ struct LocalBaliMapView: UIViewRepresentable {
                             }
                         }
                     } else {
-                        let boardKey = String(format: "%.5f,%.5f", segment.from.lat, segment.from.lng)
+                        let boardKey = String(format: "%.5f,%.5f", from.lat, from.lng)
                         if !addedStopCoords.contains(boardKey) {
                             addedStopCoords.insert(boardKey)
-                            mapView.addAnnotation(RoutePointAnnotation(coordinate: fromCoord, type: .boarding, title: segment.from.name, subtitle: segment.routeRef, routeColor: busColor))
+                            mapView.addAnnotation(RoutePointAnnotation(coordinate: fromCoord, type: .boarding, title: from.name, subtitle: segment.routeRef, routeColor: busColor))
                         }
-                        let alightKey = String(format: "%.5f,%.5f", segment.to.lat, segment.to.lng)
+                        let alightKey = String(format: "%.5f,%.5f", to.lat, to.lng)
                         if !addedStopCoords.contains(alightKey) {
                             addedStopCoords.insert(alightKey)
-                            mapView.addAnnotation(RoutePointAnnotation(coordinate: toCoord, type: .alighting, title: segment.to.name, subtitle: segment.routeRef, routeColor: busColor))
+                            mapView.addAnnotation(RoutePointAnnotation(coordinate: toCoord, type: .alighting, title: to.name, subtitle: segment.routeRef, routeColor: busColor))
                         }
                     }
                 }
-                
+
                 // Get road-following polyline coordinates
                 let cacheKey = "\(segment.type)-\(segment.id)"
                 var coords: [CLLocationCoordinate2D] = []
@@ -302,7 +522,8 @@ struct LocalBaliMapView: UIViewRepresentable {
                 
                 guard coords.count >= 2 else { continue }
                 existingRouteSourceIds.append(sourceId)
-                
+                routePathCoordinates.append(contentsOf: coords)
+
                 var pts = coords
                 let polyline = MLNPolylineFeature(coordinates: &pts, count: UInt(pts.count))
                 let source = MLNShapeSource(identifier: sourceId, shape: polyline, options: nil)
@@ -669,10 +890,36 @@ struct LocalBaliMapView: UIViewRepresentable {
                     
                     pinContainer.layer.addSublayer(pointerShape)
                     pinContainer.addSubview(pinHead)
-                    
+
                     view.addSubview(pinContainer)
+
+                case .checkpoint:
+                    // Deliberately smaller/muted than the route's own points (bus stops, pins)
+                    // — this just marks "the app is watching here," not a leg of the trip.
+                    view.frame = CGRect(x: 0, y: 0, width: 10, height: 10)
+                    view.centerOffset = CGVector(dx: 0, dy: 0)
+                    view.alpha = 0.85
+
+                    let checkpointColor = UIColor(TransiumColor.primaryYellow)
+
+                    let ring = UIView(frame: CGRect(x: 0, y: 0, width: 10, height: 10))
+                    ring.layer.cornerRadius = 5
+                    ring.backgroundColor = .white
+                    ring.layer.borderWidth = 1.5
+                    ring.layer.borderColor = checkpointColor.cgColor
+                    ring.layer.shadowColor = UIColor.black.cgColor
+                    ring.layer.shadowOpacity = 0.15
+                    ring.layer.shadowRadius = 1.5
+                    ring.layer.shadowOffset = CGSize(width: 0, height: 1)
+
+                    let dot = UIView(frame: CGRect(x: 3, y: 3, width: 4, height: 4))
+                    dot.layer.cornerRadius = 2
+                    dot.backgroundColor = checkpointColor
+                    ring.addSubview(dot)
+
+                    view.addSubview(ring)
                 }
-                
+
                 return view
             }
             

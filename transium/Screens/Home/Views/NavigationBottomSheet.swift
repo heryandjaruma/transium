@@ -28,18 +28,20 @@ struct NavigationBottomSheet: View {
                 // Horizontal timeline chips
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 4) {
-                        ForEach(Array(journey.steps.enumerated()), id: \.offset) { index, step in
+                        // Mission steps aren't a travel mode — GET /journey/overview never
+                        // sends them anyway, but skip defensively since they share this model.
+                        ForEach(Array(journey.steps.filter { !$0.isMission }.enumerated()), id: \.offset) { index, step in
                             if index > 0 {
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 8, weight: .bold))
                                     .foregroundColor(.gray.opacity(0.5))
                             }
-                            
+
                             if step.type == "walk" {
                                 HStack(spacing: 3) {
                                     Image(systemName: "figure.walk")
                                         .font(.system(size: 13))
-                                    Text("\(Int(step.durationMinutes)) m")
+                                    Text("\(Int(step.durationMinutes ?? 0)) m")
                                         .font(TransiumFont.body(11, weight: .medium))
                                 }
                                 .foregroundColor(.gray)
@@ -47,7 +49,7 @@ struct NavigationBottomSheet: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "bus.fill")
                                         .font(.system(size: 11))
-                                    Text(step.routeRef ?? "Bus")
+                                    Text((step.routeRef ?? "Bus").truncatedAtDash)
                                         .font(TransiumFont.body(11, weight: .bold))
                                 }
                                 .foregroundColor(.white)
@@ -77,24 +79,24 @@ struct NavigationBottomSheet: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 12)
             
-            // Leave sub-header card
-            HStack {
-                Text("Leave within **1 min**")
-                    .font(TransiumFont.body(14))
-                    .foregroundColor(.black)
-                
-                Spacer()
-                
-                Text("Arrive **\(arrivalTime)**")
-                    .font(TransiumFont.body(14))
-                    .foregroundColor(.black)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 46)
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-            .padding(.horizontal, 20)
-            .padding(.bottom, isCollapsed ? 12 : 16)
+//             Leave sub-header card
+//            HStack {
+//                Text("Leave within **1 min**")
+//                    .font(TransiumFont.body(14))
+//                    .foregroundColor(.black)
+//                
+//                Spacer()
+//                
+//                Text("Arrive **\(arrivalTime)**")
+//                    .font(TransiumFont.body(14))
+//                    .foregroundColor(.black)
+//            }
+//            .padding(.horizontal, 16)
+//            .frame(height: 46)
+//            .background(Color(.systemGray6))
+//            .cornerRadius(12)
+//            .padding(.horizontal, 20)
+//            .padding(.bottom, isCollapsed ? 12 : 16)
             
             // Scrollable detailed steps timeline (collapsible)
             if !isCollapsed {
@@ -176,15 +178,14 @@ struct StepTimelineView: View {
             
             VStack(spacing: 12) {
                 ForEach(Array(journey.segments.enumerated()), id: \.offset) { index, segment in
-                    if segment.type == "bus" {
+                    if segment.isMission {
+                        missionCard(segment)
+                    } else if segment.type == "bus" {
                         busRideCard(segment, index: index)
                     } else {
                         walkCard(segment, index: index)
                     }
                 }
-                
-                // Final Destination Mission Card
-                destinationMissionCard
             }
         }
     }
@@ -204,7 +205,7 @@ struct StepTimelineView: View {
                         .foregroundColor(.white)
                 }
                 
-                Text(index == 0 ? "Walk to **\(segment.to.name)**" : "Walk to **destination**")
+                Text(index == 0 ? "Walk to **\(segment.to?.name ?? "destination")**" : "Walk to **destination**")
                     .font(TransiumFont.body(15, weight: .bold))
                     .foregroundColor(.black)
                 
@@ -215,23 +216,6 @@ struct StepTimelineView: View {
                         .font(TransiumFont.body(14, weight: .bold))
                         .foregroundColor(.black)
                 }
-            }
-            
-            if let steps = segment.steps, !steps.isEmpty {
-                Divider()
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(steps.prefix(2), id: \.instructions) { step in
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.turn.down.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.gray)
-                            Text(step.instructions)
-                                .font(TransiumFont.body(13))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                .padding(.leading, 8)
             }
         }
         .padding(14)
@@ -263,7 +247,7 @@ struct StepTimelineView: View {
                     .background(routeColor)
                     .cornerRadius(8)
                 
-                Text("Get off at **\(segment.to.name)**")
+                Text("Get off at **\(segment.to?.name ?? "destination")**")
                     .font(TransiumFont.body(15, weight: .bold))
                     .foregroundColor(.black)
                     .lineLimit(1)
@@ -297,7 +281,7 @@ struct StepTimelineView: View {
                 .padding(.top, 3)
                 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(segment.from.name)
+                    Text(segment.from?.name ?? "")
                         .font(TransiumFont.body(13, weight: .semibold))
                         .foregroundColor(.black)
                     
@@ -332,7 +316,7 @@ struct StepTimelineView: View {
                         }
                     }
                     
-                    Text(segment.to.name)
+                    Text(segment.to?.name ?? "")
                         .font(TransiumFont.body(13, weight: .semibold))
                         .foregroundColor(.black)
                 }
@@ -351,68 +335,33 @@ struct StepTimelineView: View {
         )
     }
     
-    // MARK: - Destination Mission Card
-    private var destinationMissionCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color(red: 0.94, green: 0.27, blue: 0.27))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: "flag.fill")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(journey.segments.last?.to.name ?? "Destination")
-                        .font(TransiumFont.body(15, weight: .bold))
-                        .foregroundColor(.black)
-                    Text("Destination Reached")
-                        .font(TransiumFont.body(12))
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                Text(arrivalTime)
-                    .font(TransiumFont.body(14, weight: .bold))
+    // MARK: - Mission Card
+
+    /// A quest step the user must actually do there — GET /journey/real's `mission`-typed
+    /// segments, shown as their own card (never as an empty-looking "Walk to destination")
+    /// right after the leg that reaches it. Mirrors GoTripDetailsPanel's missionCard, styled
+    /// to match this screen's cards.
+    private func missionCard(_ mission: JourneySegment) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(TransiumColor.primaryYellow)
+                    .frame(width: 36, height: 36)
+                Image(systemName: "questionmark.app.fill")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Mission")
+                    .font(TransiumFont.body(11, weight: .bold))
+                    .foregroundColor(.secondary)
+                Text(mission.instructions ?? "Complete the mission")
+                    .font(TransiumFont.body(15, weight: .bold))
                     .foregroundColor(.black)
             }
-            
-            Divider()
-            
-            // Action bar: Star (Bookmark), Share, Copy
-            HStack(spacing: 24) {
-                Button(action: {
-                    AppToastCenter.shared.showSuccess(title: "Saved", message: "Destination saved.")
-                }) {
-                    Image(systemName: "star")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
-                }
-                
-                Button(action: {
-                    AppToastCenter.shared.showSuccess(title: "Shared", message: "Destination link copied.")
-                }) {
-                    Image(systemName: "square.and.arrow.up")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
-                }
-                
-                Button(action: {
-                    UIPasteboard.general.string = journey.segments.last?.to.name ?? "Destination"
-                    AppToastCenter.shared.showSuccess(title: "Copied", message: "Name copied to clipboard.")
-                }) {
-                    Image(systemName: "doc.on.doc")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.black)
-                }
-                
-                Spacer()
-            }
-            .padding(.top, 2)
-            .padding(.leading, 8)
+
+            Spacer()
         }
         .padding(14)
         .background(Color.white)
@@ -420,15 +369,8 @@ struct StepTimelineView: View {
         .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(.systemGray5), lineWidth: 1)
+                .stroke(TransiumColor.primaryYellow.opacity(0.5), lineWidth: 1)
         )
     }
-    
-    private var arrivalTime: String {
-        let totalSecs = journey.segments.compactMap { $0.durationSeconds }.reduce(0, +)
-        let arrivalDate = Date().addingTimeInterval(totalSecs > 0 ? totalSecs : 1200)
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter.string(from: arrivalDate)
-    }
+
 }

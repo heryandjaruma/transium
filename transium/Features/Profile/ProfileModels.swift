@@ -13,7 +13,10 @@ public nonisolated struct Profile: Codable, Identifiable, Sendable, Equatable {
     public let lastName: String?
     public let level: Int
     public let image: String?
-    public let email: String
+    // Documented as required by the OpenAPI spec, but POST /private/journey/{id}/complete's
+    // embedded `profile` (a leaner projection, not the full GET /private/profile response)
+    // omits it in practice — kept optional so decoding doesn't hard-fail on that.
+    public let email: String?
 
     public init(
         id: String,
@@ -22,7 +25,7 @@ public nonisolated struct Profile: Codable, Identifiable, Sendable, Equatable {
         lastName: String? = nil,
         level: Int = 1,
         image: String? = nil,
-        email: String
+        email: String? = nil
     ) {
         self.id = id
         self.userId = userId

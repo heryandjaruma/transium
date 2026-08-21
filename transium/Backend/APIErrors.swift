@@ -11,7 +11,7 @@ public enum TransiumAPIError: LocalizedError, Sendable {
     case unauthorized
     case forbidden
     case notFound(String)
-    case conflict(String)
+    case conflict(String, Data?)
     case unprocessableEntity(String)
     case serverError(statusCode: Int, message: String)
     case decodingError(Error)
@@ -31,7 +31,7 @@ public enum TransiumAPIError: LocalizedError, Sendable {
             return "You do not have permission to perform this action."
         case .notFound(let message):
             return message.isEmpty ? "Resource not found." : message
-        case .conflict(let message):
+        case .conflict(let message, _):
             return message.isEmpty ? "Conflict with existing resource." : message
         case .unprocessableEntity(let message):
             return message.isEmpty ? "Unprocessable request." : message

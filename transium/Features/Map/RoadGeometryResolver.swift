@@ -44,21 +44,26 @@ public actor RoadGeometryResolver {
     }
     
     public func resolveSegmentGeometry(_ segment: JourneySegment) async -> JourneySegment {
+        // Mission entries are a quest step, not a travel leg — no from/to/geometry to resolve.
+        guard let from = segment.from, let to = segment.to else {
+            return segment
+        }
+
         // If geometry is already high resolution (e.g. walk routes from backend with > 2 points), keep it
         if segment.type == "walk" && segment.geometry.count > 2 {
             return segment
         }
-        
+
         let stopsCount = segment.stops?.count ?? 0
-        let cacheKey = "\(segment.type)-\(segment.from.lat),\(segment.from.lng)-\(segment.to.lat),\(segment.to.lng)-\(stopsCount)"
+        let cacheKey = "\(segment.type)-\(from.lat),\(from.lng)-\(to.lat),\(to.lng)-\(stopsCount)"
         if let cached = cache[cacheKey], cached.count > 2 {
             return segment.withGeometry(cached)
         }
-        
+
         if segment.type == "bus" {
             let coords = await fetchRoadCoordinates(
-                from: segment.from.coordinate,
-                to: segment.to.coordinate,
+                from: from.coordinate,
+                to: to.coordinate,
                 stops: segment.stops,
                 transportType: .automobile
             )
@@ -69,8 +74,8 @@ public actor RoadGeometryResolver {
             }
         } else if segment.type == "transfer" || segment.type == "walk" {
             let coords = await fetchRoadCoordinates(
-                from: segment.from.coordinate,
-                to: segment.to.coordinate,
+                from: from.coordinate,
+                to: to.coordinate,
                 stops: nil,
                 transportType: .walking
             )
@@ -80,7 +85,7 @@ public actor RoadGeometryResolver {
                 return segment.withGeometry(geom)
             }
         }
-        
+
         return segment
     }
     

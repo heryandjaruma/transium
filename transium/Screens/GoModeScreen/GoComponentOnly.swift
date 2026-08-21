@@ -81,10 +81,12 @@ enum GoTravelMode {
         }
     }
 
+    /// Line name for the badge under the icon, truncated at the first "-" (e.g. "K5B-0" → "K5B") —
+    /// the suffix after the dash is an internal variant/direction marker, not part of the line name.
     fileprivate var badgeCode: String? {
         switch self {
         case .walking: nil
-        case .bus(let providerCode): providerCode
+        case .bus(let providerCode): providerCode.truncatedAtDash
         }
     }
 }
@@ -96,15 +98,23 @@ private struct GoStepIcon: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: size * 0.35, style: .continuous)
-                .fill(.white)
-                .frame(width: size, height: size)
-                .overlay {
-                    Image(systemName: mode.symbolName)
-                        .font(.system(size: size * 0.60, weight: .semibold))
-                        .foregroundStyle(TransiumColor.primaryBlue)
-                }
-//                .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+            switch mode {
+            case .walking:
+                RoundedRectangle(cornerRadius: size * 0.35, style: .continuous)
+                    .fill(.white)
+                    .frame(width: size, height: size)
+                    .overlay {
+                        Image(systemName: mode.symbolName)
+                            .font(.system(size: size * 0.60, weight: .semibold))
+                            .foregroundStyle(TransiumColor.primaryBlue)
+                    }
+
+            case .bus:
+                Image("LineIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+            }
 
             if let badgeCode = mode.badgeCode {
                 Text(badgeCode)
@@ -202,6 +212,75 @@ struct GoStepCard: View {
                     .foregroundStyle(.white)
             }
         }
+    }
+}
+
+// MARK: - Go Mission Card
+// Blue-family floating card for a "mission" segment as the current step — instructions plus a
+// white "I'm here" confirm button, matching GoStepCard/GoBusAppCard's shape and typography but
+// in the yellow used everywhere else in Go Mode to mark a mission (vs. a travel leg).
+
+struct GoMissionCard: View {
+    let instructions: String
+    /// Whether this mission's action is a photo capture (`JourneyAttemptStep.isPhotoCheckpoint`)
+    /// — changes the confirm button's label/icon to "Take a Photo" (matching `manualActionCard`'s
+    /// same distinction for unlocated steps), since tapping it does trigger the camera: it
+    /// routes through the same `handleGeofenceEntered` a real geofence entry uses, which pops
+    /// the camera for any not-yet-done photo checkpoint regardless of how it was triggered.
+    let isCapture: Bool
+    /// Whether the device is close enough to this mission's own location for the confirm
+    /// button to make sense — see `JourneyAttemptStep.isWithinConfirmationRange`. The button is
+    /// omitted (not just disabled) while out of range, same as the trip-details list used to do
+    /// before this card took over as the only place a mission gets confirmed from.
+    let isConfirmable: Bool
+    let onConfirm: () -> Void
+
+    var body: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 65 * 0.35, style: .continuous)
+                    .fill(.white)
+                    .frame(width: 65, height: 65)
+                Image(systemName: "questionmark.app.fill")
+                    .font(.system(size: 65 * 0.5, weight: .semibold))
+                    .foregroundStyle(TransiumColor.primaryYellow)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Mission")
+                    .font(TransiumFont.body(14, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+
+                Text(instructions)
+                    .font(TransiumFont.body(19, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+
+                if isConfirmable {
+                    Button(action: onConfirm) {
+                        HStack(spacing: 5) {
+                            Image(systemName: isCapture ? "camera.fill" : "checkmark.circle")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(isCapture ? "Take a Photo" : "I'm here")
+                                .font(TransiumFont.body(13, weight: .semibold))
+                        }
+                        .foregroundStyle(TransiumColor.primaryYellow)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.white)
+                        .clipShape(.capsule)
+                    }
+                    .buttonStyle(.transiumNoOpacity)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(TransiumColor.primaryYellow)
+        .clipShape(.rect(cornerRadius: 30))
     }
 }
 
@@ -304,67 +383,3 @@ struct GoBusLivePill: View {
     }
 }
 
-// MARK: - Go Bottom Sheet Handle
-// Drag-handle grabber with a trailing "Trip Details" text button.
-
-struct GoBottomSheetHandle: View {
-    let onTripDetails: () -> Void
-
-    var body: some View {
-        VStack(spacing: 10) {
-            Capsule()
-                .fill(Color.black.opacity(0.15))
-                .frame(width: 42, height: 4)
-
-            HStack {
-                Button(action: onTripDetails) {
-                    Text("Trip Details")
-                        .font(TransiumFont.body(17, weight: .bold))
-                        .foregroundStyle(TransiumColor.primaryBlue)
-                }
-                .buttonStyle(.transiumNoOpacity)
-
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-        }
-        .padding(.top, 10)
-    }
-}
-
-// MARK: - Go Bottom Panel
-// Ties everything together: optional live-tracking pill + the blue step
-// card + the bottom-sheet handle, exactly like the three screenshots.
-
-struct GoBottomPanel: View {
-    let livePill: (title: String, subtitle: String, action: () -> Void)?
-    let card: AnyView
-    let onTripDetails: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let livePill {
-                GoBusLivePill(title: livePill.title, subtitle: livePill.subtitle, action: livePill.action)
-            }
-
-            card
-
-            GoBottomSheetHandle(onTripDetails: onTripDetails)
-        }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-    }
-}
-
-
-#Preview("Walking") {
-    GoComponentMode(variant: .walking)
-}
-
-#Preview("Commute") {
-    GoComponentMode(variant: .commute)
-}
-
-#Preview("Commute On Going") {
-    GoComponentMode(variant: .commuteOnGoing)
-}
