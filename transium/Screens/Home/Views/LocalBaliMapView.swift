@@ -549,11 +549,10 @@ struct LocalBaliMapView: UIViewRepresentable {
                 casingLayer.lineJoin = NSExpression(forConstantValue: "round")
                 style.addLayer(casingLayer)
                 
-                // Sleek solid walking blue line
                 let lineLayer = MLNLineStyleLayer(identifier: lineLayerId, source: source)
-                let walkColor = UIColor(red: 0.18, green: 0.52, blue: 0.98, alpha: 0.92)
+                let walkColor = UIColor(red: 0.06, green: 0.72, blue: 0.51, alpha: 1.0)
                 lineLayer.lineColor = NSExpression(forConstantValue: walkColor)
-                lineLayer.lineWidth = NSExpression(forConstantValue: 3.6)
+                lineLayer.lineWidth = NSExpression(forConstantValue: 3.8)
                 lineLayer.lineCap = NSExpression(forConstantValue: "round")
                 lineLayer.lineJoin = NSExpression(forConstantValue: "round")
                 style.addLayer(lineLayer)
