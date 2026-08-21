@@ -51,6 +51,17 @@ struct LocalBaliMapView: UIViewRepresentable {
     /// heading-oriented "third person" view that continuously follows the user along the
     /// route, instead of the flat top-down centering used everywhere else.
     var isGoMode: Bool = false
+    /// True while the search sheet's pin-drop flow is active. The caller draws its own fixed
+    /// pin at screen center (`centerPinIndicator`); this just reports the map's own center
+    /// coordinate back via `onPinCenterChanged` as the user drags the map underneath it.
+    var isPinning: Bool = false
+    /// A specific coordinate to animate the camera to once — set when entering pinning mode
+    /// (a picked search result, or "use my current location"), unlike `centerRequestID` this
+    /// doesn't track continuous GPS updates, just a one-shot jump to wherever this points.
+    var pinFocusCoordinate: CLLocationCoordinate2D?
+    /// The map's live center coordinate, reported whenever it settles while `isPinning` is
+    /// true — the caller debounces this into a reverse-geocode lookup.
+    var onPinCenterChanged: ((CLLocationCoordinate2D) -> Void)?
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -111,7 +122,25 @@ struct LocalBaliMapView: UIViewRepresentable {
             displayLocation: displayLocation,
             context: context
         )
-        
+
+        // Keep the Coordinator's delegate callback in sync every refresh — mirrors how
+        // `geofenceMonitor.onRegionEntered` gets reassigned on the HomeScreen side elsewhere in
+        // this app, since a UIViewRepresentable's closures aren't otherwise reachable from the
+        // Coordinator's own delegate methods.
+        context.coordinator.isPinningActive = isPinning
+        context.coordinator.onPinCenterChanged = onPinCenterChanged
+
+        if isPinning, let pinFocusCoordinate {
+            let changed = context.coordinator.lastPinFocusCoordinate.map {
+                abs($0.latitude - pinFocusCoordinate.latitude) > 0.00001 ||
+                abs($0.longitude - pinFocusCoordinate.longitude) > 0.00001
+            } ?? true
+            if changed {
+                context.coordinator.lastPinFocusCoordinate = pinFocusCoordinate
+                mapView.setCenter(pinFocusCoordinate, zoomLevel: 16.5, animated: true)
+            }
+        }
+
         guard let displayLocation else {
             return
         }
@@ -168,6 +197,17 @@ struct LocalBaliMapView: UIViewRepresentable {
         private let userAnnotation = PreviewUserPointAnnotation()
         private var lastRenderedLocation: CLLocation?
 
+        // MARK: - Pin-drop (search sheet)
+
+        var isPinningActive = false
+        var onPinCenterChanged: ((CLLocationCoordinate2D) -> Void)?
+        var lastPinFocusCoordinate: CLLocationCoordinate2D?
+
+        func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
+            guard isPinningActive else { return }
+            onPinCenterChanged?(mapView.centerCoordinate)
+        }
+
         // MARK: - Go Mode third-person camera
 
         /// Whether the camera should keep chasing the user (Go Mode's default). Cleared the
@@ -185,7 +225,9 @@ struct LocalBaliMapView: UIViewRepresentable {
         private var routePathCoordinates: [CLLocationCoordinate2D] = []
         private var didAttachFollowGestureObservers = false
 
-        private static let thirdPersonZoomLevel: Double = 17.0
+        // Matches `MLNMapView.maximumZoomLevel` (set in `makeUIView`) — anything higher would
+        // just get silently clamped there anyway.
+        private static let thirdPersonZoomLevel: Double = 16.5
         private static let thirdPersonPitch: CGFloat = 55
         /// How far ahead along the route to look when computing the camera's heading — short
         /// enough to hug tight turns, long enough not to jitter on GPS noise between updates.

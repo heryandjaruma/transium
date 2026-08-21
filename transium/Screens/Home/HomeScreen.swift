@@ -82,7 +82,30 @@ struct HomeScreen: View {
     @State private var sheetState: SearchSheetState = .searching
     @State private var sheetDetent: PresentationDetent = .large
     @State private var searchText = ""
-    
+    /// A manually chosen "current location" — from the search sheet's pinning flow — that
+    /// `resolvedCurrentLocation` prefers over real GPS everywhere (map display, journey
+    /// planning). `nil` means "use real GPS," the default. Deliberately app-wide per product
+    /// intent, but Go Mode itself refuses to start while this is set (see `startGoMode`) since
+    /// its whole geofence-tracking mechanism assumes the user is actually where they say they
+    /// are.
+    @State private var manualLocationOverride: CLLocationCoordinate2D?
+    @State private var manualLocationOverrideLabel: String?
+    /// Drives the "Go requires your real location" alert `startGoMode` shows when
+    /// `manualLocationOverride` is set.
+    @State private var isLocationOverrideBlockingGoPresented = false
+    /// A coordinate to animate the map's pin-drop camera to once — set when entering pinning
+    /// mode (a picked search result, or the pinning overlay's own locate button), read by
+    /// `LocalBaliMapView.pinFocusCoordinate`.
+    @State private var pinFocusCoordinate: CLLocationCoordinate2D?
+    /// The map's live center coordinate while pinning, reported by
+    /// `LocalBaliMapView.onPinCenterChanged` as the user drags — what "Set Starting Point"
+    /// actually captures.
+    @State private var pinnedCoordinate: CLLocationCoordinate2D?
+    @State private var pinnedAddressLabel = "Locating address..."
+    /// Debounces `pinnedCoordinate` changes into a GET /maps/reverse-geocode call — cancelled
+    /// and restarted on every drag update rather than firing one per frame.
+    @State private var reverseGeocodeTask: Task<Void, Never>?
+
     // MARK: - Kelurahan Quests State
     @State private var kelurahanGroups: [KelurahanQuestsGroup] = []
     @State private var selectedKelurahan: Kelurahan = Kelurahan(id: "7760985", kelurahanName: "Benoa", kecamatanName: "Kuta Selatan")
@@ -99,7 +122,13 @@ struct HomeScreen: View {
                 centerRequestID: mapCenterRequestID,
                 activeJourney: activeJourney,
                 checkpoints: goGeofences,
-                isGoMode: showGoMode
+                isGoMode: showGoMode,
+                isPinning: isSearchPresented && sheetState == .pinning,
+                pinFocusCoordinate: pinFocusCoordinate,
+                onPinCenterChanged: { coordinate in
+                    pinnedCoordinate = coordinate
+                    scheduleReverseGeocode(for: coordinate)
+                }
             )
             .ignoresSafeArea()
             
@@ -326,6 +355,18 @@ struct HomeScreen: View {
         } message: { conflict in
             Text(conflict.message)
         }
+        .alert(
+            "Go Requires Your Real Location",
+            isPresented: $isLocationOverrideBlockingGoPresented
+        ) {
+            Button("Use My Current Location") {
+                manualLocationOverride = nil
+                manualLocationOverrideLabel = nil
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You're viewing the map from a manually set location. Switch back to your real location to start this journey.")
+        }
         .fullScreenCover(item: $pendingPhotoStep) { step in
             CameraScreen(onCaptured: { image in
                 await handlePhotoCaptured(image: image, step: step)
@@ -346,6 +387,20 @@ struct HomeScreen: View {
             SearchSheetView(
                 state: $sheetState,
                 searchText: $searchText,
+                pinnedAddressLabel: pinnedAddressLabel,
+                onSelectLocation: { coordinate, label in
+                    beginPinning(at: coordinate, label: label)
+                },
+                onConfirmStartingPoint: {
+                    manualLocationOverride = pinnedCoordinate
+                    manualLocationOverrideLabel = pinnedAddressLabel
+                    isSearchPresented = false
+                },
+                onUseCurrentLocation: {
+                    manualLocationOverride = nil
+                    manualLocationOverrideLabel = nil
+                    isSearchPresented = false
+                },
                 onCancel: { isSearchPresented = false }
             )
             .presentationDetents([.medium, .large], selection: $sheetDetent)
@@ -444,6 +499,9 @@ struct HomeScreen: View {
         if let previewLocation {
             return previewLocation
         }
+        if let manualLocationOverride {
+            return CLLocation(latitude: manualLocationOverride.latitude, longitude: manualLocationOverride.longitude)
+        }
         if let currentLocation = locationStore.currentLocation, currentLocation.coordinate.isWithinBaliRegion {
             return currentLocation
         }
@@ -523,72 +581,68 @@ struct HomeScreen: View {
 //    }
     
     // MARK: - Pinning Overlay
-    
+
     private var pinningOverlayControls: some View {
-        VStack {
-            Spacer()
-            
-            HStack(spacing: 12) {
-                Button(action: {
-                    sheetDetent = .large
-                    sheetState = .searching
-                }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.left")
-                            .font(.system(size: 14, weight: .bold))
-                        Text("List")
-                            .font(TransiumFont.body(14, weight: .bold))
-                    }
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 16)
-                    .frame(height: 44)
-                    .background(Color.white)
-                    .cornerRadius(22)
-                    .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+        VStack(spacing: 12) {
+            HStack {
+                Button(action: { isSearchPresented = false }) {
+                    Image(systemName: "arrow.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.black)
+                        .frame(width: 44, height: 44)
+                        .background(Color.white)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
                 }
-                
+
                 Spacer()
-                
+
                 Button(action: {
-                    AppToastCenter.shared.showSuccess(
-                        title: "Location Pinned",
-                        message: "Pinned destination selected."
-                    )
-                    sheetDetent = .large
-                    sheetState = .searching
+                    guard let coordinate = locationStore.currentLocation?.coordinate else { return }
+                    pinFocusCoordinate = coordinate
                 }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .bold))
-                        Text("Confirm Pin")
-                            .font(TransiumFont.body(14, weight: .bold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .frame(height: 44)
-                    .background(TransiumColor.primaryBlue)
-                    .cornerRadius(22)
-                    .shadow(color: TransiumColor.primaryBlue.opacity(0.4), radius: 6, y: 3)
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.black)
+                        .frame(width: 44, height: 44)
+                        .background(Color.white)
+                        .clipShape(Circle())
+                        .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 360)
+
+            HStack(spacing: 8) {
+                Image(systemName: "hand.draw.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Drag the point anywhere on the map.")
+                    .font(TransiumFont.body(13, weight: .semibold))
+            }
+            .foregroundColor(TransiumColor.primaryBlue)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color.white.opacity(0.95))
+            .clipShape(Capsule())
+            .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
+
+            Spacer()
         }
+        .padding(.top, 6)
         .transition(.opacity)
     }
     
     private var centerPinIndicator: some View {
         VStack(spacing: 0) {
-            Image(systemName: "mappin.circle.fill")
-                .font(.system(size: 36))
-                .foregroundColor(TransiumColor.primaryBlue)
-                .background(Circle().fill(Color.white).padding(2))
+            Image("location_red")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 40, height: 40)
                 .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
-            
-            Image(systemName: "arrowtriangle.down.fill")
-                .font(.system(size: 10))
-                .foregroundColor(TransiumColor.primaryBlue)
-                .offset(y: -3)
+
+            Ellipse()
+                .fill(Color.black.opacity(0.2))
+                .frame(width: 14, height: 4)
+                .offset(y: -4)
         }
         .allowsHitTesting(false)
         .transition(.opacity)
@@ -808,6 +862,13 @@ struct HomeScreen: View {
 
     private func startGoMode() {
         guard !isStartingGoMode, let questId = activeQuestId else { return }
+        // Go Mode's whole geofence-tracking mechanism assumes the device's real GPS position
+        // is where the journey actually is — starting it from a manually overridden "current
+        // location" would plan (and try to track) a trip the user was never physically on.
+        guard manualLocationOverride == nil else {
+            isLocationOverrideBlockingGoPresented = true
+            return
+        }
         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
             isStartingGoMode = true
         }
@@ -1309,31 +1370,38 @@ struct HomeScreen: View {
     }
     
     private var currentLocationPill: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "location.fill")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(TransiumColor.primaryBlue)
-            
-            Text("Your Current Location")
-                .font(TransiumFont.body(14, weight: .semibold))
-                .foregroundStyle(TransiumColor.ticketInk)
-            
-            Spacer()
-            
-            Text(currentLocationText)
-                .font(TransiumFont.body(12, weight: .medium))
-                .foregroundStyle(TransiumColor.ticketInk.opacity(0.6))
+        Button(action: { presentSearchSheet(in: .searching) }) {
+            HStack(spacing: 10) {
+                Image(systemName: "location.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(TransiumColor.primaryBlue)
+
+                Text(currentLocationText)
+                    .font(TransiumFont.body(14, weight: .semibold))
+                    .foregroundStyle(TransiumColor.ticketInk)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(TransiumColor.primaryBlue)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(Color.white.opacity(0.92))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.92))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+        .buttonStyle(.transiumNoOpacity)
         .padding(.horizontal, 20)
     }
-    
+
     private var currentLocationText: String {
+        if let manualLocationOverrideLabel {
+            return manualLocationOverrideLabel
+        }
         if let loc = resolvedCurrentLocation {
             return String(format: "%.4f, %.4f", loc.coordinate.latitude, loc.coordinate.longitude)
         }
@@ -1345,11 +1413,43 @@ struct HomeScreen: View {
         sheetDetent = (state == .searching) ? .large : .medium
         isSearchPresented = true
     }
-    
+
     private func resetSheetState() {
         sheetState = .searching
         sheetDetent = .large
         searchText = ""
+        pinFocusCoordinate = nil
+        pinnedCoordinate = nil
+        pinnedAddressLabel = "Locating address..."
+        reverseGeocodeTask?.cancel()
+    }
+
+    /// A search result was picked — moves the sheet into pin-drop mode centered on it. Seeds
+    /// `pinnedAddressLabel` with the result's own label so there's no blank/loading flash
+    /// before the map settles there and the first live reverse-geocode (`onPinCenterChanged` →
+    /// `scheduleReverseGeocode`) confirms it.
+    private func beginPinning(at coordinate: CLLocationCoordinate2D, label: String) {
+        pinFocusCoordinate = coordinate
+        pinnedCoordinate = coordinate
+        pinnedAddressLabel = label
+        sheetDetent = .medium
+        sheetState = .pinning
+    }
+
+    /// Debounces `pinnedCoordinate` updates (fired on every drag) into a single GET
+    /// /maps/reverse-geocode call once the map settles, rather than one request per frame.
+    private func scheduleReverseGeocode(for coordinate: CLLocationCoordinate2D) {
+        reverseGeocodeTask?.cancel()
+        reverseGeocodeTask = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            guard let result = try? await LocationService.shared.reverseGeocode(lat: coordinate.latitude, lng: coordinate.longitude),
+                  let place = result.results.first else { return }
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                pinnedAddressLabel = place.label
+            }
+        }
     }
 }
 
