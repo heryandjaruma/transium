@@ -1,14 +1,11 @@
 //
-//  ReportCard.swift
+//  JourneySummaryReportCard.swift
 //  transium
-//
-//  Created by Beatrice Deviana on 19/08/26.
 //
 
 import SwiftUI
 
-struct ComponentSummary: View {
-
+struct JourneySummaryReportCard: View {
     let origin: String
     let destination: String
     let cards: [StatCardData]
@@ -28,7 +25,6 @@ struct ComponentSummary: View {
 
             VStack(spacing: 16) {
                 routePill
-
                 statsGrid
             }
             .padding()
@@ -39,8 +35,6 @@ struct ComponentSummary: View {
     }
 
     // MARK: - Route Pill
-    // Pola pill yang sama seperti "Sanur Street" di SummaryScreen_1,
-    // tapi dengan 2 titik (origin → destination) alih-alih 1 lokasi tunggal.
 
     private var routePill: some View {
         HStack(spacing: 6) {
@@ -49,7 +43,7 @@ struct ComponentSummary: View {
                 .frame(width: 12, height: 12)
 
             Text(origin)
-                .font(TransiumFont.body(12).weight(.semibold))
+                .font(TransiumFont.body(12, weight: .semibold))
 
             Image(systemName: "arrow.right")
                 .font(.system(size: 11, weight: .semibold))
@@ -59,7 +53,7 @@ struct ComponentSummary: View {
                 .frame(width: 12, height: 12)
 
             Text(destination)
-                .font(TransiumFont.body(12).weight(.semibold))
+                .font(TransiumFont.body(12, weight: .semibold))
         }
         .foregroundStyle(.black)
         .padding(10)
@@ -81,15 +75,14 @@ struct ComponentSummary: View {
     }
 }
 
+// Backward-compatibility typealias
+typealias ComponentSummary = JourneySummaryReportCard
+
 #Preview {
-    ComponentSummary(cards: [
-        StatCardData(title: "Total Distance", value: "17", unit: "km",
-                     icon: "distance-icon"),
-        StatCardData(title: "Cost Total", value: "4.4k", unit: "Rp",
-                     icon: "cost-icon"),
-        StatCardData(title: "Calorie Burn", value: "2500", unit: nil,
-                     icon: "calorie-icon"),
-        StatCardData(title: "Total Steps", value: "3600", unit: nil,
-                     icon: "steps-icon")
+    JourneySummaryReportCard(cards: [
+        StatCardData(title: "Total Distance", value: "17", unit: "km", icon: "distance-icon"),
+        StatCardData(title: "Cost Total", value: "4.4k", unit: "Rp", icon: "cost-icon"),
+        StatCardData(title: "Calorie Burn", value: "2500", unit: nil, icon: "calorie-icon"),
+        StatCardData(title: "Total Steps", value: "3600", unit: nil, icon: "steps-icon")
     ])
 }
