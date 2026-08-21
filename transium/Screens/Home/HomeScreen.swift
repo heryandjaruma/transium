@@ -508,6 +508,54 @@ struct HomeScreen: View {
         return baliFallbackLocation
     }
 
+    private func coordinateForKelurahan(_ kelurahan: Kelurahan) -> CLLocation {
+        switch kelurahan.id {
+        case "7760985": // Benoa / Nusa Dua
+            return CLLocation(latitude: -8.7981, longitude: 115.2185)
+        case "20447626": // Ubud
+            return CLLocation(latitude: -8.5069, longitude: 115.2625)
+        case "20447290": // Panjer
+            return CLLocation(latitude: -8.6783, longitude: 115.2312)
+        case "20447300": // Dauh Puri Kaja
+            return CLLocation(latitude: -8.6425, longitude: 115.2120)
+        case "20447299": // Dauh Puri Kangin
+            return CLLocation(latitude: -8.6578, longitude: 115.2185)
+        case "20447275": // Sanur Kauh
+            return CLLocation(latitude: -8.7050, longitude: 115.2500)
+        case "20447277": // Sanur
+            return CLLocation(latitude: -8.6882, longitude: 115.2635)
+        default:
+            let name = kelurahan.kelurahanName.lowercased()
+            if name.contains("ubud") {
+                return CLLocation(latitude: -8.5069, longitude: 115.2625)
+            } else if name.contains("sanur") {
+                return CLLocation(latitude: -8.6882, longitude: 115.2635)
+            } else if name.contains("benoa") || name.contains("nusa dua") {
+                return CLLocation(latitude: -8.7981, longitude: 115.2185)
+            } else if name.contains("kuta") {
+                return CLLocation(latitude: -8.7210, longitude: 115.1700)
+            } else if name.contains("denpasar") || name.contains("panjer") || name.contains("dauh puri") {
+                return CLLocation(latitude: -8.6705, longitude: 115.2126)
+            }
+            return CLLocation(latitude: -8.7021, longitude: 115.1762)
+        }
+    }
+
+    private func distanceText(for group: KelurahanQuestsGroup) -> String {
+        let destination = coordinateForKelurahan(group.kelurahan)
+        let distanceInMeters = resolvedCurrentLocation.distance(from: destination)
+        let km = distanceInMeters / 1000.0
+        
+        if km < 1.0 {
+            let roundedMeters = max(50, Int(round(distanceInMeters / 50.0)) * 50)
+            return "\(roundedMeters) m"
+        } else if km < 10.0 {
+            return String(format: "%.1f km", km)
+        } else {
+            return "\(Int(round(km))) km"
+        }
+    }
+
     /// Appends the device's live position to `goPathBreadcrumb` while Go Mode is active —
     /// LocationStore already throttles updates to real ~5m movement, so no extra dedup is
     /// needed here. Submitted as `path` in POST /private/journey/{id}/complete.
@@ -810,7 +858,7 @@ struct HomeScreen: View {
 
         Task {
             do {
-                let originCoordinate = resolvedCurrentLocation?.coordinate ?? CLLocationCoordinate2D(latitude: -8.702105, longitude: 115.176189)
+                let originCoordinate = resolvedCurrentLocation.coordinate
                 // Authenticated + scoped to this attempt, so mission segments/steps come back
                 // with an exact `stepId` join key instead of none at all.
                 let response = try await journeyService.fetchRealJourney(questId: questId, origin: originCoordinate, journeyAttemptId: attempt.id)
@@ -888,7 +936,7 @@ struct HomeScreen: View {
                 // an attempt exists, so the rest of the session has the exact join key instead
                 // of relying on coordinate-matching. Best-effort — if it fails, Go Mode still
                 // works fine off the existing `activeJourney`, just without `stepId` on missions.
-                let originCoordinate = resolvedCurrentLocation?.coordinate ?? CLLocationCoordinate2D(latitude: -8.702105, longitude: 115.176189)
+                let originCoordinate = resolvedCurrentLocation.coordinate
                 if let response = try? await journeyService.fetchRealJourney(
                     questId: questId,
                     origin: originCoordinate,
@@ -1063,7 +1111,7 @@ struct HomeScreen: View {
     /// the one that finishes the whole journey — the completion summary screen is
     /// acknowledgement enough there.
     private func handleGeofenceEntered(stepId: String, attemptId: String, isManualConfirmation: Bool = false) {
-        guard let coordinate = locationStore.currentLocation?.coordinate ?? resolvedCurrentLocation?.coordinate else { return }
+        let coordinate = locationStore.currentLocation?.coordinate ?? resolvedCurrentLocation.coordinate
 
         // A photo-capture step is a moment-in-time prompt, not something that should wait on
         // `advance` below — so the camera pops independently of (and before) that network round
@@ -1402,10 +1450,8 @@ struct HomeScreen: View {
         if let manualLocationOverrideLabel {
             return manualLocationOverrideLabel
         }
-        if let loc = resolvedCurrentLocation {
-            return String(format: "%.4f, %.4f", loc.coordinate.latitude, loc.coordinate.longitude)
-        }
-        return "Locating..."
+        let loc = resolvedCurrentLocation
+        return String(format: "%.4f, %.4f", loc.coordinate.latitude, loc.coordinate.longitude)
     }
     
     private func presentSearchSheet(in state: SearchSheetState) {
