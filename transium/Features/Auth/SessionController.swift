@@ -46,15 +46,41 @@ final class SessionController {
             return
         }
 
+        // Fast optimistic path: If we have a cached profile, restore immediately (0ms launch)
+        if let cachedProfile = SessionTokenStore.readProfile() {
+            phase = .signedIn(cachedProfile)
+            
+            // Asynchronously validate / refresh in background
+            Task {
+                do {
+                    let freshProfile = try await backend.fetchPrivateProfile(accessToken: token)
+                    SessionTokenStore.saveProfile(freshProfile)
+                    self.phase = .signedIn(freshProfile)
+                } catch BackendError.unauthorized {
+                    SessionTokenStore.clear()
+                    self.phase = .signedOut
+                } catch {
+                    // Transient network failure - keep user signed in offline
+                }
+            }
+            
+            Task {
+                await syncPushNotifications()
+            }
+            return
+        }
+
+        // Fallback path: Validate session with backend if no cached profile
         do {
-            phase = .signedIn(try await backend.fetchPrivateProfile(accessToken: token))
-            await syncPushNotifications()
+            let profile = try await backend.fetchPrivateProfile(accessToken: token)
+            SessionTokenStore.saveProfile(profile)
+            phase = .signedIn(profile)
+            Task { await syncPushNotifications() }
         } catch BackendError.unauthorized {
-            // Remove tokens that the server no longer accepts.
             SessionTokenStore.clear()
             phase = .signedOut
         } catch {
-            // Keep the token if validation only failed because of a temporary error.
+            // Keep the token if validation only failed because of temporary network error
             phase = .signedOut
         }
     }
@@ -73,14 +99,17 @@ final class SessionController {
         do {
             let session = try await backend.verifyAppleSignIn(credential)
 
-            SessionTokenStore.save(session.accessToken)
-            try localStore.upsertLocalProfile(
+            SessionTokenStore.save(session.accessToken, profile: session.profile)
+            try? localStore.upsertLocalProfile(
                 from: credential,
                 remoteUserID: session.userID
             )
 
             phase = .signedIn(session.profile)
-            await syncPushNotifications()
+            
+            Task {
+                await syncPushNotifications()
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

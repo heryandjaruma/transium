@@ -72,9 +72,21 @@ public final class APIClient: APIClientProtocol, @unchecked Sendable {
     private let jsonEncoder: JSONEncoder
     private let jsonDecoder: JSONDecoder
 
+    public static func defaultSession() -> URLSession {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 20.0
+        config.timeoutIntervalForResource = 45.0
+        config.waitsForConnectivity = true
+        config.httpAdditionalHeaders = [
+            "Accept": "application/json",
+            "Connection": "keep-alive"
+        ]
+        return URLSession(configuration: config)
+    }
+
     public init(
         baseURL: URL = APIConfiguration.apiBaseURL,
-        session: URLSession = .shared
+        session: URLSession = defaultSession()
     ) {
         self.baseURL = baseURL
         self.session = session

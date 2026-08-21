@@ -22,6 +22,13 @@ nonisolated struct BetterAuthBackend: AuthBackend {
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
         configuration.httpCookieStorage = nil
+        configuration.timeoutIntervalForRequest = 20.0
+        configuration.timeoutIntervalForResource = 30.0
+        configuration.waitsForConnectivity = true
+        configuration.httpAdditionalHeaders = [
+            "Accept": "application/json",
+            "Connection": "keep-alive"
+        ]
 
         return URLSession(configuration: configuration)
     }
@@ -121,6 +128,7 @@ nonisolated struct BetterAuthBackend: AuthBackend {
     ) async throws -> (data: Data, response: HTTPURLResponse) {
         var request = URLRequest(url: baseURL.appending(path: path))
         request.httpMethod = method
+        request.timeoutInterval = 20.0
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         if let accessToken {
@@ -132,21 +140,30 @@ nonisolated struct BetterAuthBackend: AuthBackend {
             request.httpBody = try JSONEncoder().encode(body)
         }
 
-        let (data, response) = try await urlSession.data(for: request)
+        var attempts = 0
+        while true {
+            attempts += 1
+            do {
+                let (data, response) = try await urlSession.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw BackendError.invalidResponse
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw BackendError.invalidResponse
+                }
+
+                guard (200..<300).contains(httpResponse.statusCode) else {
+                    let message = try? JSONDecoder().decode(BetterAuthErrorResponse.self, from: data).message
+
+                    throw httpResponse.statusCode == 401 || httpResponse.statusCode == 403
+                        ? BackendError.unauthorized(message)
+                        : BackendError.requestFailed(status: httpResponse.statusCode, message: message)
+                }
+
+                return (data, httpResponse)
+            } catch let error as URLError where (error.code == .timedOut || error.code == .networkConnectionLost) && attempts < 2 {
+                try? await Task.sleep(for: .milliseconds(500))
+                continue
+            }
         }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            let message = try? JSONDecoder().decode(BetterAuthErrorResponse.self, from: data).message
-
-            throw httpResponse.statusCode == 401 || httpResponse.statusCode == 403
-                ? BackendError.unauthorized(message)
-                : BackendError.requestFailed(status: httpResponse.statusCode, message: message)
-        }
-
-        return (data, httpResponse)
     }
 
     private func decode<Value: Decodable>(from data: Data) throws -> Value {

@@ -93,9 +93,11 @@ struct AppToastOverlay: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .background(ToastWindowSceneAttachment())
             .overlay(alignment: .top) {
-                GeometryReader { proxy in
-                    if let toast = toastCenter.toast {
+                // Fallback overlay for environments without active window scene (e.g. previews)
+                if ToastWindowController.shared.window == nil, let toast = toastCenter.toast {
+                    GeometryReader { proxy in
                         AppToastView(toast: toast) {
                             toastCenter.dismiss()
                         }
@@ -105,10 +107,94 @@ struct AppToastOverlay: ViewModifier {
                         .transition(.toastSlide)
                         .zIndex(100)
                     }
+                    .ignoresSafeArea()
+                    .allowsHitTesting(true)
+                }
+            }
+    }
+}
+
+// MARK: - Global Window-Level Toast Presenter (Above All Sheets)
+
+@MainActor
+final class ToastWindowController {
+    static let shared = ToastWindowController()
+
+    private(set) var window: PassthroughToastWindow?
+
+    func setupIfNeeded(scene: UIWindowScene) {
+        guard window == nil else { return }
+
+        let toastWindow = PassthroughToastWindow(windowScene: scene)
+        toastWindow.windowLevel = .statusBar + 100
+        toastWindow.backgroundColor = .clear
+
+        let hostingController = ToastHostingController(rootView: GlobalToastOverlayView())
+        hostingController.view.backgroundColor = .clear
+
+        toastWindow.rootViewController = hostingController
+        toastWindow.isHidden = false
+        toastWindow.isUserInteractionEnabled = true
+        self.window = toastWindow
+    }
+}
+
+final class PassthroughToastWindow: UIWindow {
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard let view = super.hitTest(point, with: event) else { return nil }
+        // Pass touches through if the user tapped on the empty background area
+        if view === rootViewController?.view {
+            return nil
+        }
+        return view
+    }
+}
+
+final class ToastHostingController<Content: View>: UIHostingController<Content> {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+    }
+}
+
+struct GlobalToastOverlayView: View {
+    @ObservedObject private var toastCenter = AppToastCenter.shared
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            if let toast = toastCenter.toast {
+                GeometryReader { proxy in
+                    AppToastView(toast: toast) {
+                        toastCenter.dismiss()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, max(proxy.safeAreaInsets.top, 50) + 10)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .transition(.toastSlide)
                 }
                 .ignoresSafeArea()
-                .allowsHitTesting(toastCenter.toast != nil)
             }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .ignoresSafeArea()
+    }
+}
+
+private struct ToastWindowSceneAttachment: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = ToastAnchorView()
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {}
+
+    final class ToastAnchorView: UIView {
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if let scene = window?.windowScene {
+                ToastWindowController.shared.setupIfNeeded(scene: scene)
+            }
+        }
     }
 }
 
