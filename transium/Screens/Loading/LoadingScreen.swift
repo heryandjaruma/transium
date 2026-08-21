@@ -32,7 +32,7 @@ struct LoadingScreen: View {
                         value: isRotating
                     )
 
-                Image("Bus")
+                Image("bus_new")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 100, height: 100)
