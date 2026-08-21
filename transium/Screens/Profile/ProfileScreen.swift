@@ -315,7 +315,7 @@ struct ProfileScreen: View {
     /// Re-encodes (and, if needed, downscales) the image until it fits under
     /// `maxBytes`. Runs off the main actor since repeated JPEG encoding of a
     /// full-resolution photo can take a noticeable amount of CPU time.
-    private static func compressedAvatarData(from image: UIImage, maxBytes: Int = 1_000_000) -> Data? {
+    nonisolated private static func compressedAvatarData(from image: UIImage, maxBytes: Int = 1_000_000) -> Data? {
         var candidate = image
         var quality: CGFloat = 0.9
 

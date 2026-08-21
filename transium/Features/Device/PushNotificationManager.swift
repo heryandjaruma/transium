@@ -31,8 +31,8 @@ public final class PushNotificationManager {
         #endif
     }
 
-    init(deviceService: DeviceServiceProtocol = DeviceService.shared) {
-        self.deviceService = deviceService
+    init(deviceService: DeviceServiceProtocol? = nil) {
+        self.deviceService = deviceService ?? DeviceService.shared
     }
 
     /// Prompts for notification permission (no-ops if already decided) and,

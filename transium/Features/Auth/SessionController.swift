@@ -100,7 +100,7 @@ final class SessionController {
             let session = try await backend.verifyAppleSignIn(credential)
 
             SessionTokenStore.save(session.accessToken, profile: session.profile)
-            try? localStore.upsertLocalProfile(
+            _ = try localStore.upsertLocalProfile(
                 from: credential,
                 remoteUserID: session.userID
             )
