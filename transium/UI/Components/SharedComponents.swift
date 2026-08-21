@@ -227,7 +227,7 @@ struct QuestRow: View {
     
     @ViewBuilder
     private var thumbnailView: some View {
-        if let imageUrl = quest.imageUrl, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
+        if let imageUrl = quest.imageUrl, !imageUrl.isEmpty, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
@@ -241,17 +241,33 @@ struct QuestRow: View {
                             baseColor: Color.black.opacity(0.06),
                             highlightColor: Color.white.opacity(0.6)
                         )
-                default:
-                    Image(quest.fallbackImageName)
-                        .resizable()
-                        .scaledToFill()
+                case .failure:
+                    fallbackBadgeImage
+                @unknown default:
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.black.opacity(0.08))
                 }
             }
-        } else {
+        } else if !quest.fallbackImageName.isEmpty && quest.fallbackImageName != "Beach" && quest.fallbackImageName != "BusFee" && UIImage(named: quest.fallbackImageName) != nil {
             Image(quest.fallbackImageName)
                 .resizable()
                 .scaledToFill()
+        } else {
+            fallbackBadgeImage
         }
+    }
+
+    private var fallbackBadgeImage: some View {
+        let name: String = {
+            switch quest.theme {
+            case .red: return "gwk"
+            case .green: return "kintamani"
+            case .blue: return "sanoored"
+            }
+        }()
+        return Image(name)
+            .resizable()
+            .scaledToFill()
     }
 }
 
@@ -302,7 +318,7 @@ struct RecommendedQuestCard: View {
                     tilt: .degrees(0),
                     variant: .green
                 ) {
-                    if let imageUrl, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
+                    if let imageUrl, !imageUrl.isEmpty, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
                         AsyncImage(url: url) { phase in
                             switch phase {
                             case .success(let image):
@@ -316,14 +332,21 @@ struct RecommendedQuestCard: View {
                                         baseColor: Color.white.opacity(0.15),
                                         highlightColor: Color.white.opacity(0.45)
                                     )
-                            default:
-                                Image(fallbackImageName)
+                            case .failure:
+                                Image("sanoored")
                                     .resizable()
                                     .scaledToFill()
+                            @unknown default:
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(Color.white.opacity(0.2))
                             }
                         }
-                    } else {
+                    } else if !fallbackImageName.isEmpty && fallbackImageName != "Beach" && fallbackImageName != "BusFee" && UIImage(named: fallbackImageName) != nil {
                         Image(fallbackImageName)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Image("sanoored")
                             .resizable()
                             .scaledToFill()
                     }

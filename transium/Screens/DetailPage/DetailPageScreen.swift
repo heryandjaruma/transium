@@ -361,11 +361,11 @@ struct DetailPlaceScreen: View {
                     let theme: QuestTheme = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .red : .green)
                     let thumbUrl = q.thumbnails.first?.url
                     let fallbackImg: String = {
-                        let cat = q.category.lowercased()
-                        if cat.contains("beach") || cat.contains("leisure") { return "Beach" }
-                        if cat.contains("nature") { return "kintamani" }
-                        if cat.contains("cult") { return "gwk" }
-                        return "sanoored"
+                        switch theme {
+                        case .red: return "gwk"
+                        case .green: return "kintamani"
+                        case .blue: return "sanoored"
+                        }
                     }()
                     
                     loaded.append(Quest(
