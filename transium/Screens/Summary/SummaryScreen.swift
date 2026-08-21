@@ -26,7 +26,7 @@ struct SummaryScreen: View {
                 icon: "distance-icon"
             ),
             StatCardData(
-                title: "Travel Cost",
+                title: "Cost Saved",
                 value: Self.formatIdrAbbreviated(summary.rideHailingMotorcycleSavedIdr ?? 0),
                 unit: "Rp",
                 icon: "cost-icon"

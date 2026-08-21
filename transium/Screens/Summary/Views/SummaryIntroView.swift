@@ -108,7 +108,7 @@ typealias JourneySummaryIntroView = SummaryIntroView
 #Preview {
     SummaryIntroView(cards: [
         StatCardData(title: "Distance", value: "17", unit: "km", icon: "distance-icon"),
-        StatCardData(title: "Travel Cost", value: "4.4k", unit: "Rp", icon: "cost-icon"),
+        StatCardData(title: "Cost Saved", value: "4.4k", unit: "Rp", icon: "cost-icon"),
         StatCardData(title: "Calories", value: "2500", unit: nil, icon: "calorie-icon"),
         StatCardData(title: "Total Steps", value: "3600", unit: nil, icon: "steps-icon")
     ])
