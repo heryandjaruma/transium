@@ -129,6 +129,7 @@ struct GoComponentMode: View {
                 let matchedStep = steps.attemptStep(for: segment)
                 GoMissionCard(
                     instructions: segment.instructions ?? "Complete the mission",
+                    isCapture: matchedStep?.isPhotoCheckpoint ?? false,
                     isConfirmable: matchedStep.map { $0.status != .done && $0.isWithinConfirmationRange(of: currentLocation) } ?? false,
                     onConfirm: {
                         guard let matchedStep else { return }

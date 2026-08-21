@@ -94,6 +94,14 @@ final class JourneyGeofenceMonitor: NSObject, ObservableObject {
             region.notifyOnEntry = true
             region.notifyOnExit = false
             locationManager.startMonitoring(for: region)
+            // `didEnterRegion` only fires on an actual boundary crossing — if the device is
+            // already inside this region the moment it's registered (e.g. finishing one
+            // mission puts you right inside the next one's radius, since geofences are
+            // re-registered fresh after every /advance), it would otherwise never fire until
+            // the user physically left and came back. `requestState(for:)` resolves the
+            // region's current state once, reported via `didDetermineState(for:)` below, which
+            // treats `.inside` the same as a fresh entry.
+            locationManager.requestState(for: region)
         }
         print("JourneyGeofenceMonitor: registered \(toMonitor.count) region(s).")
     }
@@ -109,6 +117,20 @@ extension JourneyGeofenceMonitor: CLLocationManagerDelegate {
 
     nonisolated func locationManager(_ manager: CLLocationManager, monitoringDidFailFor region: CLRegion?, withError error: Error) {
         print("JourneyGeofenceMonitor: monitoring failed for region \(region?.identifier ?? "?") — \(error)")
+    }
+
+    /// Answers `requestState(for:)`, called right after registering each region — treats
+    /// "already inside" the same as a fresh `didEnterRegion` (see `registerRegions`).
+    /// `onRegionEntered`'s caller (`HomeScreen.handleGeofenceEntered`) already tolerates being
+    /// invoked more than once for the same step (guards on `status != .done`), so a region that
+    /// later also delivers a real `didEnterRegion` — a legitimate leave-and-return — isn't a
+    /// problem.
+    nonisolated func locationManager(_ manager: CLLocationManager, didDetermineState state: CLRegionState, for region: CLRegion) {
+        guard state == .inside else { return }
+        print("JourneyGeofenceMonitor: already inside region \(region.identifier) at registration")
+        Task { @MainActor in
+            onRegionEntered?(region.identifier)
+        }
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {

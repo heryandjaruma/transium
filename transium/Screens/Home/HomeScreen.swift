@@ -977,6 +977,15 @@ struct HomeScreen: View {
         }
     }
 
+    /// Grace period before an *automatic* geofence trigger pops the camera — a real region
+    /// crossing, or `JourneyGeofenceMonitor`'s "already inside" check firing the instant a
+    /// mission gets registered right where the user is already standing (e.g. finishing one
+    /// mission puts them inside the next one's radius). Without this, the camera could cover
+    /// the screen before the current-step card even has a chance to render what the new
+    /// mission is. A manual tap on this exact mission's own "Take a Photo" button skips the
+    /// delay entirely — the user already saw the card, that's why they tapped.
+    private static let autoCameraGracePeriodSeconds: Double = 5
+
     /// `isManualConfirmation` is set only when this came from a user tap (the mission "I'm
     /// here" button, or an unlocated step's "I've done it"/"Take a Photo" card) rather than a
     /// real geofence trigger — it shows a small acknowledgement toast so tapping the button
@@ -987,15 +996,23 @@ struct HomeScreen: View {
     private func handleGeofenceEntered(stepId: String, attemptId: String, isManualConfirmation: Bool = false) {
         guard let coordinate = locationStore.currentLocation?.coordinate ?? resolvedCurrentLocation?.coordinate else { return }
 
-        // Pop the camera immediately, before the network round-trip below — a photo-capture
-        // step is a moment-in-time prompt, not something that should wait on `advance`. Applies
-        // whether the step is located (geofence-triggered) or not (manually tapped) — either
-        // way it's still a capture-type step.
-        // Skip it if this step is already done (a re-firing region, or a previous catch-up
-        // advance already covered it) so the user isn't nagged for the same spot twice.
+        // A photo-capture step is a moment-in-time prompt, not something that should wait on
+        // `advance` below — so the camera pops independently of (and before) that network round
+        // trip. Skipped if this step is already done (a re-firing region, or a previous
+        // catch-up advance already covered it) so the user isn't nagged for the same spot twice.
         if let step = goJourneySteps.first(where: { $0.id == stepId }),
            step.isPhotoCheckpoint, step.status != .done {
-            pendingPhotoStep = step
+            if isManualConfirmation {
+                pendingPhotoStep = step
+            } else {
+                Task {
+                    try? await Task.sleep(for: .seconds(Self.autoCameraGracePeriodSeconds))
+                    await MainActor.run {
+                        guard showGoMode, goJourneySteps.first(where: { $0.id == stepId })?.status != .done else { return }
+                        pendingPhotoStep = step
+                    }
+                }
+            }
         }
 
         Task {

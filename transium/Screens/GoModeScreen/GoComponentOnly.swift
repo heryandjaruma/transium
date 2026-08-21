@@ -222,6 +222,12 @@ struct GoStepCard: View {
 
 struct GoMissionCard: View {
     let instructions: String
+    /// Whether this mission's action is a photo capture (`JourneyAttemptStep.isPhotoCheckpoint`)
+    /// — changes the confirm button's label/icon to "Take a Photo" (matching `manualActionCard`'s
+    /// same distinction for unlocated steps), since tapping it does trigger the camera: it
+    /// routes through the same `handleGeofenceEntered` a real geofence entry uses, which pops
+    /// the camera for any not-yet-done photo checkpoint regardless of how it was triggered.
+    let isCapture: Bool
     /// Whether the device is close enough to this mission's own location for the confirm
     /// button to make sense — see `JourneyAttemptStep.isWithinConfirmationRange`. The button is
     /// omitted (not just disabled) while out of range, same as the trip-details list used to do
@@ -254,9 +260,9 @@ struct GoMissionCard: View {
                 if isConfirmable {
                     Button(action: onConfirm) {
                         HStack(spacing: 5) {
-                            Image(systemName: "checkmark.circle")
+                            Image(systemName: isCapture ? "camera.fill" : "checkmark.circle")
                                 .font(.system(size: 12, weight: .semibold))
-                            Text("I'm here")
+                            Text(isCapture ? "Take a Photo" : "I'm here")
                                 .font(TransiumFont.body(13, weight: .semibold))
                         }
                         .foregroundStyle(TransiumColor.primaryYellow)
