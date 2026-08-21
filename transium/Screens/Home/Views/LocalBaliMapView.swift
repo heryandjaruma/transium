@@ -112,7 +112,8 @@ struct LocalBaliMapView: UIViewRepresentable {
         context.coordinator.syncUserAnnotation(
             on: mapView,
             location: displayLocation,
-            heading: markerHeading
+            heading: markerHeading,
+            isGoMode: isGoMode
         )
         
         context.coordinator.syncRouteOverlays(
@@ -340,7 +341,8 @@ struct LocalBaliMapView: UIViewRepresentable {
         func syncUserAnnotation(
             on mapView: MLNMapView,
             location: CLLocation?,
-            heading: CLLocationDirection
+            heading: CLLocationDirection,
+            isGoMode: Bool = false
         ) {
             guard let location else {
                 if mapView.annotations?.contains(where: { $0 === userAnnotation }) == true {
@@ -357,6 +359,7 @@ struct LocalBaliMapView: UIViewRepresentable {
                     userAnnotation.heading = heading
                     if let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView {
                         userView.updateHeading(heading, animated: true)
+                        userView.set3DMode(isGoMode, animated: true)
                     }
                     return
                 }
@@ -374,6 +377,7 @@ struct LocalBaliMapView: UIViewRepresentable {
                 }
                 if let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView {
                     userView.updateHeading(heading, animated: true)
+                    userView.set3DMode(isGoMode, animated: true)
                 }
             }
         }
@@ -938,6 +942,7 @@ struct LocalBaliMapView: UIViewRepresentable {
         private let arrowContainerView = UIView()
         private let arrowLayer = CAShapeLayer()
         private var currentHeadingAngle: CGFloat = 0
+        private var is3DMode: Bool = false
         
         override init(reuseIdentifier: String?) {
             super.init(reuseIdentifier: reuseIdentifier)
@@ -996,6 +1001,42 @@ struct LocalBaliMapView: UIViewRepresentable {
         
         func configure(heading: CLLocationDirection) {
             updateHeading(heading, animated: false)
+        }
+
+        func set3DMode(_ is3D: Bool, animated: Bool = true) {
+            guard is3DMode != is3D else { return }
+            is3DMode = is3D
+
+            let animations = {
+                if is3D {
+                    var transform = CATransform3DIdentity
+                    transform.m34 = -1.0 / 450.0
+                    transform = CATransform3DRotate(transform, 56.0 * .pi / 180.0, 1.0, 0.0, 0.0)
+                    transform = CATransform3DScale(transform, 1.15, 1.15, 1.15)
+                    self.layer.transform = transform
+                    self.coreView.layer.shadowOffset = CGSize(width: 0, height: 7)
+                    self.coreView.layer.shadowRadius = 8
+                    self.coreView.layer.shadowOpacity = 0.42
+                    self.outerPulseView.alpha = 0.5
+                } else {
+                    self.layer.transform = CATransform3DIdentity
+                    self.coreView.layer.shadowOffset = CGSize(width: 0, height: 2)
+                    self.coreView.layer.shadowRadius = 5
+                    self.coreView.layer.shadowOpacity = 0.28
+                    self.outerPulseView.alpha = 1.0
+                }
+            }
+
+            if animated {
+                UIView.animate(
+                    withDuration: 0.5,
+                    delay: 0,
+                    options: [.beginFromCurrentState, .curveEaseInOut],
+                    animations: animations
+                )
+            } else {
+                animations()
+            }
         }
         
         func updateHeading(_ heading: CLLocationDirection, animated: Bool = true) {

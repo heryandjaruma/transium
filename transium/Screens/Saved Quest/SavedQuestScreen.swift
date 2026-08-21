@@ -11,30 +11,6 @@ struct SavedQuestScreen: View {
     @State private var bookmarkedQuests: [DetailPlaceScreen.Quest] = []
     @State private var isLoading: Bool = true
 
-    private let fallbackQuests: [DetailPlaceScreen.Quest] = [
-        DetailPlaceScreen.Quest(
-            imageName: "sanoored",
-            title: "Sanoored",
-            description: "Enjoy the vibe along the shore of Sanur",
-            points: 10,
-            theme: .blue
-        ),
-        DetailPlaceScreen.Quest(
-            imageName: "gelatour",
-            title: "Gela-tour",
-            description: "Gelato + Sanur weather = perfect summer",
-            points: 10,
-            theme: .red
-        ),
-        DetailPlaceScreen.Quest(
-            imageName: "littlestalls",
-            title: "Little Stalls",
-            description: "Go local by enjoying snacks from small businesses",
-            points: 10,
-            theme: .green
-        )
-    ]
-
     var body: some View {
         ZStack(alignment: .top) {
             TransiumColor.primaryBlue
@@ -53,14 +29,14 @@ struct SavedQuestScreen: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
                     }
-                } else if displayedQuests.isEmpty {
+                } else if bookmarkedQuests.isEmpty {
                     emptyState
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 14) {
-                            ForEach(displayedQuests) { quest in
+                            ForEach(bookmarkedQuests) { quest in
                                 SavedQuestCard(quest: quest) {
-                                    // Start quest handler
+                                    // Start quest action
                                     dismiss()
                                 } onRemove: {
                                     removeBookmark(quest: quest)
@@ -78,10 +54,6 @@ struct SavedQuestScreen: View {
         .task {
             await loadBookmarks()
         }
-    }
-
-    private var displayedQuests: [DetailPlaceScreen.Quest] {
-        bookmarkedQuests.isEmpty ? fallbackQuests : bookmarkedQuests
     }
 
     // MARK: - Header
@@ -167,28 +139,51 @@ struct SavedQuestScreen: View {
 
         do {
             let bookmarks = try await BookmarkService.shared.listBookmarks()
-            if !bookmarks.isEmpty {
-                self.bookmarkedQuests = bookmarks.map { bookmark in
-                    let theme: DetailPlaceScreen.QuestTheme = switch bookmark.questCategory.lowercased() {
-                    case "culture", "heritage": .red
-                    case "nature", "culinary": .green
-                    default: .blue
-                    }
+            guard !bookmarks.isEmpty else {
+                self.bookmarkedQuests = []
+                return
+            }
 
-                    return DetailPlaceScreen.Quest(
-                        id: bookmark.questId,
-                        fallbackImageName: "sanoored",
-                        title: bookmark.questName,
-                        description: "\(bookmark.questCategory) Quest",
-                        points: 10,
-                        theme: theme
+            // Enrich each bookmark with thumbnail and quest details if available
+            var enrichedQuests: [DetailPlaceScreen.Quest] = []
+            for bookmark in bookmarks {
+                let theme: DetailPlaceScreen.QuestTheme = switch bookmark.questCategory.lowercased() {
+                case "culture", "heritage": .red
+                case "nature", "culinary": .green
+                default: .blue
+                }
+
+                if let questDetail = try? await QuestService.shared.getQuest(id: bookmark.questId) {
+                    let thumbUrl = questDetail.thumbnails.first?.url
+                    enrichedQuests.append(
+                        DetailPlaceScreen.Quest(
+                            id: bookmark.questId,
+                            imageUrl: thumbUrl,
+                            fallbackImageName: "sanoored",
+                            title: questDetail.name,
+                            description: questDetail.description,
+                            points: questDetail.xp ?? 10,
+                            theme: theme
+                        )
+                    )
+                } else {
+                    enrichedQuests.append(
+                        DetailPlaceScreen.Quest(
+                            id: bookmark.questId,
+                            imageUrl: nil,
+                            fallbackImageName: "sanoored",
+                            title: bookmark.questName,
+                            description: "\(bookmark.questCategory) Quest",
+                            points: 10,
+                            theme: theme
+                        )
                     )
                 }
-            } else {
-                self.bookmarkedQuests = fallbackQuests
             }
+
+            self.bookmarkedQuests = enrichedQuests
         } catch {
-            self.bookmarkedQuests = fallbackQuests
+            self.bookmarkedQuests = []
         }
     }
 

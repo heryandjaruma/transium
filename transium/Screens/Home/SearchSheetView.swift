@@ -67,7 +67,7 @@ struct SearchSheetView: View {
     }
 
     private var searchingContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
@@ -78,6 +78,18 @@ struct SearchSheetView: View {
                         .focused($isSearchFieldFocused)
                         .font(TransiumFont.body(14))
                         .submitLabel(.search)
+
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(Color.gray.opacity(0.6))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     Button(action: onCancel) {
                         Image(systemName: "xmark")
                             .font(.system(size: 17, weight: .semibold))
@@ -89,43 +101,44 @@ struct SearchSheetView: View {
                 .background(Color.white.opacity(0.95))
                 .clipShape(.capsule)
                 .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
-
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
+            .padding(.bottom, 10)
             .foregroundStyle(TransiumColor.primaryBlue)
 
             resultsList
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder
     private var resultsList: some View {
-        if isResolvingSelection {
-            HStack {
-                Spacer()
-                ProgressView().tint(.white)
-                Spacer()
-            }
-            .padding(.top, 24)
-        } else if isSearching && suggestions.isEmpty {
-            HStack {
-                Spacer()
-                ProgressView().tint(.white)
+        if isResolvingSelection || (isSearching && suggestions.isEmpty) {
+            VStack {
+                HStack {
+                    Spacer()
+                    ProgressView().tint(.white)
+                    Spacer()
+                }
+                .padding(.top, 28)
+
                 Spacer()
             }
-            .padding(.top, 24)
         } else if suggestions.isEmpty {
-            if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text("No results for \"\(searchText)\"")
-                    .font(TransiumFont.body(13, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
+            VStack(alignment: .leading) {
+                if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("No results for \"\(searchText)\"")
+                        .font(TransiumFont.body(14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.8))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                }
+                Spacer()
             }
-            Spacer()
         } else {
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 VStack(spacing: 8) {
                     ForEach(suggestions, id: \.self) { suggestion in
                         Button(action: { selectSuggestion(suggestion) }) {
@@ -135,8 +148,8 @@ struct SearchSheetView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 20)
+                .padding(.top, 4)
+                .padding(.bottom, 24)
             }
         }
     }
