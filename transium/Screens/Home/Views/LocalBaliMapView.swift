@@ -534,30 +534,28 @@ struct LocalBaliMapView: UIViewRepresentable {
                 style.addSource(source)
             }
             
-            // Pass 1 (Bottom Layers): Add walking & transfer routes first (Apple Maps style round dots)
+            // Pass 1 (Bottom Layers): Add walking & transfer routes first (clean sleek solid line with rounded joints)
             for (index, segment) in activeJourney.segments.enumerated() where segment.type != "bus" {
                 let sourceId = "route-source-\(index)"
                 let lineLayerId = "route-line-\(index)"
                 let casingLayerId = "route-casing-\(index)"
                 guard let source = style.source(withIdentifier: sourceId) else { continue }
                 
-                // Dotted white outline halo for high contrast over any map tiles
+                // Crisp white casing
                 let casingLayer = MLNLineStyleLayer(identifier: casingLayerId, source: source)
-                casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white.withAlphaComponent(0.92))
-                casingLayer.lineWidth = NSExpression(forConstantValue: 6.2)
+                casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white)
+                casingLayer.lineWidth = NSExpression(forConstantValue: 6.0)
                 casingLayer.lineCap = NSExpression(forConstantValue: "round")
                 casingLayer.lineJoin = NSExpression(forConstantValue: "round")
-                casingLayer.lineDashPattern = NSExpression(forConstantValue: [0.01, 1.75])
                 style.addLayer(casingLayer)
                 
-                // Crisp circular walking dots
+                // Sleek solid walking blue line
                 let lineLayer = MLNLineStyleLayer(identifier: lineLayerId, source: source)
-                let walkColor = UIColor(red: 0.14, green: 0.47, blue: 0.98, alpha: 1.0)
+                let walkColor = UIColor(red: 0.18, green: 0.52, blue: 0.98, alpha: 0.92)
                 lineLayer.lineColor = NSExpression(forConstantValue: walkColor)
-                lineLayer.lineWidth = NSExpression(forConstantValue: 3.8)
+                lineLayer.lineWidth = NSExpression(forConstantValue: 3.6)
                 lineLayer.lineCap = NSExpression(forConstantValue: "round")
                 lineLayer.lineJoin = NSExpression(forConstantValue: "round")
-                lineLayer.lineDashPattern = NSExpression(forConstantValue: [0.01, 1.75])
                 style.addLayer(lineLayer)
             }
             
