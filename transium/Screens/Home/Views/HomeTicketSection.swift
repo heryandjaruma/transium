@@ -15,15 +15,15 @@ struct HomeTicketSection: View {
     var onEditLocation: () -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 8) {
             ticketRail
             
             ticketPageIndicator
-                .padding(.bottom, 6)
             
             currentLocationPill
+                .padding(.top, 2)
         }
-        .padding(.bottom, 24)
+        .padding(.bottom, 16)
     }
 
     private var ticketRail: some View {
@@ -83,7 +83,7 @@ struct HomeTicketSection: View {
             .scrollTargetLayout()
             .padding(.horizontal, 20)
         }
-        .frame(height: 190)
+        .frame(height: 172)
         .scrollIndicators(.hidden)
         .scrollTargetBehavior(.viewAligned)
         .scrollPosition(id: $visibleTicketPage)
