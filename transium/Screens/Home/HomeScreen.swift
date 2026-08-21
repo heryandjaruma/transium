@@ -98,7 +98,8 @@ struct HomeScreen: View {
                 markerHeading: previewLocation == nil ? locationStore.currentHeading : 22,
                 centerRequestID: mapCenterRequestID,
                 activeJourney: activeJourney,
-                checkpoints: goGeofences
+                checkpoints: goGeofences,
+                isGoMode: showGoMode
             )
             .ignoresSafeArea()
             
