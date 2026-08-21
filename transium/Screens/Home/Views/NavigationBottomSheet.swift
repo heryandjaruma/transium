@@ -27,7 +27,7 @@ struct NavigationBottomSheet: View {
             HStack(alignment: .center, spacing: 0) {
                 // Horizontal timeline chips
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 6) {
                         ForEach(Array(timelineChips.enumerated()), id: \.offset) { index, chip in
                             if index > 0 {
                                 Image(systemName: "chevron.right")
@@ -38,43 +38,44 @@ struct NavigationBottomSheet: View {
                             switch chip {
                             case .walk(let minutes, let isMissionWalk):
                                 if isMissionWalk {
-                                    HStack(spacing: 3) {
+                                    HStack(spacing: 4) {
                                         Image(systemName: "figure.walk")
-                                            .font(.system(size: 12, weight: .semibold))
+                                            .font(.system(size: 12, weight: .bold))
                                         Text("\(minutes) m")
                                             .font(TransiumFont.body(11, weight: .bold))
                                     }
                                     .foregroundColor(Color(red: 0.05, green: 0.62, blue: 0.42))
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3.5)
+                                    .padding(.horizontal, 8)
+                                    .frame(height: 28)
                                     .background(Color(red: 0.05, green: 0.62, blue: 0.42).opacity(0.12))
                                     .clipShape(Capsule())
                                 } else {
-                                    HStack(spacing: 3) {
+                                    HStack(spacing: 4) {
                                         Image(systemName: "figure.walk")
-                                            .font(.system(size: 13))
+                                            .font(.system(size: 13, weight: .medium))
                                         Text("\(minutes) m")
-                                            .font(TransiumFont.body(11, weight: .medium))
+                                            .font(TransiumFont.body(11, weight: .semibold))
                                     }
                                     .foregroundColor(.gray)
+                                    .padding(.horizontal, 6)
+                                    .frame(height: 28)
                                 }
 
                             case .bus(let routeRef):
-                                HStack(spacing: 4) {
+                                HStack(spacing: 5) {
                                     Image(systemName: "bus.fill")
-                                        .font(.system(size: 11))
+                                        .font(.system(size: 11, weight: .semibold))
                                     Text(routeRef.truncatedAtDash)
                                         .font(TransiumFont.body(11, weight: .bold))
                                 }
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 8)
-                                .padding(.vertical, 5)
+                                .frame(height: 28)
                                 .background(TransiumTransitColor.color(for: routeRef))
-                                .cornerRadius(6)
+                                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
                             case .missionPoint(let name, let number):
                                 HStack(spacing: 4) {
-                                    // Milestone point dot (like a transit stop point)
                                     Circle()
                                         .fill(Color(red: 0.98, green: 0.72, blue: 0.12))
                                         .frame(width: 6, height: 6)
@@ -88,28 +89,23 @@ struct NavigationBottomSheet: View {
                                         .foregroundColor(Color(red: 0.82, green: 0.52, blue: 0.04))
                                         .lineLimit(1)
                                 }
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, 8)
+                                .frame(height: 28)
                                 .background(Color(red: 0.98, green: 0.72, blue: 0.12).opacity(0.15))
                                 .clipShape(Capsule())
                             }
                         }
                     }
+                    .frame(height: 28)
                 }
                 
                 Spacer(minLength: 12)
                 
-                // Price & Duration
-                HStack(spacing: 8) {
-                    Text("IDR 4.400")
-                        .font(TransiumFont.body(13, weight: .bold))
-                        .foregroundColor(TransiumColor.primaryBlue)
-                    
-                    Text("\(Int(round(totalSeconds / 60))) min")
-                        .font(TransiumFont.body(20, weight: .black))
-                        .foregroundColor(.black)
-                }
-                .fixedSize()
+                // Formatted Duration (e.g. "1h 3m" or "25 min")
+                Text(formattedDuration)
+                    .font(TransiumFont.body(20, weight: .black))
+                    .foregroundColor(.black)
+                    .fixedSize()
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 12)
@@ -196,6 +192,19 @@ struct NavigationBottomSheet: View {
         return formatter.string(from: arrivalDate)
     }
 
+    private var formattedDuration: String {
+        let totalMinutes = Int(round(totalSeconds / 60))
+        if totalMinutes < 60 {
+            return "\(totalMinutes) min"
+        }
+        let hours = totalMinutes / 60
+        let mins = totalMinutes % 60
+        if mins == 0 {
+            return "\(hours)h"
+        }
+        return "\(hours)h \(mins)m"
+    }
+
     private var timelineChips: [JourneyTimelineChip] {
         var chips: [JourneyTimelineChip] = []
         var missionCount = 0
@@ -212,12 +221,12 @@ struct NavigationBottomSheet: View {
                 chips.append(.bus(routeRef: step.routeRef ?? "Bus"))
             } else if step.type == "walk" {
                 let mins = Int(step.durationMinutes ?? 0)
-                // If duration is 0 and we are adjacent to a mission point, prune redundant 0m walk chip
-                if mins == 0 && (chips.last?.isMission ?? false) {
+                // Filter out 0m transfer/transition walks completely
+                if mins <= 0 && !chips.isEmpty {
                     continue
                 }
                 let isMissionWalk = hasMissions && (hasSeenBus || missionCount > 0)
-                chips.append(.walk(minutes: mins, isMissionWalk: isMissionWalk))
+                chips.append(.walk(minutes: max(1, mins), isMissionWalk: isMissionWalk))
             }
         }
 
@@ -231,7 +240,10 @@ struct NavigationBottomSheet: View {
                     chips.append(.bus(routeRef: segment.routeRef ?? "Bus"))
                 } else {
                     let mins = Int(round((segment.durationSeconds ?? 0) / 60))
-                    chips.append(.walk(minutes: mins, isMissionWalk: false))
+                    if mins <= 0 && !chips.isEmpty {
+                        continue
+                    }
+                    chips.append(.walk(minutes: max(1, mins), isMissionWalk: false))
                 }
             }
         }
@@ -339,18 +351,31 @@ struct StepTimelineView: View {
         let routeColor = TransiumTransitColor.color(for: segment.routeRef, hex: segment.routeColor)
         
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
+            HStack(spacing: 8) {
                 // Route Ref Badge with route-specific color
-                Text(routeRef)
-                    .font(TransiumFont.body(12, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(routeColor)
-                    .cornerRadius(8)
+                HStack(spacing: 4) {
+                    Image(systemName: "bus.fill")
+                        .font(.system(size: 11))
+                    Text(routeRef)
+                        .font(TransiumFont.body(12, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(routeColor)
+                .cornerRadius(8)
+
+                // Transit Fare Badge
+                Text("IDR 4.400")
+                    .font(TransiumFont.body(11, weight: .bold))
+                    .foregroundColor(TransiumColor.primaryBlue)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(TransiumColor.primaryBlue.opacity(0.1))
+                    .clipShape(Capsule())
                 
-                Text("Get off at **\(segment.to?.name ?? "destination")**")
-                    .font(TransiumFont.body(15, weight: .bold))
+                Text("to **\(segment.to?.name ?? "destination")**")
+                    .font(TransiumFont.body(14, weight: .bold))
                     .foregroundColor(.black)
                     .lineLimit(1)
                 
