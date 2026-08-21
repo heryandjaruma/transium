@@ -121,6 +121,7 @@ final class ToastWindowController {
     static let shared = ToastWindowController()
 
     private(set) var window: PassthroughToastWindow?
+    var toastFrame: CGRect = .zero
 
     func setupIfNeeded(scene: UIWindowScene) {
         guard window == nil else { return }
@@ -141,12 +142,16 @@ final class ToastWindowController {
 
 final class PassthroughToastWindow: UIWindow {
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        guard let view = super.hitTest(point, with: event) else { return nil }
-        // Pass touches through if the user tapped on the empty background area
-        if view === rootViewController?.view {
+        guard AppToastCenter.shared.toast != nil else { return nil }
+
+        let frame = ToastWindowController.shared.toastFrame
+        guard frame != .zero, frame.contains(point) else {
+            // Touch is outside the toast card -> pass through to underlying UI
             return nil
         }
-        return view
+
+        // Touch is inside the toast card -> intercept so buttons behind the toast are NOT clicked
+        return super.hitTest(point, with: event)
     }
 }
 
@@ -167,6 +172,21 @@ struct GlobalToastOverlayView: View {
                     AppToastView(toast: toast) {
                         toastCenter.dismiss()
                     }
+                    .background(
+                        GeometryReader { cardGeo in
+                            Color.clear
+                                .onAppear {
+                                    ToastWindowController.shared.toastFrame = cardGeo.frame(in: .global)
+                                }
+                                .onChange(of: cardGeo.frame(in: .global)) { _, newFrame in
+                                    ToastWindowController.shared.toastFrame = newFrame
+                                }
+                        }
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    .onTapGesture {
+                        toastCenter.dismiss()
+                    }
                     .padding(.horizontal, 16)
                     .padding(.top, max(proxy.safeAreaInsets.top, 50) + 10)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -177,6 +197,11 @@ struct GlobalToastOverlayView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea()
+        .onChange(of: toastCenter.toast) { _, newToast in
+            if newToast == nil {
+                ToastWindowController.shared.toastFrame = .zero
+            }
+        }
     }
 }
 
