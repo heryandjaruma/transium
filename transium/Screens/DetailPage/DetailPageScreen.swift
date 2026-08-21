@@ -420,8 +420,8 @@ struct TransiumCategoryPaperBadge: View {
         HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .bold))
-            Text(category.uppercased())
-                .font(TransiumFont.display(12, weight: .bold))
+            Text(category)
+                .font(TransiumFont.display(12, weight: .semibold))
                 .tracking(0.8)
                 .lineLimit(1)
         }

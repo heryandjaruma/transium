@@ -105,8 +105,11 @@ struct HomeScreen: View {
     /// Debounces `pinnedCoordinate` changes into a GET /maps/reverse-geocode call — cancelled
     /// and restarted on every drag update rather than firing one per frame.
     @State private var reverseGeocodeTask: Task<Void, Never>?
+    @State private var resolvedAddressLabel: String? = nil
 
-    // MARK: - Kelurahan Quests State
+    // MARK: - Bookmarks & Quests State
+    @State private var bookmarkedQuestIds: Set<String> = []
+    @State private var isTogglingBookmark: Bool = false
     @State private var kelurahanGroups: [KelurahanQuestsGroup] = []
     @State private var selectedKelurahan: Kelurahan = Kelurahan(id: "7760985", kelurahanName: "Benoa", kecamatanName: "Kuta Selatan")
     
@@ -164,96 +167,11 @@ struct HomeScreen: View {
             } else if let journey = activeJourney, showNavigationSheet {
                 // MARK: - Navigation Mode
                 VStack {
-                    // Top Bar (Back, Bookmark, Share, Locate, Profile)
-                    HStack {
-                        TransiumIconButton(
-                            systemName: "arrow.left",
-                            accessibilityLabel: "Back",
-                            size: 44
-                        ) {
-                            exitToExploreMode()
-                        }
-                        
-                        Spacer()
-
-                        HStack(spacing: 12) {
-                            if goJourneyAttempt != nil {
-                                TransiumIconButton(
-                                    systemName: "xmark",
-                                    accessibilityLabel: "Cancel journey",
-                                    backgroundColor: TransiumColor.lightRed,
-                                    foregroundColor: .white,
-                                    size: 44
-                                ) {
-                                    cancelActiveJourneyAttempt()
-                                }
-                                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                                .disabled(isCancelingJourney)
-                            }
-
-                            TransiumIconButton(
-                                systemName: "bookmark",
-                                accessibilityLabel: "Save route",
-                                size: 44
-                            ) {
-                                AppToastCenter.shared.showSuccess(title: "Saved", message: "Route bookmarked.")
-                            }
-                            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-
-                            TransiumIconButton(
-                                systemName: "square.and.arrow.up",
-                                accessibilityLabel: "Share route",
-                                size: 44
-                            ) {
-                                AppToastCenter.shared.showSuccess(title: "Shared", message: "Route link copied.")
-                            }
-                            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                            
-                            TransiumIconButton(
-                                icon: .asset("focus"),
-                                accessibilityLabel: "Center map on route",
-                                size: 44
-                            ) {
-                                mapCenterRequestID += 1
-                            }
-                            .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
-                        }
-                    }
-                    .padding(.top, 6)
-                    .padding(.horizontal, 20)
-                    
+                    navigationTopBar
                     Spacer()
                 }
                 
-                // Docked Bottom Stack: Floating Go Button + Navigation Bottom Sheet
-                VStack(spacing: 0) {
-                    HStack {
-                        Spacer()
-                        Button(action: { startGoMode() }) {
-                            HStack(spacing: 8) {
-                                Text("Go")
-                                    .font(TransiumFont.body(17, weight: .bold))
-                                Image(systemName: "chevron.right.2")
-                                    .font(.system(size: 14, weight: .bold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 14)
-                            .background(Color(red: 0.24, green: 0.65, blue: 0.44))
-                            .cornerRadius(28)
-                            .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                        }
-                        .disabled(isStartingGoMode)
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 16)
-                    }
-                    
-                    NavigationBottomSheet(journey: journey, onBack: {
-                        exitToExploreMode()
-                    })
-                }
-                .ignoresSafeArea(edges: .bottom)
-                .transition(.move(edge: .bottom))
+                navigationBottomStack(journey: journey)
             } else {
                 // MARK: - Explore Mode
                 VStack(spacing: 0) {
@@ -320,20 +238,23 @@ struct HomeScreen: View {
         }
         .task {
             locationStore.requestCurrentLocation()
+            reverseGeocodeCurrentLocation()
+            await loadUserBookmarks()
             await fetchKelurahanGroups()
             await checkOngoingJourney()
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
-            guard newPhase == .active, oldPhase == .background else { return }
-            Task { await checkOngoingJourney() }
+            handleScenePhaseChange(from: oldPhase, to: newPhase)
         }
         .onChange(of: locationStore.currentLocation?.coordinate.latitude) { _, _ in
             recordPathPointIfNeeded()
             advanceGoSegmentIfNeeded()
+            reverseGeocodeCurrentLocation()
         }
         .onChange(of: locationStore.currentLocation?.coordinate.longitude) { _, _ in
             recordPathPointIfNeeded()
             advanceGoSegmentIfNeeded()
+            reverseGeocodeCurrentLocation()
         }
         // A mission segment only advances once its matched step reaches `.done` (see
         // `advanceGoSegmentIfNeeded`), which happens here — via `handleGeofenceEntered`
@@ -479,6 +400,98 @@ struct HomeScreen: View {
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
+
+    private var navigationTopBar: some View {
+        HStack {
+            TransiumIconButton(
+                systemName: "arrow.left",
+                accessibilityLabel: "Back",
+                size: 44
+            ) {
+                exitToExploreMode()
+            }
+            
+            Spacer()
+
+            HStack(spacing: 12) {
+                if goJourneyAttempt != nil {
+                    TransiumIconButton(
+                        systemName: "xmark",
+                        accessibilityLabel: "Cancel journey",
+                        backgroundColor: TransiumColor.lightRed,
+                        foregroundColor: .white,
+                        size: 44
+                    ) {
+                        cancelActiveJourneyAttempt()
+                    }
+                    .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                    .disabled(isCancelingJourney)
+                }
+
+                TransiumIconButton(
+                    systemName: isCurrentJourneyBookmarked ? "bookmark.fill" : "bookmark",
+                    accessibilityLabel: isCurrentJourneyBookmarked ? "Remove bookmark" : "Save route",
+                    foregroundColor: isCurrentJourneyBookmarked ? TransiumColor.primaryBlue : .black,
+                    size: 44
+                ) {
+                    toggleBookmarkForCurrentJourney()
+                }
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                .disabled(isTogglingBookmark)
+
+                TransiumIconButton(
+                    systemName: "square.and.arrow.up",
+                    accessibilityLabel: "Share route",
+                    size: 44
+                ) {
+                    AppToastCenter.shared.showSuccess(title: "Shared", message: "Route link copied.")
+                }
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+                
+                TransiumIconButton(
+                    icon: .asset("focus"),
+                    accessibilityLabel: "Center map on route",
+                    size: 44
+                ) {
+                    mapCenterRequestID += 1
+                }
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 3)
+            }
+        }
+        .padding(.top, 6)
+        .padding(.horizontal, 20)
+    }
+
+    private func navigationBottomStack(journey: JourneyResult) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button(action: { startGoMode() }) {
+                    HStack(spacing: 8) {
+                        Text("Go")
+                            .font(TransiumFont.body(17, weight: .bold))
+                        Image(systemName: "chevron.right.2")
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
+                    .background(Color(red: 0.24, green: 0.65, blue: 0.44))
+                    .cornerRadius(28)
+                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                }
+                .disabled(isStartingGoMode)
+                .padding(.trailing, 20)
+                .padding(.bottom, 16)
+            }
+            
+            NavigationBottomSheet(journey: journey, onBack: {
+                exitToExploreMode()
+            })
+        }
+        .ignoresSafeArea(edges: .bottom)
+        .transition(.move(edge: .bottom))
+    }
     
     private func fetchKelurahanGroups() async {
         do {
@@ -559,6 +572,14 @@ struct HomeScreen: View {
             return String(format: "%.1f km", km)
         } else {
             return "\(Int(round(km))) km"
+        }
+    }
+
+    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
+        guard newPhase == .active && oldPhase == .background else { return }
+        Task {
+            await loadUserBookmarks()
+            await checkOngoingJourney()
         }
     }
 
@@ -1452,12 +1473,71 @@ struct HomeScreen: View {
         .padding(.horizontal, 20)
     }
 
+    private var isCurrentJourneyBookmarked: Bool {
+        guard let questId = activeQuestId ?? ongoingJourneyAttempt?.questId else { return false }
+        return bookmarkedQuestIds.contains(questId)
+    }
+
+    private func loadUserBookmarks() async {
+        guard let bookmarks = try? await BookmarkService.shared.listBookmarks() else { return }
+        let ids = Set(bookmarks.map { $0.questId })
+        await MainActor.run {
+            self.bookmarkedQuestIds = ids
+        }
+    }
+
+    private func toggleBookmarkForCurrentJourney() {
+        guard let questId = activeQuestId ?? ongoingJourneyAttempt?.questId, !isTogglingBookmark else {
+            AppToastCenter.shared.showWarning(title: "Save Route", message: "Select a quest route first to bookmark.")
+            return
+        }
+        isTogglingBookmark = true
+        let isCurrentlyBookmarked = bookmarkedQuestIds.contains(questId)
+        
+        Task {
+            defer { isTogglingBookmark = false }
+            do {
+                if isCurrentlyBookmarked {
+                    try await BookmarkService.shared.removeBookmark(questId: questId)
+                    await MainActor.run {
+                        bookmarkedQuestIds.remove(questId)
+                        AppToastCenter.shared.showSuccess(title: "Removed", message: "Quest removed from bookmarks.")
+                    }
+                } else {
+                    _ = try await BookmarkService.shared.addBookmark(questId: questId)
+                    await MainActor.run {
+                        bookmarkedQuestIds.insert(questId)
+                        AppToastCenter.shared.showSuccess(title: "Saved", message: "Quest bookmarked!")
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    AppToastCenter.shared.showError(title: "Bookmark Failed", message: "Could not update bookmark. Please try again.")
+                }
+            }
+        }
+    }
+
+    private func reverseGeocodeCurrentLocation() {
+        let loc = resolvedCurrentLocation
+        Task {
+            if let result = try? await LocationService.shared.reverseGeocode(lat: loc.coordinate.latitude, lng: loc.coordinate.longitude),
+               let first = result.results.first, !first.label.isEmpty {
+                await MainActor.run {
+                    self.resolvedAddressLabel = first.label
+                }
+            }
+        }
+    }
+
     private var currentLocationText: String {
         if let manualLocationOverrideLabel {
             return manualLocationOverrideLabel
         }
-        let loc = resolvedCurrentLocation
-        return String(format: "%.4f, %.4f", loc.coordinate.latitude, loc.coordinate.longitude)
+        if let resolvedAddressLabel, !resolvedAddressLabel.isEmpty {
+            return resolvedAddressLabel
+        }
+        return "Current Location, Bali"
     }
     
     private func presentSearchSheet(in state: SearchSheetState) {

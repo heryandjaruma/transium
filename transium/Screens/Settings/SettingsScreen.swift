@@ -52,7 +52,8 @@ struct SettingsScreen: View {
                     Spacer(minLength: 20)
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 12)
+                .padding(.top, 24)
+                .padding(.bottom, 36)
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -74,7 +75,7 @@ struct SettingsScreen: View {
     private var header: some View {
         ZStack {
             Text("Settings")
-                .font(TransiumFont.display(34, weight: .bold))
+                .font(TransiumFont.display(32, weight: .bold))
                 .foregroundColor(.white)
 
             HStack {
@@ -92,7 +93,7 @@ struct SettingsScreen: View {
                 Spacer()
             }
         }
-        .padding(.bottom, 8)
+        .padding(.bottom, 12)
     }
 
     // MARK: - Language Card

@@ -349,7 +349,7 @@ struct ProfileScreen: View {
         VStack(spacing: 16) {
             ZStack {
                 Text("Profile")
-                    .font(TransiumFont.display(27, weight: .bold))
+                    .font(TransiumFont.display(32, weight: .bold))
                     .foregroundColor(.white)
 
                 HStack {
@@ -362,12 +362,13 @@ struct ProfileScreen: View {
                             .frame(width: 44, height: 44)
                             .background(Color.white)
                             .clipShape(Circle())
+                            .shadow(color: Color.black.opacity(0.12), radius: 6, y: 3)
                     }
                     Spacer()
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 8)
+            .padding(.top, 24)
 
             ZStack(alignment: .bottomTrailing) {
                 avatarView
@@ -817,7 +818,7 @@ final class ImageSaver: NSObject {
 // MARK: - Image Resize Helper
 
 extension UIImage {
-    func resized(to targetSize: CGSize) -> UIImage? {
+    nonisolated func resized(to targetSize: CGSize) -> UIImage? {
         let renderer = UIGraphicsImageRenderer(size: targetSize)
         return renderer.image { _ in
             draw(in: CGRect(origin: .zero, size: targetSize))

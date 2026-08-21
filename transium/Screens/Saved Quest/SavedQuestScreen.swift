@@ -61,7 +61,7 @@ struct SavedQuestScreen: View {
     private var header: some View {
         ZStack {
             Text("Saved Quest")
-                .font(TransiumFont.display(34, weight: .bold))
+                .font(TransiumFont.display(32, weight: .bold))
                 .foregroundColor(.white)
 
             HStack {
@@ -81,7 +81,7 @@ struct SavedQuestScreen: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 8)
+        .padding(.top, 24)
         .padding(.bottom, 12)
     }
 
