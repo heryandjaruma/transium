@@ -214,14 +214,12 @@ private struct SavedQuestCard: View {
         }()
 
         HStack(spacing: 14) {
-            TransiumStampCard(
-                size: 74,
-                tilt: .degrees(0),
-                variant: stampVariant
-            ) {
-                thumbnailView
-            }
-            .frame(width: 74, height: 74)
+            QuestBadgePostageStack(
+                badgeUrls: quest.badgeImageUrls,
+                fallbackImageName: quest.fallbackImageName,
+                theme: quest.theme
+            )
+            .frame(width: 76, height: 76)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(quest.title)
@@ -266,31 +264,6 @@ private struct SavedQuestCard: View {
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .shadow(color: Color.black.opacity(0.08), radius: 10, y: 4)
-    }
-
-    @ViewBuilder
-    private var thumbnailView: some View {
-        if let imageUrl = quest.imageUrl, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .empty:
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.black.opacity(0.08))
-                default:
-                    Image(quest.fallbackImageName)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-        } else {
-            Image(quest.fallbackImageName)
-                .resizable()
-                .scaledToFill()
-        }
     }
 }
 

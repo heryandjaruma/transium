@@ -157,6 +157,153 @@ struct PaymentMethodRow: View {
     }
 }
 
+// MARK: - Quest Badge Postage Stack
+
+struct QuestBadgePostageStack: View {
+    let badgeUrls: [String]
+    let fallbackImageName: String
+    let theme: DetailPlaceScreen.QuestTheme
+
+    private var stampVariant: TransiumStampVariant {
+        switch theme {
+        case .blue: return .blue
+        case .red: return .warm
+        case .green: return .green
+        }
+    }
+
+    var body: some View {
+        let displayImages: [String] = {
+            if !badgeUrls.isEmpty {
+                return Array(badgeUrls.prefix(3))
+            }
+            return [fallbackImageName]
+        }()
+
+        ZStack {
+            if displayImages.count == 1 {
+                singleBadgeView(imageSource: displayImages[0], size: 72, tilt: .degrees(0), variant: stampVariant)
+            } else if displayImages.count == 2 {
+                // Back badge
+                singleBadgeView(
+                    imageSource: displayImages[0],
+                    size: 62,
+                    tilt: .degrees(-8),
+                    variant: .warm
+                )
+                .offset(x: -6, y: -4)
+                .shadow(color: Color.black.opacity(0.12), radius: 3, x: -2, y: 2)
+
+                // Front badge
+                singleBadgeView(
+                    imageSource: displayImages[1],
+                    size: 64,
+                    tilt: .degrees(6),
+                    variant: stampVariant
+                )
+                .offset(x: 5, y: 4)
+                .shadow(color: Color.black.opacity(0.16), radius: 4, x: 2, y: 3)
+            } else {
+                // 3 badges (max is 3, fixed scale and scatter)
+                // Bottom/Back badge (0)
+                singleBadgeView(
+                    imageSource: displayImages[0],
+                    size: 52,
+                    tilt: .degrees(-12),
+                    variant: .classic
+                )
+                .offset(x: -10, y: -6)
+                .shadow(color: Color.black.opacity(0.10), radius: 3, x: -2, y: 2)
+
+                // Middle badge (1)
+                singleBadgeView(
+                    imageSource: displayImages[1],
+                    size: 54,
+                    tilt: .degrees(10),
+                    variant: .green
+                )
+                .offset(x: 8, y: -3)
+                .shadow(color: Color.black.opacity(0.13), radius: 3, x: 2, y: 2)
+
+                // Top/Front badge (2)
+                singleBadgeView(
+                    imageSource: displayImages[2],
+                    size: 56,
+                    tilt: .degrees(-2),
+                    variant: stampVariant
+                )
+                .offset(x: 0, y: 6)
+                .shadow(color: Color.black.opacity(0.18), radius: 4, x: 0, y: 3)
+            }
+        }
+        .frame(width: 76, height: 76)
+    }
+
+    private func singleBadgeView(
+        imageSource: String,
+        size: CGFloat,
+        tilt: Angle,
+        variant: TransiumStampVariant
+    ) -> some View {
+        TransiumStampCard(
+            size: size,
+            tilt: tilt,
+            variant: variant
+        ) {
+            badgeImageContent(imageSource: imageSource)
+        }
+    }
+
+    @ViewBuilder
+    private func badgeImageContent(imageSource: String) -> some View {
+        if imageSource.hasPrefix("http") || imageSource.hasPrefix("/"),
+           let url = URL(string: imageSource.hasPrefix("http") ? imageSource : "https://transium-api.heryandjaruma.workers.dev\(imageSource)") {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .empty:
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Color.black.opacity(0.08))
+                        .transiumShimmer(
+                            baseColor: Color.black.opacity(0.06),
+                            highlightColor: Color.white.opacity(0.6)
+                        )
+                case .failure:
+                    fallbackImage
+                @unknown default:
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Color.black.opacity(0.08))
+                }
+            }
+        } else if !imageSource.isEmpty && imageSource != "Beach" && imageSource != "BusFee" && UIImage(named: imageSource) != nil {
+            Image(imageSource)
+                .resizable()
+                .scaledToFill()
+        } else {
+            fallbackImage
+        }
+    }
+
+    private var fallbackImage: some View {
+        let name: String = {
+            if !fallbackImageName.isEmpty && fallbackImageName != "Beach" && fallbackImageName != "BusFee" && UIImage(named: fallbackImageName) != nil {
+                return fallbackImageName
+            }
+            switch theme {
+            case .red: return "gwk"
+            case .green: return "kintamani"
+            case .blue: return "sanoored"
+            }
+        }()
+        return Image(name)
+            .resizable()
+            .scaledToFill()
+    }
+}
+
 // MARK: - Quest Row
 
 struct QuestRow: View {
@@ -164,23 +311,13 @@ struct QuestRow: View {
     var onStart: (() -> Void)? = nil
 
     var body: some View {
-        let stampVariant: TransiumStampVariant = {
-            switch quest.theme {
-            case .blue: return .blue
-            case .red: return .warm
-            case .green: return .green
-            }
-        }()
-
         HStack(spacing: 14) {
-            TransiumStampCard(
-                size: 74,
-                tilt: .degrees(0),
-                variant: stampVariant
-            ) {
-                thumbnailView
-            }
-            .frame(width: 74, height: 74)
+            QuestBadgePostageStack(
+                badgeUrls: quest.badgeImageUrls,
+                fallbackImageName: quest.fallbackImageName,
+                theme: quest.theme
+            )
+            .frame(width: 76, height: 76)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(quest.title)
@@ -223,51 +360,6 @@ struct QuestRow: View {
         .padding(14)
         .background(quest.theme.background)
         .clipShape(RoundedRectangle(cornerRadius: 18))
-    }
-    
-    @ViewBuilder
-    private var thumbnailView: some View {
-        if let imageUrl = quest.imageUrl, !imageUrl.isEmpty, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .empty:
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.black.opacity(0.08))
-                        .transiumShimmer(
-                            baseColor: Color.black.opacity(0.06),
-                            highlightColor: Color.white.opacity(0.6)
-                        )
-                case .failure:
-                    fallbackBadgeImage
-                @unknown default:
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.black.opacity(0.08))
-                }
-            }
-        } else if !quest.fallbackImageName.isEmpty && quest.fallbackImageName != "Beach" && quest.fallbackImageName != "BusFee" && UIImage(named: quest.fallbackImageName) != nil {
-            Image(quest.fallbackImageName)
-                .resizable()
-                .scaledToFill()
-        } else {
-            fallbackBadgeImage
-        }
-    }
-
-    private var fallbackBadgeImage: some View {
-        let name: String = {
-            switch quest.theme {
-            case .red: return "gwk"
-            case .green: return "kintamani"
-            case .blue: return "sanoored"
-            }
-        }()
-        return Image(name)
-            .resizable()
-            .scaledToFill()
     }
 }
 

@@ -14,6 +14,7 @@ struct DetailPlaceScreen: View {
     struct Quest: Identifiable {
         let id: String
         let imageUrl: String?
+        let badgeImageUrls: [String]
         let fallbackImageName: String
         let title: String
         let description: String
@@ -23,6 +24,7 @@ struct DetailPlaceScreen: View {
         init(
             id: String = UUID().uuidString,
             imageUrl: String? = nil,
+            badgeImageUrls: [String] = [],
             fallbackImageName: String = "sanoored",
             title: String,
             description: String,
@@ -31,6 +33,7 @@ struct DetailPlaceScreen: View {
         ) {
             self.id = id
             self.imageUrl = imageUrl
+            self.badgeImageUrls = badgeImageUrls
             self.fallbackImageName = fallbackImageName
             self.title = title
             self.description = description
@@ -41,6 +44,7 @@ struct DetailPlaceScreen: View {
         init(
             id: String = UUID().uuidString,
             imageName: String,
+            badgeImageUrls: [String] = [],
             title: String,
             description: String,
             points: Int = 10,
@@ -49,6 +53,7 @@ struct DetailPlaceScreen: View {
             self.init(
                 id: id,
                 imageUrl: nil,
+                badgeImageUrls: badgeImageUrls,
                 fallbackImageName: imageName,
                 title: title,
                 description: description,
@@ -369,6 +374,15 @@ struct DetailPlaceScreen: View {
                 for (index, q) in detail.quests.enumerated() {
                     let theme: QuestTheme = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .red : .green)
                     let thumbUrl = q.thumbnails.first?.url
+                    
+                    // Extract badges' image URLs from the quest's badges (capped to max 3)
+                    let badgeUrls: [String] = q.badges.compactMap { badge in
+                        if let img = badge.badgeImageUrl, !img.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            return img
+                        }
+                        return nil
+                    }
+                    
                     let fallbackImg: String = {
                         switch theme {
                         case .red: return "gwk"
@@ -380,10 +394,11 @@ struct DetailPlaceScreen: View {
                     loaded.append(Quest(
                         id: q.id,
                         imageUrl: thumbUrl,
+                        badgeImageUrls: Array(badgeUrls.prefix(3)),
                         fallbackImageName: fallbackImg,
                         title: q.name,
                         description: "\(q.category) • \(q.description)",
-                        points: 10,
+                        points: q.xp ?? 10,
                         theme: theme
                     ))
                 }
