@@ -564,7 +564,7 @@ struct GoTripDetailsPanel: View {
                 Spacer()
             }
 
-            if let matchedStep, matchedStep.status != .done {
+            if let matchedStep, matchedStep.status != .done, isWithinConfirmationRange(of: matchedStep) {
                 Divider()
                 HStack {
                     Spacer()
@@ -598,7 +598,7 @@ struct GoTripDetailsPanel: View {
                 Spacer()
             }
 
-            if step.status != .done {
+            if step.status != .done, isWithinConfirmationRange(of: step) {
                 HStack {
                     Spacer()
                     markDoneButton(for: step, tint: tint)
@@ -606,6 +606,23 @@ struct GoTripDetailsPanel: View {
             }
         }
         .padding(.leading, 8)
+    }
+
+    /// Whether the device's current location is within this step's own geofence radius — the
+    /// same radius `HomeScreen.geofences(from:)` registers a `CLCircularRegion` for. Gates the
+    /// located-step "I'm here" button so it only appears once the user could plausibly be there,
+    /// instead of the moment the step becomes current. No location fix yet → hide (Go Mode
+    /// already requires location access to run at all, so one should arrive within moments).
+    /// Missing `radiusMeters` on an otherwise-located step → show, since that step isn't
+    /// geofenced either (see `geofences(from:)`'s own guard) and hiding its only other
+    /// completion path would strand it.
+    private func isWithinConfirmationRange(of step: JourneyAttemptStep) -> Bool {
+        guard let lat = step.lat, let lng = step.lng else { return true }
+        guard let radiusMeters = step.radiusMeters else { return true }
+        guard let currentLocation else { return false }
+        let current = CLLocation(latitude: currentLocation.latitude, longitude: currentLocation.longitude)
+        let target = CLLocation(latitude: lat, longitude: lng)
+        return current.distance(from: target) <= radiusMeters
     }
 
     /// A manual fallback for POST /private/journey/{id}/advance's own documented "manual
