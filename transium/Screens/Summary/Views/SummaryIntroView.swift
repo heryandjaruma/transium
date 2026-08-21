@@ -1,11 +1,11 @@
 //
-//  JourneySummaryIntroView.swift
+//  SummaryIntroView.swift
 //  transium
 //
 
 import SwiftUI
 
-struct JourneySummaryIntroView: View {
+struct SummaryIntroView: View {
     let cards: [StatCardData]
     var locationLabel: String = "Sanur Street"
     var calorieMessage: String = "This trip burned 250 calories. That's like doing 1,000 jumping jacks 🥵"
@@ -101,11 +101,12 @@ struct JourneySummaryIntroView: View {
     }
 }
 
-// Backward-compatibility typealias
-typealias Summary = JourneySummaryIntroView
+// Backward-compatibility aliases
+typealias Summary = SummaryIntroView
+typealias JourneySummaryIntroView = SummaryIntroView
 
 #Preview {
-    JourneySummaryIntroView(cards: [
+    SummaryIntroView(cards: [
         StatCardData(title: "Distance", value: "17", unit: "km", icon: "distance-icon"),
         StatCardData(title: "Travel Cost", value: "4.4k", unit: "Rp", icon: "cost-icon"),
         StatCardData(title: "Calories", value: "2500", unit: nil, icon: "calorie-icon"),

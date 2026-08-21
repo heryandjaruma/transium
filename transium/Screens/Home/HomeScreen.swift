@@ -299,7 +299,7 @@ struct HomeScreen: View {
             })
         }
         .fullScreenCover(item: $journeyCompletionResult) { result in
-            JourneyCompletionSummaryScreen(result: result, onDismiss: {
+            SummaryScreen(result: result, onDismiss: {
                 journeyCompletionResult = nil
                 endGoMode()
             })

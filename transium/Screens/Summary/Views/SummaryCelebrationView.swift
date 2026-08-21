@@ -1,11 +1,11 @@
 //
-//  JourneySummaryCelebrationView.swift
+//  SummaryCelebrationView.swift
 //  transium
 //
 
 import SwiftUI
 
-struct JourneySummaryCelebrationView: View {
+struct SummaryCelebrationView: View {
     let cards: [StatCardData]
     var origin: String = "Jimbaran"
     var destination: String = "Sanur Beach"
@@ -157,11 +157,12 @@ struct JourneySummaryCelebrationView: View {
     }
 }
 
-// Backward-compatibility typealias
-typealias SummaryCelebrationScreen = JourneySummaryCelebrationView
+// Backward-compatibility aliases
+typealias SummaryCelebrationScreen = SummaryCelebrationView
+typealias JourneySummaryCelebrationView = SummaryCelebrationView
 
 #Preview {
-    JourneySummaryCelebrationView(cards: [
+    SummaryCelebrationView(cards: [
         StatCardData(title: "Distance", value: "17", unit: "km", icon: "distance-icon"),
         StatCardData(title: "Travel Cost", value: "4.4k", unit: "Rp", icon: "cost-icon"),
         StatCardData(title: "Calories", value: "2500", unit: nil, icon: "calorie-icon"),

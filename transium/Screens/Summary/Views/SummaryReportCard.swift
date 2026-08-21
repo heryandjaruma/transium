@@ -1,11 +1,11 @@
 //
-//  JourneySummaryReportCard.swift
+//  SummaryReportCard.swift
 //  transium
 //
 
 import SwiftUI
 
-struct JourneySummaryReportCard: View {
+struct SummaryReportCard: View {
     let origin: String
     let destination: String
     let cards: [StatCardData]
@@ -75,11 +75,12 @@ struct JourneySummaryReportCard: View {
     }
 }
 
-// Backward-compatibility typealias
-typealias ComponentSummary = JourneySummaryReportCard
+// Backward-compatibility aliases
+typealias ComponentSummary = SummaryReportCard
+typealias JourneySummaryReportCard = SummaryReportCard
 
 #Preview {
-    JourneySummaryReportCard(cards: [
+    SummaryReportCard(cards: [
         StatCardData(title: "Total Distance", value: "17", unit: "km", icon: "distance-icon"),
         StatCardData(title: "Cost Total", value: "4.4k", unit: "Rp", icon: "cost-icon"),
         StatCardData(title: "Calorie Burn", value: "2500", unit: nil, icon: "calorie-icon"),

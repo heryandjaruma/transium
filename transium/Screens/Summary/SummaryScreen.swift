@@ -1,15 +1,13 @@
 //
-//  JourneyCompletionSummaryScreen.swift
+//  SummaryScreen.swift
 //  transium
 //
 
 import SwiftUI
 
-/// Presented the instant POST /private/journey/{id}/complete succeeds — `Summary` for 3
-/// seconds, then an internal cross-fade into `SummaryCelebrationScreen`. Both were built as
-/// static mockups (StatCardData cards, hardcoded badge/location copy); this is what actually
-/// feeds them real data from the finished `JourneyCompleteResult`.
-struct JourneyCompletionSummaryScreen: View {
+/// Main screen presented when a journey is completed (`POST /private/journey/{id}/complete`).
+/// Shows `SummaryIntroView` for 3 seconds, then transitions into `SummaryCelebrationView`.
+struct SummaryScreen: View {
     let result: JourneyCompleteResult
     var onDismiss: () -> Void = {}
 
@@ -62,7 +60,7 @@ struct JourneyCompletionSummaryScreen: View {
     var body: some View {
         ZStack {
             if showCelebration {
-                SummaryCelebrationScreen(
+                SummaryCelebrationView(
                     cards: cards,
                     origin: summary?.startPoint ?? "Origin",
                     destination: summary?.finishPoint ?? "Destination",
@@ -75,7 +73,7 @@ struct JourneyCompletionSummaryScreen: View {
                 )
                 .transition(.opacity)
             } else {
-                Summary(
+                SummaryIntroView(
                     cards: cards,
                     locationLabel: summary?.finishPoint ?? "Destination",
                     calorieMessage: calorieMessage,
@@ -104,9 +102,10 @@ struct JourneyCompletionSummaryScreen: View {
     }
 }
 
-/// A quest badge's artwork, loaded from its (possibly relative) URL with a graceful fallback
-/// to a bundled placeholder while loading or on failure — same idiom already used for quest
-/// ticket stamps in TransiumTicketComponents.swift.
+// Backward-compatibility alias
+typealias JourneyCompletionSummaryScreen = SummaryScreen
+
+/// A quest badge's artwork, loaded from its URL with a graceful fallback to a bundled placeholder.
 struct BadgeArtworkImage: View {
     let urlString: String?
     var fallback: String = "SampleBadge"
@@ -116,13 +115,20 @@ struct BadgeArtworkImage: View {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
-                    image.resizable().scaledToFit()
+                    image.resizable().scaledToFill()
+                case .empty:
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Color.white.opacity(0.12))
+                        .transiumShimmer(
+                            baseColor: Color.white.opacity(0.1),
+                            highlightColor: Color.white.opacity(0.3)
+                        )
                 default:
-                    Image(fallback).resizable().scaledToFit()
+                    Image(fallback).resizable().scaledToFill()
                 }
             }
         } else {
-            Image(fallback).resizable().scaledToFit()
+            Image(fallback).resizable().scaledToFill()
         }
     }
 
