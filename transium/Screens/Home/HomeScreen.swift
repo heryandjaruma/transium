@@ -726,34 +726,15 @@ struct HomeScreen: View {
     // MARK: - Bottom Ticket & Action Content
     
     private var bottomMapContent: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
             ticketRail
-            ticketPageIndicator
             
-//            // "Do Quest" Button
-//            Button(action: {
-//                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-//                doQuest()
-//            }) {
-//                HStack(spacing: 10) {
-//                    Image(systemName: "flag.fill")
-//                        .font(.system(size: 16, weight: .bold))
-//                    Text("Do Quest")
-//                        .font(TransiumFont.body(16, weight: .bold))
-//                }
-//                .foregroundColor(.white)
-//                .frame(maxWidth: .infinity)
-//                .frame(height: 52)
-//                .background(TransiumColor.primaryBlue)
-//                .cornerRadius(26)
-//                .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
-//            }
-//            .disabled(isFetchingJourney)
-//            .padding(.horizontal, 20)
+            ticketPageIndicator
+                .padding(.bottom, 6)
             
             currentLocationPill
         }
-        .padding(.bottom, 20)
+        .padding(.bottom, 24)
     }
     
     private func doQuest(questId: String? = nil) {
