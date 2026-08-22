@@ -47,7 +47,7 @@ struct TransiumLoadingSpinner: View {
                 .shadow(color: Color.white.opacity(0.4), radius: 8)
 
             // Centered Bus icon with breathing animation
-            Image("Bus")
+            Image("bus_new")
                 .resizable()
                 .scaledToFit()
                 .frame(width: busSize, height: busSize)

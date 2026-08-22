@@ -11,6 +11,12 @@ enum TransiumAsset {
         static let onboardingExplore = "onboard-1"
         static let onboardingAdventure = "onboard-2"
         static let onboardingShare = "onboard-3"
+        
+        static let onboard3trophy = "onboard3trophy"
+        static let onboard3photo1 = "onboard3photo1"
+        static let onboard3photo2 = "onboard3photo2"
+        static let onboard3photo3 = "onboard3photo3"
+        
         static let permissionOnboarding = "Permission_onboarding"
         static let payment = "Payment"
         static let sanur_beach = "sanur_beach"
