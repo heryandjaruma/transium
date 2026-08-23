@@ -47,7 +47,7 @@ struct HomeTicketSection: View {
                                 subtitle: group.area.description ?? group.quests.first?.description ?? "\(group.area.name), Bali",
                                 distance: HomeLocationFormatter.distanceText(for: group, currentLocation: currentLocation),
                                 price: "Rp. 4,4k",
-                                imageUrl: group.area.thumbnails.first?.url ?? group.area.photoUrl ?? group.quests.first?.thumbnails.first?.url,
+                                imageUrl: group.area.photoUrl ?? group.area.thumbnails.first?.url ?? group.quests.first?.thumbnails.first?.url,
                                 fallbackImageName: isRecommended ? "kintamani" : "sanoored",
                                 variant: variant
                             )
