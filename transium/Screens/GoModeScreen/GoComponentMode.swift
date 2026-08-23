@@ -194,17 +194,17 @@ struct GoComponentMode: View {
     /// and how many stops remain via `liveStopsRemaining`.
     private func rideCard(_ segment: JourneySegment) -> some View {
         let stopsRemaining = segment.liveStopsRemaining(from: currentLocation)
-        let verb: String = {
-            guard let stopsRemaining else { return "Ride to" }
-            return stopsRemaining == 1 ? "1 Stop to" : "\(stopsRemaining) Stops to"
-        }()
+        let liveDuration = segment.liveRemaining(from: currentLocation).durationSeconds
+        let timeBadge = liveDuration.map { "\(max(0, Int(round($0 / 60)))) min" }
 
         return GoStepCard(
             mode: .bus(providerCode: segment.routeRef ?? "BUS"),
-            verb: verb,
+            verb: "Ride to",
             destination: segment.to?.name ?? "your destination",
-            metrics: Array(metrics(for: segment).prefix(1)),
-            caption: estimatedArrivalCaption(for: segment)
+            metrics: metrics(for: segment),
+            caption: estimatedArrivalCaption(for: segment),
+            stopsRemaining: stopsRemaining,
+            cornerBadge: timeBadge
         )
     }
 

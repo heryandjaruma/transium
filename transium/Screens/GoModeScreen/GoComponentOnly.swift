@@ -152,6 +152,13 @@ struct GoStepCard: View {
     let metrics: [Metric]
     /// Tiny line under the metrics row — e.g. "Est. arrival 9:52 PM" on a bus leg's live ride card.
     var caption: String? = nil
+    /// When set, replaces `verb`'s plain text with a bold count badge + "Stop(s) to" — a bus
+    /// leg's live stop countdown.
+    var stopsRemaining: Int? = nil
+    /// When set, replaces the inline metrics row with a floating clock pill in the card's top
+    /// trailing corner (e.g. "15 min") — pairs with `stopsRemaining` on a bus leg's ride card,
+    /// where the countdown itself takes over the verb line's usual spot.
+    var cornerBadge: String? = nil
 
     /// Dipakai kalau cuma ada 1 metrik. Contoh: GoStepCard(..., metricValue: "5", metricUnit: "min")
     init(mode: GoTravelMode, verb: String, destination: String, metricValue: String, metricUnit: String, caption: String? = nil) {
@@ -164,44 +171,95 @@ struct GoStepCard: View {
 
     /// Dipakai kalau ada lebih dari 1 metrik (misal durasi + jarak).
     /// Contoh: GoStepCard(..., metrics: [.init("15", "min"), .init("1.2", "kilometer")])
-    init(mode: GoTravelMode, verb: String, destination: String, metrics: [Metric], caption: String? = nil) {
+    init(
+        mode: GoTravelMode,
+        verb: String,
+        destination: String,
+        metrics: [Metric],
+        caption: String? = nil,
+        stopsRemaining: Int? = nil,
+        cornerBadge: String? = nil
+    ) {
         self.mode = mode
         self.verb = verb
         self.destination = destination
         self.metrics = metrics
         self.caption = caption
+        self.stopsRemaining = stopsRemaining
+        self.cornerBadge = cornerBadge
     }
 
     var body: some View {
-        HStack(spacing: 20) {
-            GoStepIcon(mode: mode)
+        ZStack(alignment: .topTrailing) {
+            HStack(spacing: 20) {
+                GoStepIcon(mode: mode)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verb)
-                    .font(TransiumFont.body(17, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
+                VStack(alignment: .leading, spacing: 2) {
+                    verbRow
 
-                Text(destination)
-                    .font(TransiumFont.body(24, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    Text(destination)
+                        .font(TransiumFont.body(24, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
 
-                metricsRow
+                    if cornerBadge == nil {
+                        metricsRow
+                    }
 
-                if let caption {
-                    Text(caption)
-                        .font(TransiumFont.body(11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.7))
+                    if let caption {
+                        Text(caption)
+                            .font(TransiumFont.body(11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
                 }
-            }
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }
+            .padding(16)
+
+            if let cornerBadge {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(cornerBadge)
+                        .font(TransiumFont.body(12, weight: .semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.black.opacity(0.2))
+                .clipShape(.capsule)
+                .padding(14)
+            }
         }
-        .padding(16)
         .frame(maxWidth: .infinity)
         .background(TransiumColor.primaryBlue)
         .clipShape(.rect(cornerRadius: 30))
+    }
+
+    @ViewBuilder
+    private var verbRow: some View {
+        if let stopsRemaining {
+            HStack(spacing: 6) {
+                Text("\(stopsRemaining)")
+                    .font(TransiumFont.body(15, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 2)
+                    .background(.white.opacity(0.22))
+                    .clipShape(.capsule)
+
+                Text(stopsRemaining == 1 ? "Stop to" : "Stops to")
+                    .font(TransiumFont.body(17, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                
+            }
+        } else {
+            Text(verb)
+                .font(TransiumFont.body(17, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+        }
     }
 
     private var metricsRow: some View {

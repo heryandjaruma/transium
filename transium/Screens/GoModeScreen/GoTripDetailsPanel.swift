@@ -330,7 +330,7 @@ struct GoTripDetailsPanel: View {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.turn.down.right")
                             .font(.system(size: 11, weight: .semibold))
-                        Text("Wait for \(boardingSegment.routeRef ?? "the bus") towards \(boardingSegment.to?.name ?? "destination")")
+                        Text("Wait for \(boardingSegment.routeRef?.truncatedAtDash ?? "the bus") towards \(boardingSegment.to?.name ?? "destination")")
                             .font(TransiumFont.body(13))
                     }
                     HStack(spacing: 8) {
