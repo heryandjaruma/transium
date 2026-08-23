@@ -343,6 +343,25 @@ public nonisolated struct JourneySegment: Codable, Equatable, Sendable, Identifi
         return (liveDistance, liveDistance / pace)
     }
 
+    /// How many of this bus leg's stops remain before the alighting stop, estimated by matching
+    /// the device's current position to the nearest stop in `stops` and counting forward from
+    /// there — the same live-GPS-as-bus-proxy approach `liveRemaining` uses for a bus leg's ETA.
+    /// Falls back to the full stop count (best available estimate) with no live position yet,
+    /// and nil when this segment carries fewer than 2 stops (nothing to count down).
+    public func liveStopsRemaining(from currentLocation: CLLocationCoordinate2D?) -> Int? {
+        guard let stops, stops.count > 1 else { return nil }
+        guard let currentLocation else { return stops.count - 1 }
+
+        let point = CLLocation(latitude: currentLocation.latitude, longitude: currentLocation.longitude)
+        let nearestIndex = stops.indices.min { lhs, rhs in
+            let lhsDistance = CLLocation(latitude: stops[lhs].lat, longitude: stops[lhs].lng).distance(from: point)
+            let rhsDistance = CLLocation(latitude: stops[rhs].lat, longitude: stops[rhs].lng).distance(from: point)
+            return lhsDistance < rhsDistance
+        } ?? 0
+
+        return max(0, stops.count - 1 - nearestIndex)
+    }
+
     /// True when `location` lies within `toleranceMeters` of this segment's route geometry
     /// (nearest-vertex distance over the resolved road-following polyline — good enough to
     /// tell "on this road" from "nowhere near it" without true point-to-segment projection).

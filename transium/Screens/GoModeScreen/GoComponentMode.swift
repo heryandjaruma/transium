@@ -190,14 +190,31 @@ struct GoComponentMode: View {
 
     /// Shown once the user is assumed to have boarded (see `isNearBoardingStop`) — the
     /// device's own GPS doubles as a rough proxy for the bus's position while riding, so this
-    /// still recomputes distance/time to the alighting stop live, using the segment's own pace.
+    /// still recomputes distance/time to the alighting stop live, using the segment's own pace,
+    /// and how many stops remain via `liveStopsRemaining`.
     private func rideCard(_ segment: JourneySegment) -> some View {
-        GoStepCard(
+        let stopsRemaining = segment.liveStopsRemaining(from: currentLocation)
+        let verb: String = {
+            guard let stopsRemaining else { return "Ride to" }
+            return stopsRemaining == 1 ? "1 Stop to" : "\(stopsRemaining) Stops to"
+        }()
+
+        return GoStepCard(
             mode: .bus(providerCode: segment.routeRef ?? "BUS"),
-            verb: "Ride to",
+            verb: verb,
             destination: segment.to?.name ?? "your destination",
-            metrics: metrics(for: segment)
+            metrics: Array(metrics(for: segment).prefix(1)),
+            caption: estimatedArrivalCaption(for: segment)
         )
+    }
+
+    /// "Est. arrival 9:52 PM" — the live ETA (see `liveRemaining`) projected onto a wall-clock
+    /// time, shown as the tiny caption under a bus leg's ride card.
+    private func estimatedArrivalCaption(for segment: JourneySegment) -> String? {
+        guard let duration = segment.liveRemaining(from: currentLocation).durationSeconds else { return nil }
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return "Est. arrival \(formatter.string(from: Date().addingTimeInterval(duration)))"
     }
 
     private var arrivedCard: some View {

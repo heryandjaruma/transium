@@ -150,22 +150,26 @@ struct GoStepCard: View {
     let verb: String
     let destination: String
     let metrics: [Metric]
+    /// Tiny line under the metrics row — e.g. "Est. arrival 9:52 PM" on a bus leg's live ride card.
+    var caption: String? = nil
 
     /// Dipakai kalau cuma ada 1 metrik. Contoh: GoStepCard(..., metricValue: "5", metricUnit: "min")
-    init(mode: GoTravelMode, verb: String, destination: String, metricValue: String, metricUnit: String) {
+    init(mode: GoTravelMode, verb: String, destination: String, metricValue: String, metricUnit: String, caption: String? = nil) {
         self.mode = mode
         self.verb = verb
         self.destination = destination
         self.metrics = [Metric(metricValue, metricUnit)]
+        self.caption = caption
     }
 
     /// Dipakai kalau ada lebih dari 1 metrik (misal durasi + jarak).
     /// Contoh: GoStepCard(..., metrics: [.init("15", "min"), .init("1.2", "kilometer")])
-    init(mode: GoTravelMode, verb: String, destination: String, metrics: [Metric]) {
+    init(mode: GoTravelMode, verb: String, destination: String, metrics: [Metric], caption: String? = nil) {
         self.mode = mode
         self.verb = verb
         self.destination = destination
         self.metrics = metrics
+        self.caption = caption
     }
 
     var body: some View {
@@ -184,6 +188,12 @@ struct GoStepCard: View {
                     .minimumScaleFactor(0.8)
 
                 metricsRow
+
+                if let caption {
+                    Text(caption)
+                        .font(TransiumFont.body(11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                }
             }
 
             Spacer(minLength: 0)
