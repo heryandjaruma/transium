@@ -344,7 +344,7 @@ struct GoTripDetailsPanel: View {
                 .padding(.leading, 8)
             } else if segment.type == "bus" {
                 Divider().overlay(Color.white.opacity(0.3))
-                stopsMiniTimeline(segment, textColor: .white, mutedColor: .white.opacity(0.75), chipBackground: .white.opacity(0.18))
+                stopsMiniTimeline(segment, textColor: .white, mutedColor: .white.opacity(0.75), chipBackground: .white.opacity(0.18), liveLocation: currentLocation)
 
                 if let matched = matchedSteps[segment.id] {
                     Divider().overlay(Color.white.opacity(0.3))
@@ -362,16 +362,36 @@ struct GoTripDetailsPanel: View {
 
     // MARK: - Stops Mini-Timeline (shared between the active and inactive bus cards)
 
-    private func stopsMiniTimeline(_ segment: JourneySegment, textColor: Color, mutedColor: Color, chipBackground: Color) -> some View {
+    /// `liveLocation` is only meaningful for the currently-active leg — pass it from
+    /// `activeCard` to grey out/checkmark stops already behind the device; `inactiveBusCard`
+    /// (a leg not yet reached, or already fully completed) leaves it nil, so nothing here reads
+    /// as "passed" independent of the segment's own already-done styling.
+    private func stopsMiniTimeline(_ segment: JourneySegment, textColor: Color, mutedColor: Color, chipBackground: Color, liveLocation: CLLocationCoordinate2D? = nil) -> some View {
         let routeColor = TransiumTransitColor.color(for: segment.routeRef, hex: segment.routeColor)
-        let stopCount = segment.stops?.count ?? 0
+        let stops = segment.stops ?? []
+        let stopCount = stops.count
         let isExpanded = isStopsExpanded[segment.id] ?? false
+        let passedIndex = liveLocation.flatMap { segment.liveStopIndex(from: $0) } ?? 0
+        let lineHeight: CGFloat = isExpanded ? CGFloat(max(1, stopCount - 2) * 22) : 24
+        let progress: CGFloat = stopCount > 1 ? CGFloat(min(max(passedIndex, 0), stopCount - 1)) / CGFloat(stopCount - 1) : 0
 
         return HStack(alignment: .top, spacing: 12) {
             VStack(spacing: 0) {
-                Circle().fill(routeColor).frame(width: 12, height: 12)
-                Rectangle().fill(routeColor.opacity(0.7)).frame(width: 3, height: isExpanded ? CGFloat(max(1, stopCount - 2) * 22) : 24)
-                Circle().fill(routeColor).frame(width: 12, height: 12)
+                ZStack {
+                    Circle().fill(routeColor).frame(width: 12, height: 12)
+                    if passedIndex > 0 {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                }
+
+                ZStack(alignment: .top) {
+                    Rectangle().fill(routeColor.opacity(0.25)).frame(width: 3, height: lineHeight)
+                    Rectangle().fill(routeColor).frame(width: 3, height: lineHeight * progress)
+                }
+
+                Circle().fill(routeColor).opacity(passedIndex >= stopCount - 1 ? 1 : 0.3).frame(width: 12, height: 12)
             }
             .padding(.top, 3)
 
@@ -379,6 +399,8 @@ struct GoTripDetailsPanel: View {
                 Text(segment.from?.name ?? "")
                     .font(TransiumFont.body(13, weight: .semibold))
                     .foregroundColor(textColor)
+                    .strikethrough(passedIndex > 0, color: mutedColor)
+                    .opacity(passedIndex > 0 ? 0.55 : 1)
 
                 if stopCount > 2 {
                     Button(action: {
@@ -400,12 +422,21 @@ struct GoTripDetailsPanel: View {
                     }
                     .buttonStyle(.transiumNoOpacity)
 
-                    if isExpanded, let stops = segment.stops {
+                    if isExpanded {
                         VStack(alignment: .leading, spacing: 4) {
-                            ForEach(Array(stops.dropFirst().dropLast().enumerated()), id: \.offset) { _, stop in
-                                Text("• \(stop.name)")
-                                    .font(TransiumFont.body(12))
-                                    .foregroundColor(mutedColor)
+                            ForEach(Array(stops.dropFirst().dropLast().enumerated()), id: \.offset) { offset, stop in
+                                let isPassed = (offset + 1) < passedIndex
+                                HStack(spacing: 6) {
+                                    Image(systemName: isPassed ? "checkmark.circle.fill" : "circle.fill")
+                                        .font(.system(size: isPassed ? 10 : 4, weight: .bold))
+                                        .foregroundColor(isPassed ? routeColor : mutedColor.opacity(0.5))
+                                        .frame(width: 10)
+                                    Text(stop.name)
+                                        .font(TransiumFont.body(12))
+                                        .foregroundColor(mutedColor)
+                                        .strikethrough(isPassed, color: mutedColor)
+                                        .opacity(isPassed ? 0.55 : 1)
+                                }
                             }
                         }
                         .padding(.leading, 4)
