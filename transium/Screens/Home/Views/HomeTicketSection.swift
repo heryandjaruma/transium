@@ -7,11 +7,11 @@ import CoreLocation
 import SwiftUI
 
 struct HomeTicketSection: View {
-    let kelurahanGroups: [KelurahanQuestsGroup]
+    let areaGroups: [AreaQuestsGroup]
     @Binding var visibleTicketPage: Int?
     let currentLocationLabel: String
     let currentLocation: CLLocation
-    var onSelectKelurahan: (Kelurahan) -> Void
+    var onSelectArea: (Area) -> Void
     var onEditLocation: () -> Void
 
     var body: some View {
@@ -29,11 +29,11 @@ struct HomeTicketSection: View {
     private var ticketRail: some View {
         ScrollView(.horizontal) {
             HStack(alignment: .bottom, spacing: 14) {
-                if !kelurahanGroups.isEmpty {
-                    ForEach(Array(kelurahanGroups.enumerated()), id: \.offset) { index, group in
+                if !areaGroups.isEmpty {
+                    ForEach(Array(areaGroups.enumerated()), id: \.offset) { index, group in
                         let variant: TransiumTicketVariant = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .mint : .coral)
                         let isRecommended = (index == 0)
-                        
+
                         VStack(alignment: .leading, spacing: 0) {
                             if isRecommended {
                                 TransiumRecommendedSeal(style: .ticketTab)
@@ -41,19 +41,19 @@ struct HomeTicketSection: View {
                                     .padding(.bottom, -12)
                                     .zIndex(1)
                             }
-                            
+
                             TransiumTicketCard(
-                                title: group.kelurahan.kelurahanName,
-                                subtitle: group.kelurahan.description ?? group.quests.first?.description ?? "\(group.kelurahan.kecamatanName), Bali",
+                                title: group.area.name,
+                                subtitle: group.area.description ?? group.quests.first?.description ?? "\(group.area.name), Bali",
                                 distance: HomeLocationFormatter.distanceText(for: group, currentLocation: currentLocation),
                                 price: "Rp. 4,4k",
-                                imageUrl: group.kelurahan.thumbnails.first?.url ?? group.quests.first?.thumbnails.first?.url,
+                                imageUrl: group.area.photoUrl ?? group.area.thumbnails.first?.url ?? group.quests.first?.thumbnails.first?.url,
                                 fallbackImageName: isRecommended ? "kintamani" : "sanoored",
                                 variant: variant
                             )
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                onSelectKelurahan(group.kelurahan)
+                                onSelectArea(group.area)
                             }
                         }
                         .frame(width: 336)
@@ -79,7 +79,7 @@ struct HomeTicketSection: View {
                     }
                 }
             }
-            .animation(.easeInOut(duration: 0.35), value: kelurahanGroups.isEmpty)
+            .animation(.easeInOut(duration: 0.35), value: areaGroups.isEmpty)
             .scrollTargetLayout()
             .padding(.horizontal, 20)
         }
@@ -93,11 +93,11 @@ struct HomeTicketSection: View {
     private var ticketPageIndicator: some View {
         PageIndicator(
             currentPage: visibleTicketPage ?? 0,
-            totalPages: max(kelurahanGroups.count, 2),
+            totalPages: max(areaGroups.count, 2),
             activeColor: TransiumColor.primaryBlue,
             inactiveColor: TransiumColor.ticketInk.opacity(0.26)
         )
-        .accessibilityLabel("Ticket \(min((visibleTicketPage ?? 0) + 1, max(kelurahanGroups.count, 2))) of \(max(kelurahanGroups.count, 2))")
+        .accessibilityLabel("Ticket \(min((visibleTicketPage ?? 0) + 1, max(areaGroups.count, 2))) of \(max(areaGroups.count, 2))")
     }
 
     private var currentLocationPill: some View {

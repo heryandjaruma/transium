@@ -72,8 +72,8 @@ final class HomeViewModel: ObservableObject {
 
     // MARK: - Bookmarks & Quests State
     @Published var visibleTicketPage: Int? = 0
-    @Published var kelurahanGroups: [KelurahanQuestsGroup] = []
-    @Published var selectedKelurahan: Kelurahan = Kelurahan(id: "7760985", kelurahanName: "Benoa", kecamatanName: "Kuta Selatan")
+    @Published var areaGroups: [AreaQuestsGroup] = []
+    @Published var selectedArea: Area = Area(id: "7760985", name: "Benoa", lat: -8.73704, lng: 115.17570)
     @Published var bookmarkedQuestIds: Set<String> = []
     @Published var isTogglingBookmark: Bool = false
 
@@ -86,7 +86,7 @@ final class HomeViewModel: ObservableObject {
         locationStore.requestCurrentLocation()
         reverseGeocodeCurrentLocation()
         await loadUserBookmarks()
-        await fetchKelurahanGroups()
+        await fetchAreaGroups()
         await checkOngoingJourney()
     }
 
@@ -127,21 +127,20 @@ final class HomeViewModel: ObservableObject {
         mapCenterRequestID += 1
     }
 
-    // MARK: - Kelurahan & Quest Discovery
+    // MARK: - Area & Quest Discovery
 
-    func fetchKelurahanGroups() async {
+    func fetchAreaGroups() async {
         do {
-            let originParam = "\(resolvedCurrentLocation.coordinate.latitude),\(resolvedCurrentLocation.coordinate.longitude)"
-            let groups = try await QuestService.shared.listKelurahanQuests(origin: originParam)
+            let groups = try await QuestService.shared.listAreaQuests()
             let validGroups = groups.filter { !$0.quests.isEmpty }
             if !validGroups.isEmpty {
-                kelurahanGroups = validGroups
+                areaGroups = validGroups
                 if let first = validGroups.first {
-                    selectedKelurahan = first.kelurahan
+                    selectedArea = first.area
                 }
             }
         } catch {
-            print("Failed to fetch kelurahan quests: \(error)")
+            print("Failed to fetch area quests: \(error)")
         }
     }
 
@@ -171,10 +170,10 @@ final class HomeViewModel: ObservableObject {
                 let targetQuestId: String? = {
                     if let questId { return questId }
                     let page = visibleTicketPage ?? 0
-                    if kelurahanGroups.indices.contains(page) {
-                        return kelurahanGroups[page].quests.first?.id
+                    if areaGroups.indices.contains(page) {
+                        return areaGroups[page].quests.first?.id
                     }
-                    return kelurahanGroups.first?.quests.first?.id
+                    return areaGroups.first?.quests.first?.id
                 }()
                 
                 var response: JourneyResponse?
