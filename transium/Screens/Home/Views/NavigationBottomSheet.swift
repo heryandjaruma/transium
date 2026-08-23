@@ -307,24 +307,50 @@ struct StepTimelineView: View {
     // MARK: - Walk Card
     @ViewBuilder
     private func walkCard(_ segment: JourneySegment, index: Int) -> some View {
+        // A walk immediately followed by another bus leg (and not the very first leg, which is
+        // just walking to the first boarding stop) is a transfer between two rides — label it
+        // with the upcoming route so it doesn't read as "arrived".
+        let nextSegment = journey.segments.indices.contains(index + 1) ? journey.segments[index + 1] : nil
+        let transferRouteRef = (index > 0 && nextSegment?.type == "bus") ? nextSegment?.routeRef : nil
+        let transferColor = TransiumTransitColor.color(for: transferRouteRef, hex: nextSegment?.routeColor)
+
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
-                // Emerald circular walk icon
                 ZStack {
                     Circle()
-                        .fill(Color(red: 0.06, green: 0.72, blue: 0.51))
+                        .fill(transferRouteRef != nil ? TransiumColor.primaryBlue : Color(red: 0.06, green: 0.72, blue: 0.51))
                         .frame(width: 36, height: 36)
                     Image(systemName: "figure.walk")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
                 }
-                
-                Text(index == 0 ? "Walk to **\(segment.to?.name ?? "destination")**" : "Walk to **destination**")
-                    .font(TransiumFont.body(15, weight: .bold))
-                    .foregroundColor(.black)
-                
+
+                if let transferRouteRef {
+                    HStack(spacing: 6) {
+                        Text("Transit to")
+                            .font(TransiumFont.body(15, weight: .bold))
+                            .foregroundColor(.black)
+
+                        HStack(spacing: 4) {
+                            Image(systemName: "bus.fill")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(transferRouteRef.truncatedAtDash)
+                                .font(TransiumFont.body(12, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(transferColor)
+                        .cornerRadius(6)
+                    }
+                } else {
+                    Text(index == 0 ? "Walk to **\(segment.to?.name ?? "destination")**" : "Walk to **destination**")
+                        .font(TransiumFont.body(15, weight: .bold))
+                        .foregroundColor(.black)
+                }
+
                 Spacer()
-                
+
                 if let dur = segment.durationSeconds {
                     Text("\(Int(round(dur / 60))) min")
                         .font(TransiumFont.body(14, weight: .bold))
@@ -338,7 +364,7 @@ struct StepTimelineView: View {
         .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(.systemGray5), lineWidth: 1)
+                .stroke(transferRouteRef != nil ? TransiumColor.primaryBlue.opacity(0.35) : Color(.systemGray5), lineWidth: 1)
         )
     }
     
@@ -356,7 +382,7 @@ struct StepTimelineView: View {
                 HStack(spacing: 4) {
                     Image(systemName: "bus.fill")
                         .font(.system(size: 11))
-                    Text(routeRef)
+                    Text(routeRef.truncatedAtDash)
                         .font(TransiumFont.body(12, weight: .bold))
                 }
                 .foregroundColor(.white)
