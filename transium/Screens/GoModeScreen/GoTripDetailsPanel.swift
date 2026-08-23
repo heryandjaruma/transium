@@ -120,15 +120,15 @@ struct GoTripDetailsPanel: View {
                         .foregroundColor(.secondary)
                 }
                 #endif
+                Text("\(Int(round(totalSeconds / 60))) min")
+                    .font(TransiumFont.body(20, weight: .black))
+                    .foregroundColor(.black)
+                    .fixedSize()
             }
             .padding(.horizontal, 20)
             .padding(.bottom, isExpanded ? 10 : 16)
 
             if isExpanded {
-                modeChipsRow
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
-
 //                leaveArriveBar
 //                    .padding(.horizontal, 20)
 //                    .padding(.bottom, 16)
@@ -187,59 +187,6 @@ struct GoTripDetailsPanel: View {
     private func setExpanded(_ expanded: Bool) {
         withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
             isExpanded = expanded
-        }
-    }
-
-    // MARK: - Header
-
-    private var modeChipsRow: some View {
-        HStack(alignment: .center, spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(Array(journey.steps.enumerated()), id: \.offset) { index, step in
-                        if index > 0 {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(.gray.opacity(0.5))
-                        }
-
-                        if step.type == "walk" {
-                            HStack(spacing: 3) {
-                                Image(systemName: "figure.walk")
-                                    .font(.system(size: 13))
-                                Text("\(Int(step.durationMinutes ?? 0)) m")
-                                    .font(TransiumFont.body(11, weight: .medium))
-                            }
-                            .foregroundColor(.gray)
-                        } else if step.isMission {
-                            // No duration to show, just a marker that a mission sits here in
-                            // the itinerary — its own card further down has the instructions.
-                            Image(systemName: "questionmark.app.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(TransiumColor.primaryYellow)
-                        } else {
-                            HStack(spacing: 4) {
-                                Image(systemName: "bus.fill")
-                                    .font(.system(size: 11))
-                                Text((step.routeRef ?? "Bus").truncatedAtDash)
-                                    .font(TransiumFont.body(11, weight: .bold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(TransiumTransitColor.color(for: step.routeRef))
-                            .cornerRadius(6)
-                        }
-                    }
-                }
-            }
-
-            Spacer(minLength: 12)
-
-            Text("\(Int(round(totalSeconds / 60))) min")
-                .font(TransiumFont.body(20, weight: .black))
-                .foregroundColor(.black)
-                .fixedSize()
         }
     }
 
