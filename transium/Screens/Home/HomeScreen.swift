@@ -219,13 +219,13 @@ struct HomeScreen: View {
             
             if !vm.isSearchPresented {
                 HomeTicketSection(
-                    kelurahanGroups: vm.kelurahanGroups,
+                    areaGroups: vm.areaGroups,
                     visibleTicketPage: $vm.visibleTicketPage,
                     currentLocationLabel: vm.currentLocationText,
                     currentLocation: vm.resolvedCurrentLocation,
-                    onSelectKelurahan: { kelurahan in
+                    onSelectArea: { area in
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            vm.selectedKelurahan = kelurahan
+                            vm.selectedArea = area
                             vm.isDetailPresented = true
                         }
                     },
@@ -249,7 +249,7 @@ struct HomeScreen: View {
 
     private var detailOverlay: some View {
         DetailPlaceScreen(
-            kelurahan: vm.selectedKelurahan,
+            area: vm.selectedArea,
             initialQuests: [],
             onBack: {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {

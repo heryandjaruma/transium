@@ -81,28 +81,28 @@ struct DetailPlaceScreen: View {
     
     // MARK: - Properties & State
     
-    var kelurahan: Kelurahan = Kelurahan(id: "7760985", kelurahanName: "Benoa", kecamatanName: "Kuta Selatan")
+    var area: Area = Area(id: "7760985", name: "Benoa", lat: -8.7981, lng: 115.2185)
     var initialQuests: [Quest] = []
     var onBack: (() -> Void)? = nil
     var onStartQuest: ((String) -> Void)? = nil
-    
+
     @Environment(\.dismiss) private var dismiss
     @State private var selectedImageIndex: Int = 0
     @State private var headerImageUrls: [String] = []
     @State private var quests: [Quest] = []
     @State private var isLoadingQuests: Bool = false
-    @State private var activeKelurahan: Kelurahan?
-    
-    private var currentKelurahan: Kelurahan {
-        activeKelurahan ?? kelurahan
+    @State private var activeArea: Area?
+
+    private var currentArea: Area {
+        activeArea ?? area
     }
-    
+
     private var isBenoa: Bool {
-        currentKelurahan.kelurahanName.localizedCaseInsensitiveContains("benoa")
+        currentArea.name.localizedCaseInsensitiveContains("benoa")
     }
-    
+
     private var isUbud: Bool {
-        currentKelurahan.kelurahanName.localizedCaseInsensitiveContains("ubud")
+        currentArea.name.localizedCaseInsensitiveContains("ubud")
     }
     
     // MARK: - Body
@@ -281,7 +281,7 @@ struct DetailPlaceScreen: View {
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
-                Text("\(currentKelurahan.kelurahanName) Quests")
+                Text("\(currentArea.name) Quests")
                     .font(TransiumFont.display(28, weight: .bold))
                     .foregroundColor(.black)
                 
@@ -325,22 +325,22 @@ struct DetailPlaceScreen: View {
                     shimmerHighlight: Color.white.opacity(0.55)
                 )
             } else {
-                Text("\(currentKelurahan.kecamatanName) • \(kelurahanTagline)")
+                Text(areaTagline)
                     .font(TransiumFont.body(14))
                     .foregroundColor(.gray)
             }
         }
     }
-    
+
     private var resolvedCategory: String {
-        if let cat = currentKelurahan.category, !cat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if let cat = currentArea.category, !cat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return cat
         }
         return "Beach"
     }
-    
-    private var kelurahanTagline: String {
-        if let desc = currentKelurahan.description, !desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+
+    private var areaTagline: String {
+        if let desc = currentArea.description, !desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return desc
         }
         if isBenoa { return "Where earlybirds relax 🌊" }
@@ -361,13 +361,13 @@ struct DetailPlaceScreen: View {
         defer { isLoadingQuests = false }
         
         do {
-            let detail = try await QuestService.shared.getKelurahanQuests(id: kelurahan.id)
-            self.activeKelurahan = detail.kelurahan
-            
-            // Prioritize kelurahan's own thumbnails for carousel, followed by quest thumbnails
-            let kelurahanThumbs = detail.kelurahan.thumbnails.map(\.url)
+            let detail = try await QuestService.shared.getAreaQuests(id: area.id)
+            self.activeArea = detail.area
+
+            // Prioritize the area's hero photo and thumbnails for the carousel, followed by quest thumbnails
+            let areaThumbs = ([detail.area.photoUrl].compactMap { $0 }) + detail.area.thumbnails.map(\.url)
             let questThumbs = detail.quests.flatMap { $0.thumbnails.map(\.url) }
-            headerImageUrls = !kelurahanThumbs.isEmpty ? kelurahanThumbs : questThumbs
+            headerImageUrls = !areaThumbs.isEmpty ? areaThumbs : questThumbs
             
             if !detail.quests.isEmpty {
                 var loaded: [Quest] = []
@@ -409,7 +409,7 @@ struct DetailPlaceScreen: View {
                 }
             }
         } catch {
-            print("Failed to load kelurahan quests: \(error)")
+            print("Failed to load area quests: \(error)")
         }
     }
 }

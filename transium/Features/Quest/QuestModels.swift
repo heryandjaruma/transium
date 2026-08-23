@@ -299,13 +299,13 @@ public nonisolated struct QuestWithBadgesAndDistance: Codable, Identifiable, Sen
     }
 }
 
-// MARK: - KelurahanQuestsGroup
-public nonisolated struct KelurahanQuestsGroup: Codable, Sendable, Equatable {
-    public let kelurahan: Kelurahan
+// MARK: - AreaQuestsGroup
+public nonisolated struct AreaQuestsGroup: Codable, Sendable, Equatable {
+    public let area: Area
     public let quests: [Quest]
 
-    public init(kelurahan: Kelurahan, quests: [Quest]) {
-        self.kelurahan = kelurahan
+    public init(area: Area, quests: [Quest]) {
+        self.area = area
         self.quests = quests
     }
 }
@@ -323,11 +323,11 @@ nonisolated struct QuestBadgesResponse: Codable {
     let questBadges: [QuestBadgeEntry]
 }
 
-nonisolated struct KelurahanQuestGroupsResponse: Codable {
-    let groups: [KelurahanQuestsGroup]
+nonisolated struct AreaQuestGroupsResponse: Codable {
+    let groups: [AreaQuestsGroup]
 }
 
-public nonisolated struct KelurahanDetailQuestsResponse: Codable, Sendable, Equatable {
-    public let kelurahan: Kelurahan
+public nonisolated struct AreaDetailQuestsResponse: Codable, Sendable, Equatable {
+    public let area: Area
     public let quests: [QuestWithBadges]
 }
