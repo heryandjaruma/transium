@@ -324,7 +324,7 @@ struct ProfileScreen: View {
 
     private func uploadAvatar(_ image: UIImage) async {
         guard let imageData = await Task.detached(priority: .userInitiated, operation: {
-            Self.compressedAvatarData(from: image)
+            image.compressedJPEGData()
         }).value else {
             AppToastCenter.shared.showError(
                 title: "Couldn't update photo",
@@ -381,38 +381,6 @@ struct ProfileScreen: View {
             image: image,
             email: profile.email
         )
-    }
-
-    /// Re-encodes (and, if needed, downscales) the image until it fits under
-    /// `maxBytes`. Runs off the main actor since repeated JPEG encoding of a
-    /// full-resolution photo can take a noticeable amount of CPU time.
-    nonisolated private static func compressedAvatarData(from image: UIImage, maxBytes: Int = 1_000_000) -> Data? {
-        var candidate = image
-        var quality: CGFloat = 0.9
-
-        for _ in 0..<6 {
-            var data = candidate.jpegData(compressionQuality: quality)
-
-            while let currentData = data, currentData.count > maxBytes, quality > 0.1 {
-                quality -= 0.15
-                data = candidate.jpegData(compressionQuality: quality)
-            }
-
-            if let data, data.count <= maxBytes {
-                return data
-            }
-
-            // Still too big even at low quality; shrink the dimensions and try again.
-            let smallerSize = CGSize(width: candidate.size.width * 0.7, height: candidate.size.height * 0.7)
-            guard smallerSize.width > 50, smallerSize.height > 50, let resized = candidate.resized(to: smallerSize) else {
-                return data
-            }
-
-            candidate = resized
-            quality = 0.8
-        }
-
-        return candidate.jpegData(compressionQuality: 0.3)
     }
 
     // MARK: - Header

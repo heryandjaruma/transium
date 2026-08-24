@@ -12,7 +12,12 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		B67F14DD303708BA00F03EEE /* 0_Sanur_happy_Walk2Stop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = 0_Sanur_happy_Walk2Stop.gpx; path = "../gpx-testcases/Sanur/0_Sanur_happy_Walk2Stop.gpx"; sourceTree = "<group>"; };
+		B67F29AF303BB87600F03EEE /* 0_Sanur_happy_Walk2Stop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = 0_Sanur_happy_Walk2Stop.gpx; path = "../gpx-testcases/Sanur/0_Sanur_happy_Walk2Stop.gpx"; sourceTree = "<group>"; };
+		B67F29B0303BB87600F03EEE /* 1-1_Sanur_happy_RideBus.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "1-1_Sanur_happy_RideBus.gpx"; path = "../gpx-testcases/Sanur/1-1_Sanur_happy_RideBus.gpx"; sourceTree = "<group>"; };
+		B67F29B1303BB87600F03EEE /* 1_Sanur_happy_RideBus.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = 1_Sanur_happy_RideBus.gpx; path = "../gpx-testcases/Sanur/1_Sanur_happy_RideBus.gpx"; sourceTree = "<group>"; };
+		B67F29B2303BB87600F03EEE /* 0-1_Sanur_happy_Walk2Stop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "0-1_Sanur_happy_Walk2Stop.gpx"; path = "../gpx-testcases/Sanur/0-1_Sanur_happy_Walk2Stop.gpx"; sourceTree = "<group>"; };
+		B67F29B3303BB87600F03EEE /* 2_Sanur_happy_Walk2Dest.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = 2_Sanur_happy_Walk2Dest.gpx; path = "../gpx-testcases/Sanur/2_Sanur_happy_Walk2Dest.gpx"; sourceTree = "<group>"; };
+		B67F29B4303BB87600F03EEE /* 2-1_Sanur_happy_Walk2Dest.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "2-1_Sanur_happy_Walk2Dest.gpx"; path = "../gpx-testcases/Sanur/2-1_Sanur_happy_Walk2Dest.gpx"; sourceTree = "<group>"; };
 		B685FCA43028DCB5005B7C1E /* transium.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = transium.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B685FCB23028DD88005B7C1E /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -53,7 +58,12 @@
 		B685FC9B3028DCB5005B7C1E = {
 			isa = PBXGroup;
 			children = (
-				B67F14DD303708BA00F03EEE /* 0_Sanur_happy_Walk2Stop.gpx */,
+				B67F29AF303BB87600F03EEE /* 0_Sanur_happy_Walk2Stop.gpx */,
+				B67F29B2303BB87600F03EEE /* 0-1_Sanur_happy_Walk2Stop.gpx */,
+				B67F29B1303BB87600F03EEE /* 1_Sanur_happy_RideBus.gpx */,
+				B67F29B0303BB87600F03EEE /* 1-1_Sanur_happy_RideBus.gpx */,
+				B67F29B3303BB87600F03EEE /* 2_Sanur_happy_Walk2Dest.gpx */,
+				B67F29B4303BB87600F03EEE /* 2-1_Sanur_happy_Walk2Dest.gpx */,
 				B685FCB23028DD88005B7C1E /* .gitignore */,
 				B685FCA63028DCB5005B7C1E /* transium */,
 				B685FCA53028DCB5005B7C1E /* Products */,
