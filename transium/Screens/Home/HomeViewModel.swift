@@ -570,7 +570,9 @@ final class HomeViewModel: ObservableObject {
     }
 
     func handlePhotoCaptured(image: UIImage, step: JourneyAttemptStep) async {
-        guard let data = image.jpegData(compressionQuality: 0.85) else {
+        guard let data = await Task.detached(priority: .userInitiated, operation: {
+            image.compressedJPEGData()
+        }).value else {
             AppToastCenter.shared.showError(title: "Upload Failed", message: "Couldn't process that photo. Please try again.")
             return
         }
@@ -633,7 +635,9 @@ final class HomeViewModel: ObservableObject {
             await MainActor.run { isRandomPhotoOpPresented = false }
             return
         }
-        guard let data = image.jpegData(compressionQuality: 0.85) else {
+        guard let data = await Task.detached(priority: .userInitiated, operation: {
+            image.compressedJPEGData()
+        }).value else {
             AppToastCenter.shared.showError(title: "Upload Failed", message: "Couldn't process that photo. Please try again.")
             return
         }
