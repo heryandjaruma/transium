@@ -23,14 +23,6 @@ struct ProfileScreen: View {
         }
     }
 
-    struct Badge: Identifiable {
-        let id = UUID()
-        let imageName: String
-        let title: String
-        let date: String
-        let borderColor: Color
-    }
-
     @Environment(\.dismiss) private var dismiss
     @Environment(SessionController.self) private var session
 
@@ -73,12 +65,14 @@ struct ProfileScreen: View {
     @State private var isSettingsPresented: Bool = false
 
     // Badges
-    private let badges: [Badge] = [
-        Badge(imageName: "sanoored", title: "Sanoored", date: "27 Aug 2026", borderColor: .black),
-        Badge(imageName: "kintamani", title: "Kintamani", date: "27 Aug 2026", borderColor: .blue),
-        Badge(imageName: "gwk", title: "GWK", date: "27 Aug 2026", borderColor: .green),
-        Badge(imageName: "traveling", title: "Traveling", date: "27 Aug 2026", borderColor: .red)
-    ]
+    @State private var earnedBadges: [EarnedBadge] = []
+    @State private var isLoadingBadges: Bool = false
+
+    private static let badgeDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM yyyy"
+        return formatter
+    }()
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -121,6 +115,9 @@ struct ProfileScreen: View {
         }
         .task {
             await loadGallery()
+        }
+        .task {
+            await loadBadges()
         }
         .sheet(isPresented: $isEditingAccount) {
             editAccountSheet
@@ -203,12 +200,54 @@ struct ProfileScreen: View {
         }
     }
 
+    // MARK: - Remote Badges
+
+    private func loadBadges() async {
+        guard earnedBadges.isEmpty else { return }
+        isLoadingBadges = true
+        defer { isLoadingBadges = false }
+
+        do {
+            earnedBadges = try await BadgeService.shared.listEarnedBadges()
+        } catch {
+            AppToastCenter.shared.showError(
+                title: "Couldn't load badges",
+                message: "Please try again in a moment."
+            )
+        }
+    }
+
     private func resolvedImageURL(_ raw: String) -> URL? {
         if raw.hasPrefix("http") {
             return URL(string: raw)
         }
         return APIConfiguration.origin.appending(path: raw.hasPrefix("/") ? String(raw.dropFirst()) : raw)
     }
+
+    /// `earnedBadges` arrives most-recently-earned first, so this interpolates each badge's
+    /// postage-frame from a faded, vintage sepia tone at the oldest end of the list to a vivid
+    /// fresh blue at the newest — a color gradient across the whole collection rather than one
+    /// fixed look, since the frame art is a template SVG that takes any tint.
+    private func stampVariant(forBadgeAt index: Int) -> TransiumStampVariant {
+        guard earnedBadges.count > 1 else { return .blue }
+        let recency = 1 - (CGFloat(index) / CGFloat(earnedBadges.count - 1)) // 1 = most recent, 0 = oldest
+
+        return TransiumStampVariant(
+            frameColor: Self.vintageFrame.interpolated(to: Self.freshFrame, fraction: recency),
+            paperColor: Self.vintagePaper.interpolated(to: Self.freshPaper, fraction: recency),
+            shadowColor: Self.vintageShadow.interpolated(to: Self.freshShadow, fraction: recency),
+            imageBackground: Self.vintageImageBackground.interpolated(to: Self.freshImageBackground, fraction: recency)
+        )
+    }
+
+    private static let vintageFrame = Color(red: 0.93, green: 0.86, blue: 0.72)
+    private static let freshFrame = Color(red: 0.74, green: 0.88, blue: 1.0)
+    private static let vintagePaper = Color(red: 0.98, green: 0.95, blue: 0.87)
+    private static let freshPaper = Color(red: 0.95, green: 0.98, blue: 1.0)
+    private static let vintageImageBackground = Color(red: 0.87, green: 0.74, blue: 0.52)
+    private static let freshImageBackground = Color(red: 0.74, green: 0.88, blue: 1.0)
+    private static let vintageShadow = Color(red: 0.45, green: 0.32, blue: 0.12).opacity(0.22)
+    private static let freshShadow = TransiumColor.ticketInk.opacity(0.18)
 
     private func presentEditAccount() {
         editedFirstName = profile?.firstName ?? ""
@@ -552,38 +591,61 @@ struct ProfileScreen: View {
                     .font(TransiumFont.body(17, weight: .bold))
                     .foregroundColor(.black)
                 Spacer()
-                Text("\(badges.count) Badges")
+                Text("\(earnedBadges.count) Badges")
                     .font(TransiumFont.body(17, weight: .bold))
                     .foregroundColor(TransiumColor.primaryBlue)
             }
 
-            LazyVGrid(
-                columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
-                spacing: 10
-            ) {
-                ForEach(badges) { badge in
-                    VStack(spacing: 8) {
-                        Image(badge.imageName)
-                            .resizable()
-                            .scaledToFill()
-                            .aspectRatio(1, contentMode: .fill)   // square, bukan .infinity
-                            .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .clipped()
-                            .onTapGesture {
-                                // optional: open badge detail
+            if isLoadingBadges && earnedBadges.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+            } else if earnedBadges.isEmpty {
+                Text("No badges yet — complete a quest to earn your first one.")
+                    .font(TransiumFont.body(14))
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+            } else {
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                    spacing: 10
+                ) {
+                    ForEach(Array(earnedBadges.enumerated()), id: \.element.id) { index, badge in
+                        VStack(spacing: 8) {
+                            TransiumStampCard(
+                                size: 92,
+                                tilt: .degrees(index.isMultiple(of: 2) ? -3 : 3),
+                                variant: stampVariant(forBadgeAt: index)
+                            ) {
+                                AsyncImage(url: badge.badgeImageUrl.flatMap(resolvedImageURL)) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                    default:
+                                        Image(systemName: "rosette")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .padding(10)
+                                            .foregroundColor(.white.opacity(0.85))
+                                    }
+                                }
                             }
+                            .frame(maxWidth: .infinity)
 
-                        VStack(spacing: 0) {
-                            Text(badge.title)
-                                .font(TransiumFont.body(14, weight: .semibold))
-                                .foregroundColor(.black)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                            VStack(spacing: 0) {
+                                Text(badge.badgeName)
+                                    .font(TransiumFont.body(14, weight: .semibold))
+                                    .foregroundColor(.black)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
 
-                            Text(badge.date)
-                                .font(TransiumFont.body(11).weight(.medium))
-                                .foregroundColor(.gray)
+                                Text(Self.badgeDateFormatter.string(from: badge.earnedAt))
+                                    .font(TransiumFont.body(11).weight(.medium))
+                                    .foregroundColor(.gray)
+                            }
                         }
                     }
                 }
@@ -908,6 +970,27 @@ extension UIImage {
         return renderer.image { _ in
             draw(in: CGRect(origin: .zero, size: targetSize))
         }
+    }
+}
+
+// MARK: - Color Interpolation Helper
+
+extension Color {
+    /// Linear RGBA interpolation toward `other`, `fraction` clamped to 0...1 — used to build a
+    /// smooth color gradient across a collection (e.g. the badges grid's oldest-to-newest
+    /// postage frame tint) rather than picking from a fixed palette.
+    func interpolated(to other: Color, fraction: CGFloat) -> Color {
+        let t = min(max(fraction, 0), 1)
+        var (r1, g1, b1, a1): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        var (r2, g2, b2, a2): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        UIColor(self).getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        UIColor(other).getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        return Color(
+            red: r1 + (r2 - r1) * t,
+            green: g1 + (g2 - g1) * t,
+            blue: b1 + (b2 - b1) * t,
+            opacity: a1 + (a2 - a1) * t
+        )
     }
 }
 
