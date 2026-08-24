@@ -422,10 +422,22 @@ struct GoTripDetailsPanel: View {
                         .cornerRadius(8)
                 }
 
-                Text("Get off at **\(segment.to?.name ?? "destination")**")
-                    .font(TransiumFont.body(15, weight: .bold))
-                    .foregroundColor(.black)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text("Get off at")
+                        .font(TransiumFont.body(15, weight: .bold))
+                        .foregroundColor(.black)
+                        .layoutPriority(1)
+
+                    Image("LineIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+
+                    Text(segment.to?.name ?? "destination")
+                        .font(TransiumFont.body(15, weight: .bold))
+                        .foregroundColor(.black)
+                        .lineLimit(1)
+                }
 
                 Spacer()
 
