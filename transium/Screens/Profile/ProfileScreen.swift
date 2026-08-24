@@ -23,11 +23,6 @@ struct ProfileScreen: View {
         }
     }
 
-    struct GalleryPhoto: Identifiable, Equatable {
-        let id = UUID()
-        let imageName: String
-    }
-
     struct Badge: Identifiable {
         let id = UUID()
         let imageName: String
@@ -58,15 +53,13 @@ struct ProfileScreen: View {
     @State private var isDeletingAccount: Bool = false
 
     // Gallery
-    @State private var galleryPhotos: [GalleryPhoto] = [
-        GalleryPhoto(imageName: "gallery-1"),
-        GalleryPhoto(imageName: "gallery-2"),
-        GalleryPhoto(imageName: "gallery-3"),
-    ]
-//    @State private var photoPendingDelete: GalleryPhoto? = nil
+    @State private var galleryPhotos: [GalleryItem] = []
+    @State private var galleryPagination: GalleryPagination?
+    @State private var isLoadingGallery: Bool = false
+    @State private var isLoadingMoreGallery: Bool = false
+//    @State private var photoPendingDelete: GalleryItem? = nil
 //    @State private var showDeleteConfirmation: Bool = false
-    @State private var likedPhotoIDs: Set<UUID> = []
-    @State private var viewingPhoto: GalleryPhoto? = nil
+    @State private var viewingPhoto: GalleryItem? = nil
 
     // Photo download (save to Photos library)
     @State private var isSavingPhoto: Bool = false
@@ -126,6 +119,9 @@ struct ProfileScreen: View {
         .task {
             await loadProfile()
         }
+        .task {
+            await loadGallery()
+        }
         .sheet(isPresented: $isEditingAccount) {
             editAccountSheet
         }
@@ -134,10 +130,10 @@ struct ProfileScreen: View {
         }
         .fullScreenCover(item: $viewingPhoto) { photo in
             PhotoViewer(
-                imageName: photo.imageName,
+                imageURL: resolvedImageURL(photo.url),
                 isSaving: isSavingPhoto,
                 onClose: { viewingPhoto = nil },
-                onDownload: { downloadPhoto(photo) }
+                onDownload: { Task { await downloadPhoto(photo) } }
             )
         }
         .alert("Save Photo", isPresented: $showSaveResultAlert) {
@@ -168,6 +164,42 @@ struct ProfileScreen: View {
         } catch {
             // Keep the placeholder values if the fetch fails; the user can
             // still browse the rest of the screen.
+        }
+    }
+
+    // MARK: - Remote Gallery
+
+    private func loadGallery() async {
+        guard galleryPhotos.isEmpty else { return }
+        isLoadingGallery = true
+        defer { isLoadingGallery = false }
+
+        do {
+            let page = try await GalleryService.shared.listGallery(page: 1, limit: 30)
+            galleryPhotos = page.media
+            galleryPagination = page.pagination
+        } catch {
+            AppToastCenter.shared.showError(
+                title: "Couldn't load gallery",
+                message: "Please try again in a moment."
+            )
+        }
+    }
+
+    private func loadMoreGalleryIfNeeded() async {
+        guard let pagination = galleryPagination, pagination.hasNextPage, !isLoadingMoreGallery else { return }
+        isLoadingMoreGallery = true
+        defer { isLoadingMoreGallery = false }
+
+        do {
+            let nextPage = try await GalleryService.shared.listGallery(page: pagination.page + 1, limit: pagination.limit)
+            galleryPhotos.append(contentsOf: nextPage.media)
+            galleryPagination = nextPage.pagination
+        } catch {
+            AppToastCenter.shared.showError(
+                title: "Couldn't load more photos",
+                message: "Please try again in a moment."
+            )
         }
     }
 
@@ -566,69 +598,110 @@ struct ProfileScreen: View {
                 .font(TransiumFont.body(17, weight: .semibold))
                 .foregroundColor(.black)
 
-            LazyVGrid(
-                columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
-                spacing: 10
-            ) {
-                ForEach(galleryPhotos) { photo in
-                    ZStack(alignment: .bottomTrailing) {
-                        Image(photo.imageName)
-                            .resizable()
-                            .scaledToFill()
+            if isLoadingGallery && galleryPhotos.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+            } else if galleryPhotos.isEmpty {
+                Text("No photos yet — they'll show up here once you snap some on a quest.")
+                    .font(TransiumFont.body(14))
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+            } else {
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                    spacing: 10
+                ) {
+                    ForEach(galleryPhotos) { photo in
+                        ZStack(alignment: .bottomTrailing) {
+                            AsyncImage(url: resolvedImageURL(photo.url)) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                case .empty:
+                                    Rectangle().fill(Color(.systemGray5))
+                                default:
+                                    Rectangle().fill(Color(.systemGray4))
+                                }
+                            }
                             .frame(height: 145)
                             .frame(maxWidth: .infinity)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .clipped()
                             .onTapGesture {
                                 viewingPhoto = photo
                             }
 
-                        Button {
-                            downloadPhoto(photo)
-                        } label: {
-                            Image(systemName: "arrow.down.to.line")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(6)
-                                .background(Color.black.opacity(0.35))
-                                .clipShape(Circle())
+                            Button {
+                                Task { await downloadPhoto(photo) }
+                            } label: {
+                                Image(systemName: "arrow.down.to.line")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(6)
+                                    .background(Color.black.opacity(0.35))
+                                    .clipShape(Circle())
+                            }
+                            .padding(6)
                         }
-                        .padding(6)
                     }
+                }
+
+                if galleryPagination?.hasNextPage == true {
+                    Button {
+                        Task { await loadMoreGalleryIfNeeded() }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isLoadingMoreGallery {
+                                ProgressView()
+                            } else {
+                                Text("Load More")
+                                    .font(TransiumFont.body(14, weight: .semibold))
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                    }
+                    .disabled(isLoadingMoreGallery)
                 }
             }
         }
     }
 
-    private func toggleLike(for photo: GalleryPhoto) {
-        if likedPhotoIDs.contains(photo.id) {
-            likedPhotoIDs.remove(photo.id)
-        } else {
-            likedPhotoIDs.insert(photo.id)
-        }
-    }
-
     // MARK: - Photo Download
 
-    /// Saves a gallery photo (by asset name) into the user's Photos library.
-    private func downloadPhoto(_ photo: GalleryPhoto) {
-        guard let uiImage = UIImage(named: photo.imageName) else {
-            saveResultMessage = "Couldn't find that photo to download."
-            showSaveResultAlert = true
-            return
-        }
-
+    /// Downloads a gallery photo's raw bytes via `GET /private/gallery/{id}` and saves it into
+    /// the user's Photos library.
+    private func downloadPhoto(_ photo: GalleryItem) async {
         isSavingPhoto = true
-        ImageSaver { success, error in
-            isSavingPhoto = false
-            if success {
-                saveResultMessage = "Saved to your Photos."
-            } else if let error {
-                saveResultMessage = "Couldn't save the photo: \(error.localizedDescription)"
-            } else {
-                saveResultMessage = "Couldn't save the photo. Check that Transium has permission to add photos in Settings."
+        defer { isSavingPhoto = false }
+
+        do {
+            let data = try await GalleryService.shared.downloadPhoto(id: photo.id)
+            guard let uiImage = UIImage(data: data) else {
+                saveResultMessage = "Couldn't process that photo."
+                showSaveResultAlert = true
+                return
             }
+
+            ImageSaver { success, error in
+                if success {
+                    saveResultMessage = "Saved to your Photos."
+                } else if let error {
+                    saveResultMessage = "Couldn't save the photo: \(error.localizedDescription)"
+                } else {
+                    saveResultMessage = "Couldn't save the photo. Check that Transium has permission to add photos in Settings."
+                }
+                showSaveResultAlert = true
+            }.save(uiImage)
+        } catch {
+            saveResultMessage = "Couldn't download that photo. Please try again."
             showSaveResultAlert = true
-        }.save(uiImage)
+        }
     }
 
     // MARK: - Edit Account Sheet
@@ -742,7 +815,7 @@ struct ProfileScreen: View {
 // MARK: - Photo Viewer
 
 private struct PhotoViewer: View {
-    let imageName: String
+    let imageURL: URL?
     let isSaving: Bool
     let onClose: () -> Void
     let onDownload: () -> Void
@@ -751,10 +824,22 @@ private struct PhotoViewer: View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
 
-            Image(imageName)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            AsyncImage(url: imageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                case .empty:
+                    ProgressView()
+                        .tint(.white)
+                default:
+                    Image(systemName: "photo")
+                        .font(.system(size: 40, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             HStack {
                 Button(action: onDownload) {
