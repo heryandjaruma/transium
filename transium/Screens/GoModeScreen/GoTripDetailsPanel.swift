@@ -2,13 +2,14 @@
 //  GoTripDetailsPanel.swift
 //  transium
 //
-//  Go Mode's bottom sheet — one persistent white docked surface (styled after
-//  NavigationBottomSheet, the pre-Go overview's own bottom sheet), not a modal .sheet().
-//  Collapsed, it's just the drag handle + "Trip Details" label peeking up; dragging it up
-//  (or tapping the handle) expands the SAME sheet into the full itinerary, exactly like
-//  NavigationBottomSheet's isCollapsed toggle — so it never covers the map/top bar the way
-//  a system sheet would, and the handle/label are always part of a real sheet surface
-//  rather than floating bare on the map.
+//  Go Mode's bottom sheet — presented by GoComponentMode as a real, native .sheet with
+//  presentationDetents (collapsed "Trip Details" peek vs. the full itinerary) and
+//  presentationBackgroundInteraction(.enabled), so the map/top bar stay interactive
+//  underneath it while dragging still gets genuine system sheet physics (live finger
+//  tracking, rubber-banding, velocity-based settle) instead of a hand-rolled DragGesture.
+//  This view is just the sheet's content — no background/corner/shadow chrome of its own,
+//  and no expanded/collapsed branching: it always lays out the full itinerary and lets the
+//  sheet's current detent height decide how much of it is visible.
 //
 //  The current leg is highlighted as a blue "active" card; the quest's own photo-checkpoint
 //  steps (from POST /private/journey/go, unrelated in the API to the route's segments) are
@@ -23,7 +24,6 @@ struct GoTripDetailsPanel: View {
     let currentSegmentIndex: Int
     let steps: [JourneyAttemptStep]
     var currentLocation: CLLocationCoordinate2D? = nil
-    @Binding var isExpanded: Bool
     var geofenceMonitor: JourneyGeofenceMonitor = JourneyGeofenceMonitor()
     var goStartResult: JourneyGoResult? = nil
     /// POST /private/journey/{id}/advance's own doc calls this "a geofence trigger, or a
@@ -90,13 +90,6 @@ struct GoTripDetailsPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 2.5)
-                .fill(Color(.systemGray3))
-                .frame(width: 38, height: 5)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-                .onTapGesture { toggle() }
-
             HStack {
                 Text("Trip Details")
                     .font(TransiumFont.body(20, weight: .bold))
@@ -126,68 +119,37 @@ struct GoTripDetailsPanel: View {
                     .fixedSize()
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, isExpanded ? 10 : 16)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
 
-            if isExpanded {
 //                leaveArriveBar
 //                    .padding(.horizontal, 20)
 //                    .padding(.bottom, 16)
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    timeline
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 28)
-                }
-                .frame(maxHeight: 380)
-                .mask(
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: .black, location: 0.0),
-                            .init(color: .black, location: 0.9),
-                            .init(color: .clear, location: 1.0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            ScrollView(.vertical, showsIndicators: false) {
+                timeline
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 28)
             }
+            .frame(maxHeight: .infinity)
+            .mask(
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: .black, location: 0.0),
+                        .init(color: .black, location: 0.94),
+                        .init(color: .clear, location: 1.0)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
         }
-        .gesture(
-            DragGesture()
-                .onEnded { value in
-                    let dy = value.translation.height
-                    if dy > 35 {
-                        setExpanded(false)
-                    } else if dy < -35 {
-                        setExpanded(true)
-                    }
-                }
-        )
         .frame(maxWidth: .infinity)
-        .background(Color.white)
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 12, y: -4)
-        .overlay(alignment: .bottom) {
-            Color.white
-                .frame(height: 120)
-                .offset(y: 120)
-        }
         #if DEBUG
         .sheet(item: $debugShareItem) { item in
             ActivityShareSheet(activityItems: [item.url])
         }
         #endif
-    }
-
-    private func toggle() {
-        setExpanded(!isExpanded)
-    }
-
-    private func setExpanded(_ expanded: Bool) {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-            isExpanded = expanded
-        }
     }
 
 //    private var leaveArriveBar: some View {
