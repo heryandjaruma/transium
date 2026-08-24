@@ -200,6 +200,12 @@ struct HomeScreen: View {
                     onCenterMap: { vm.centerMapOnUser() }
                 )
             }
+            // Fixed to the collapsed toggle button's own height so expanding the menu (which
+            // stacks more buttons below it) never pushes the Ongoing Trip card underneath it —
+            // the extra buttons simply overflow past this frame instead of growing it. Safe
+            // since the menu is trailing-aligned on the right while the trip card sits on the
+            // left, so the overflowing buttons never land on top of it.
+            .frame(height: 44, alignment: .top)
             .padding(.top, 6)
             .padding(.horizontal, 20)
 
