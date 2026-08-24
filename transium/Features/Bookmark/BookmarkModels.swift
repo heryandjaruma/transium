@@ -11,14 +11,14 @@ public nonisolated struct Bookmark: Codable, Identifiable, Sendable, Equatable {
     public let questId: String
     public let questName: String
     public let questCategory: String
-    public let createdAt: Date
+    public let createdAt: String?
 
     public init(
         id: String,
         questId: String,
         questName: String,
         questCategory: String,
-        createdAt: Date
+        createdAt: String? = nil
     ) {
         self.id = id
         self.questId = questId

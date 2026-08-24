@@ -1,280 +1,66 @@
 # Transium API Reference
 
-This document outlines the API endpoints, data models, and routing logic provided by the Transium Backend service (`https://transium-api.heryandjaruma.workers.dev`). 
-
-The API is used by the client for door-to-door transit planning, quest discovery, and authentication.
+This document outlines the complete REST API endpoints, schemas, authentication protocols, and data models provided by the Transium Backend service (`https://transium-api.heryandjaruma.workers.dev`).
 
 ---
 
-## Base URLs and Setup
+## 1. Base URLs & Configuration
 
 - **Production API Base**: `https://transium-api.heryandjaruma.workers.dev/api`
-- **Authentication Endpoints**: `https://transium-api.heryandjaruma.workers.dev/api/auth`
-- **OpenAPI Schema**: `https://transium-api.heryandjaruma.workers.dev/api/openapi.json`
-- **Scalar Reference Docs**: `https://transium-api.heryandjaruma.workers.dev/reference`
+- **OpenAPI JSON Schema**: `https://transium-api.heryandjaruma.workers.dev/api/openapi.json`
+- **Scalar Interactive Docs**: `https://transium-api.heryandjaruma.workers.dev/reference`
 
 Configuration in the codebase is managed via [`transium/Backend/APIConfiguration.swift`](file:///Users/msafdev/Code/swift/transium/transium/Backend/APIConfiguration.swift).
 
----
-
-## 1. Journey Planning
-
-### `GET /journey/real`
-
-Plan a real door-to-door transit journey directly to a Quest using its `questId` and the user's starting origin coordinates. This eliminates the need for the client to manually specify a destination coordinate, deriving it automatically from the quest's first actionable badge step.
-
-#### Query Parameters
-- `questId` (string, required): UUID identifier of the target quest. Example: `c8e567dc-e321-438f-9a30-33eb8ae06546`
-- `origin` (string, required): Starting coordinate as `lat,lng`. Example: `-8.702105,115.176189`
-
-#### Response Schema (200 OK)
-Returns the standard `JourneyResponse` containing `best` (and optional `lessWalking`/`lessTransit` alternatives).
+### Authorization Header
+All endpoints under `/api/private/*` require an HTTP `Authorization` header:
+```http
+Authorization: Bearer <session-token>
+```
+Tokens are stored securely in iOS Keychain via `SessionTokenStore`. When running in Xcode SwiftUI Previews (`AppEnvironment.DEV_MODE`), `"debug-token-123"` is injected automatically.
 
 ---
 
-### `GET /journey/overview`
+## 2. Kelurahan & Quest Discovery Endpoints
 
-Plan a door-to-door journey between two coordinates in Bali, optimizing for different travel preferences (walking vs public transport).
+### `GET /api/private/kelurahan/quest`
+Lists all Kelurahan groups containing quests, with optional distance calculation relative to the user's starting location.
 
-#### Query Parameters
-- `origin` (string, required): Starting coordinate as `lat,lng`. Example: `-8.6705,115.2126`
-- `destination` (string, required): Destination coordinate as `lat,lng`. Example: `-8.7089,115.2537`
+- **Auth**: Required (`Bearer <token>`)
+- **Query Parameters**:
+  - `origin` (string, optional): Starting coordinate as `lat,lng` (e.g. `-8.702105,115.176189`). When provided, `distanceMeters` is calculated for each quest.
 
-#### How Routing Works
-The router computes routes under two distinct cost profiles:
-1. **`lessWalking`**: Minimizes walking distances, accepting more transfers if needed.
-2. **`lessTransit`**: Minimizes transfers and waiting time, accepting longer walks.
-
-The backend response encapsulates this in the following structure:
-- **`best`**: Always returned. This is the optimal route under `lessWalking`, or `lessTransit` if `lessWalking` is unavailable.
-- **`alternativesAvailable`**: Set to `true` if both profiles found physically distinct routes (different stop sequences). In this case, the response contains `lessWalking` and `lessTransit` objects. If they are the same or only one exists, `alternativesAvailable` is `false` and only `best` is returned.
-- **Walk Fallback**: If the origin and destination are close enough that walking is faster or transit is unavailable, the journey returned is a single walk segment.
-
-#### Response Schema (200 OK)
-```json
-{
-  "alternativesAvailable": boolean,
-  "best": JourneyResult,
-  "lessWalking": JourneyResult, // Optional, only if alternativesAvailable is true
-  "lessTransit": JourneyResult  // Optional, only if alternativesAvailable is true
-}
-```
-
-#### Error Responses
-- **`400 Bad Request`**: Missing/invalid parameters.
-  - `{ "error": "Invalid arguments" }`
-- **`404 Not Found`**: No routes found or transit/walking directions unavailable.
-  - `{ "error": "No stops available" }`
-  - `{ "error": "No route found" }`
-  - `{ "error": "No walking route to boarding stop" }`
-  - `{ "error": "No walking route from alighting stop" }`
-
-#### Example Curl and Response
-```bash
-curl -s "https://transium-api.heryandjaruma.workers.dev/api/journey/overview?origin=-8.6705,115.2126&destination=-8.7089,115.2537"
-```
-
-Response snippet:
-```json
-{
-  "alternativesAvailable": false,
-  "best": {
-    "origin": { "lat": -8.6705, "lng": 115.2126 },
-    "destination": { "lat": -8.7089, "lng": 115.2537 },
-    "segments": [
-      {
-        "type": "walk",
-        "from": { "lat": -8.6705, "lng": 115.2126, "name": "Origin" },
-        "to": { "lat": -8.6693, "lng": 115.21259, "name": "Teuku Umar 2", "stopId": "cd8a695c-59df-4324-ae69-f89c8b41613c" },
-        "distanceMeters": 284,
-        "durationSeconds": 219,
-        "geometry": [[115.212648, -8.670506], [115.212691, -8.670264], ...],
-        "steps": [
-          { "instructions": "Proceed to the route", "distanceMeters": 0, "durationSeconds": 4, "geometry": [...] },
-          { "instructions": "Take a left onto Pulau Seram", "distanceMeters": 125, "durationSeconds": 94, "geometry": [...] }
-        ]
-      },
-      {
-        "type": "bus",
-        "routeId": "K2B-1",
-        "routeRef": "K2B-1",
-        "routeName": "Ngurah Rai → Terminal Ubung",
-        "routeColor": "#0073b2",
-        "from": { "stopId": "cd8a695c-59df-4324-ae69-f89c8b41613c", "name": "Teuku Umar 2", "lat": -8.6693, "lng": 115.21259 },
-        "to": { "stopId": "bc3055a6-503d-4d40-b594-24e6219b4fd6", "name": "Unud Sudirman 1", "lat": -8.6717297, "lng": 115.2182818 },
-        "stops": [
-          { "stopId": "cd8a695c-59df-4324-ae69-f89c8b41613c", "name": "Teuku Umar 2", "lat": -8.6693, "lng": 115.21259 },
-          { "stopId": "bc3055a6-503d-4d40-b594-24e6219b4fd6", "name": "Unud Sudirman 1", "lat": -8.6717297, "lng": 115.2182818 }
-        ],
-        "distanceMeters": 681.5,
-        "durationSeconds": 122.7,
-        "geometry": [[-8.743842, 115.1790356], [-8.743842, 115.1790356]]
-      },
-      {
-        "type": "transfer",
-        "from": { "stopId": "bc3055a6-503d-4d40-b594-24e6219b4fd6", "name": "Unud Sudirman 1", "lat": -8.6717297, "lng": 115.2182818 },
-        "to": { "stopId": "7d37a66c-9d9d-4c95-bea1-a0b19d75cb5f", "name": "Simpang Sudirman", "lat": -8.66953, "lng": 115.21849 },
-        "distanceMeters": 245.7,
-        "durationSeconds": 182.0,
-        "geometry": [[115.2182818, -8.6717297], [115.21849, -8.66953]]
-      }
-    ],
-    "summary": {
-      "distanceMeters": 10763.8,
-      "walkingDistanceMeters": 353,
-      "walkingDurationSeconds": 276,
-      "transitDistanceMeters": 10410.8,
-      "busLegCount": 3,
-      "transferCount": 2
-    },
-    "steps": [
-      { "type": "walk", "durationMinutes": 4 },
-      { "type": "ride", "routeRef": "K2B-1", "routeName": "Ngurah Rai → Terminal Ubung", "durationMinutes": 2 },
-      { "type": "walk", "durationMinutes": 3 }
-    ]
-  }
-}
-```
-
----
-
-## 2. Quests and Kelurahan
-
-Quests are discoverable activities linked to specific regional areas ("Kelurahan") in Bali. A quest itself does not have a single coordinate; instead, it is reachable through any Kelurahan associated with its badges, and its route preview coordinates come from the badge action steps.
-
-### `GET /quest`
-List all discoverable quests along with their thumbnail assets.
-
-#### Response Schema (200 OK)
-```json
-{
-  "quests": [ Quest ]
-}
-```
-
-#### Example Curl and Response
-```bash
-curl -s "https://transium-api.heryandjaruma.workers.dev/api/quest"
-```
-```json
-{
-  "quests": [
-    {
-      "id": "9d136db8-9c86-4222-8c2c-80240c44b85c",
-      "name": "Explore Sanur",
-      "category": "Beaches",
-      "description": "Exploring Sanur.",
-      "thumbnails": [
-        {
-          "id": "89df4eaf-6fe4-4c8c-a2be-07e9d0bb4969",
-          "createdAt": "2026-08-18T04:52:35.289Z",
-          "type": "image/jpeg",
-          "url": "/media/system/quest/9d136db8-9c86-4222-8c2c-80240c44b85c/89df4eaf-6fe4-4c8c-a2be-07e9d0bb4969.jpg"
-        }
-      ]
-    }
-  ]
-}
-```
-
-### `GET /quest/{id}`
-Retrieve a detailed representation of a specific quest, including its thumbnails, attached badges (each with its ordered sequence of action steps), and computed origin/destination coordinates (derived from the first and last steps with coordinate mappings).
-
-*Tip: Pass the returned `origin` and `destination` directly to `/journey/overview` to show a route preview for the quest.*
-
-#### Response Schema (200 OK)
-```json
-{
-  "quest": QuestDetail
-}
-```
-
-#### Example Curl and Response
-```bash
-curl -s "https://transium-api.heryandjaruma.workers.dev/api/quest/9d136db8-9c86-4222-8c2c-80240c44b85c"
-```
-```json
-{
-  "quest": {
-    "id": "9d136db8-9c86-4222-8c2c-80240c44b85c",
-    "name": "Explore Sanur",
-    "category": "Beaches",
-    "description": "Exploring Sanur.",
-    "thumbnails": [
-      {
-        "id": "89df4eaf-6fe4-4c8c-a2be-07e9d0bb4969",
-        "createdAt": "2026-08-18T04:52:35.289Z",
-        "type": "image/jpeg",
-        "url": "/media/system/quest/9d136db8-9c86-4222-8c2c-80240c44b85c/89df4eaf-6fe4-4c8c-a2be-07e9d0bb4969.jpg"
-      }
-    ],
-    "badges": [
-      {
-        "id": "3729e521-be0e-4ac3-9a02-7339b0123007",
-        "badgeId": "ae2cf1b2-e536-416b-9db7-d7e76c6f3443",
-        "badgeName": "Sanoored",
-        "badgeCategory": "Explore",
-        "badgeType": "quest",
-        "badgeImageUrl": "/media/system/badge/ae2cf1b2-e536-416b-9db7-d7e76c6f3443/8d771144-5968-4262-b698-8213cb29d096.png",
-        "steps": []
-      }
-    ],
-    "origin": null,
-    "destination": null
-  }
-}
-```
-
-### `GET /quest/{id}/badges`
-List badges associated with a specific quest.
-
-#### Response Schema (200 OK)
-```json
-{
-  "questBadges": [ QuestBadgeEntry ]
-}
-```
-
-### `GET /kelurahan/quests`
-List quests grouped by Kelurahan. Only Kelurahans containing at least one quest are returned. Quests can appear under multiple Kelurahans if their badges span different regions.
-
-#### Response Schema (200 OK)
-```json
-{
-  "groups": [
-    {
-      "kelurahan": Kelurahan,
-      "quests": [ Quest ]
-    }
-  ]
-}
-```
-
-#### Example Curl and Response
-```bash
-curl -s "https://transium-api.heryandjaruma.workers.dev/api/kelurahan/quests"
-```
+#### Response (200 OK)
 ```json
 {
   "groups": [
     {
       "kelurahan": {
-        "id": "20447277",
-        "kelurahanName": "Sanur",
-        "kecamatanName": "Denpasar Selatan"
+        "id": "7760985",
+        "kelurahanName": "Benoa",
+        "kecamatanName": "Kuta Selatan",
+        "description": "Scenic southern coastal region",
+        "thumbnails": [
+          {
+            "id": "c711fa7a-d0a4-4f0f-8c3b-ef90731a5450",
+            "url": "https://storage.googleapis.com/.../benoa.jpg",
+            "type": "image/jpeg"
+          }
+        ]
       },
       "quests": [
         {
           "id": "9d136db8-9c86-4222-8c2c-80240c44b85c",
-          "name": "Explore Sanur",
-          "category": "Beaches",
-          "description": "Exploring Sanur.",
+          "name": "Explore Nusa Dua Coast",
+          "category": "Beach",
+          "description": "Discover white sand beaches and coral reefs.",
+          "xp": 10,
+          "distanceMeters": 4200,
           "thumbnails": [
             {
               "id": "89df4eaf-6fe4-4c8c-a2be-07e9d0bb4969",
-              "createdAt": "2026-08-18T04:52:35.289Z",
-              "type": "image/jpeg",
-              "url": "/media/system/quest/9d136db8-9c86-4222-8c2c-80240c44b85c/89df4eaf-6fe4-4c8c-a2be-07e9d0bb4969.jpg"
+              "url": "/media/system/quest/9d136db8.../thumb.jpg",
+              "type": "image/jpeg"
             }
           ]
         }
@@ -284,51 +70,40 @@ curl -s "https://transium-api.heryandjaruma.workers.dev/api/kelurahan/quests"
 }
 ```
 
-### `GET /kelurahan/{id}/quests`
-List all quests reachable in a specific Kelurahan.
+---
 
-#### Response Schema (200 OK)
-```json
-{
-  "kelurahan": Kelurahan,
-  "quests": [ QuestWithBadges ]
-}
-```
+### `GET /api/private/kelurahan/{id}/quest`
+Retrieves detailed quests and badge associations for a specific Kelurahan.
 
-#### Example Curl and Response
-```bash
-curl -s "https://transium-api.heryandjaruma.workers.dev/api/kelurahan/20447277/quests"
-```
+- **Auth**: Required (`Bearer <token>`)
+- **Path Parameters**:
+  - `id` (string, required): Kelurahan ID (e.g. `7760985`).
+
+#### Response (200 OK)
 ```json
 {
   "kelurahan": {
-    "id": "20447277",
-    "kelurahanName": "Sanur",
-    "kecamatanName": "Denpasar Selatan"
+    "id": "7760985",
+    "kelurahanName": "Benoa",
+    "kecamatanName": "Kuta Selatan",
+    "thumbnails": [...]
   },
   "quests": [
     {
       "id": "9d136db8-9c86-4222-8c2c-80240c44b85c",
-      "name": "Explore Sanur",
-      "category": "Beaches",
-      "description": "Exploring Sanur.",
-      "thumbnails": [
-        {
-          "id": "89df4eaf-6fe4-4c8c-a2be-07e9d0bb4969",
-          "createdAt": "2026-08-18T04:52:35.289Z",
-          "type": "image/jpeg",
-          "url": "/media/system/quest/9d136db8-9c86-4222-8c2c-80240c44b85c/89df4eaf-6fe4-4c8c-a2be-07e9d0bb4969.jpg"
-        }
-      ],
+      "name": "Bougenville Trail",
+      "category": "Leisure",
+      "description": "Bougie vibez along the boulevard.",
+      "xp": 10,
+      "thumbnails": [...],
       "badges": [
         {
           "id": "3729e521-be0e-4ac3-9a02-7339b0123007",
-          "questId": "9d136db8-9c86-4222-8c2c-80240c44b85c",
           "badgeId": "ae2cf1b2-e536-416b-9db7-d7e76c6f3443",
           "badgeName": "Sanoored",
           "badgeCategory": "Explore",
           "badgeType": "quest",
-          "badgeImageUrl": "/media/system/badge/ae2cf1b2-e536-416b-9db7-d7e76c6f3443/8d771144-5968-4262-b698-8213cb29d096.png"
+          "badgeImageUrl": "/media/system/badge/.../badge.png"
         }
       ]
     }
@@ -338,112 +113,268 @@ curl -s "https://transium-api.heryandjaruma.workers.dev/api/kelurahan/20447277/q
 
 ---
 
-## 3. Data Models (Schemas)
+### `GET /api/private/quest/{id}`
+Retrieves full details for a specific quest, including origin/destination anchor coordinates and all checkpoint badge steps.
 
-### `JourneyResult`
-Represents a fully-calculated route option.
-- `origin` (`LatLng`): Origin point.
-- `destination` (`LatLng`): Destination point.
-- `summary` (object):
-  - `distanceMeters` (number): Combined walking and transit distance.
-  - `walkingDistanceMeters` (number): Total walking distance.
-  - `walkingDurationSeconds` (number): Real walking duration from Apple Maps (first/last legs only).
-  - `transitDistanceMeters` (number): Distance covered on buses and transfers.
-  - `busLegCount` (integer): Number of bus rides.
-  - `transferCount` (integer): Number of stop-to-stop transfers.
-- `segments` (array of WalkLeg | TransferLeg | BusLeg):
-  - **WalkLeg**: A walk leg from Apple Maps.
-    - `type`: `"walk"`
-    - `from`/`to`: `{ lat: number, lng: number, name: string, stopId?: string }`
-    - `distanceMeters`: number (or null)
-    - `durationSeconds`: number (or null)
-    - `geometry`: `[[lng, lat], ...]`
-    - `steps` (array of Turn): Turn-by-turn instruction list (each containing `instructions`, `distanceMeters`, `durationSeconds`, and `geometry`).
-  - **TransferLeg**: A walking connection between two nearby transit stops.
-    - `type`: `"transfer"`
-    - `from`/`to`: `JourneyStopRef`
-    - `distanceMeters`: number
-    - `durationSeconds`: number
-    - `geometry`: `[[lng, lat], ...]`
-  - **BusLeg**: A transit segment on a specific route.
-    - `type`: `"bus"`
-    - `routeId` (string, UUID): Internal route ID.
-    - `routeRef` (string, optional): Short display code (e.g., `"K2B-1"`).
-    - `routeName` (string, optional): Name of the transit route.
-    - `routeColor` (string, optional): Hex color code for rendering (e.g. `"#0073b2"`).
-    - `from`/`to`: `JourneyStopRef`
-    - `stops` (array of `JourneyStopRef`): Every stop the bus stops at during this leg.
-    - `distanceMeters`: number
-    - `durationSeconds`: number
-    - `geometry`: `[[lng, lat], ...]`
-- `steps` (array of `JourneyStep`): A glanceable step-by-step summary.
-
-### `JourneyStep`
-A simplified segment description for rapid UI timeline rendering.
-- **Walk Step**: `{ "type": "walk", "durationMinutes": number }`
-- **Ride Step**: `{ "type": "ride", "routeRef": string, "routeName": string | null, "durationMinutes": number }`
-
-### `JourneyStopRef`
-- `stopId` (string, UUID): Database identifier.
-- `name` (string): Display name.
-- `lat` (number): Latitude.
-- `lng` (number): Longitude.
-
-### `Quest`
-- `id` (string, UUID)
-- `name` (string)
-- `category` (string)
-- `description` (string)
-- `thumbnails` (array of `MediaAsset`)
-
-### `QuestDetail`
-- `id` (string, UUID)
-- `name` (string)
-- `category` (string)
-- `description` (string)
-- `thumbnails` (array of `MediaAsset`)
-- `badges` (array of `QuestBadgeWithSteps`)
-- `origin` (`LatLng` | null): Coordinates of the first badge step.
-- `destination` (`LatLng` | null): Coordinates of the last badge step.
-
-### `QuestBadgeWithSteps`
-- `id` (string, UUID): Link/attachment ID.
-- `badgeId` (string, UUID): Core badge ID.
-- `badgeName` (string)
-- `badgeCategory` (string)
-- `badgeType` (string)
-- `badgeImageUrl` (string | null)
-- `steps` (array of `BadgeActionStep`)
-
-### `BadgeActionStep`
-- `id` (string, UUID)
-- `badgeId` (string, UUID)
-- `actionId` (string, UUID)
-- `actionName` (string)
-- `actionType` (string)
-- `sequence` (integer): Ordered sequence number.
-- `lat` (number | null)
-- `lng` (number | null)
-- `instruction` (string | null)
-
-### `Kelurahan`
-- `id` (string): Kelurahan identifier.
-- `kelurahanName` (string): Kelurahan name (e.g., `"Sanur"`).
-- `kecamatanName` (string): Kecamatan name (e.g., `"Denpasar Selatan"`).
-
-### `MediaAsset`
-- `id` (string, UUID)
-- `createdAt` (string, date-time)
-- `type` (string): MIME type, e.g. `"image/jpeg"`.
-- `url` (string): Relative URL path to media.
+#### Response (200 OK)
+```json
+{
+  "quest": {
+    "id": "9d136db8-9c86-4222-8c2c-80240c44b85c",
+    "name": "Sanur Sunrise Quest",
+    "category": "Nature",
+    "description": "Catch early sunrise and local markets.",
+    "xp": 15,
+    "thumbnails": [...],
+    "badges": [
+      {
+        "id": "b1",
+        "badgeId": "badge-1",
+        "badgeName": "Early Bird",
+        "badgeCategory": "Explore",
+        "badgeType": "quest",
+        "badgeImageUrl": "https://.../early_bird.png",
+        "steps": [
+          {
+            "id": "step-1",
+            "badgeId": "badge-1",
+            "actionId": "act-1",
+            "actionName": "Arrive at Pantai Karang",
+            "type": "location",
+            "sequence": 1,
+            "lat": -8.6942,
+            "lng": 115.2638,
+            "instruction": "Walk to the pavilion marker."
+          }
+        ]
+      }
+    ],
+    "origin": { "lat": -8.7021, "lng": 115.1762 },
+    "destination": { "lat": -8.6942, "lng": 115.2638 }
+  }
+}
+```
 
 ---
 
-## 4. Authentication (Better Auth)
+## 3. Location & Geocoding Endpoints
 
-Authentication endpoints are integrated with the client in [`transium/Backend/BetterAuthBackend.swift`](file:///Users/msafdev/Code/swift/transium/transium/Backend/BetterAuthBackend.swift).
+### `GET /api/maps/reverse-geocode`
+Converts coordinates to human-readable street names and locality labels in Bali.
 
-- **`POST /api/auth/sign-in/social`**: Performs social login verification (Sign in with Apple).
-- **`GET /api/auth/get-session`**: Retrieves the active profile session.
-- **`POST /api/auth/update-user`**: Updates profile properties.
-- **`POST /api/auth/sign-out`**: Invalidates the active session token.
+- **Query Parameters**:
+  - `lat` (double, required): Latitude (e.g. `-8.73704`).
+  - `lng` (double, required): Longitude (e.g. `115.17570`).
+
+#### Response (200 OK)
+```json
+{
+  "results": [
+    {
+      "label": "Jl. Raya Tuban, Kuta, Kabupaten Badung",
+      "lat": -8.73704,
+      "lng": 115.17570
+    }
+  ]
+}
+```
+
+---
+
+### `GET /api/maps/autocomplete`
+Provides real-time search suggestions for Bali landmarks, bus stops, and venues.
+
+- **Query Parameters**:
+  - `input` (string, required): Partial query text.
+
+#### Response (200 OK)
+```json
+{
+  "suggestions": [
+    {
+      "placeId": "place_12345",
+      "mainText": "Sanur Port",
+      "secondaryText": "Jl. Hang Tuah, Denpasar Selatan"
+    }
+  ]
+}
+```
+
+---
+
+## 4. Transit & Journey Routing Endpoints
+
+### `GET /api/journey/overview`
+Calculates door-to-door transit itineraries between any two Bali coordinates.
+
+- **Query Parameters**:
+  - `origin` (string, required): `lat,lng`
+  - `destination` (string, required): `lat,lng`
+
+#### Response (200 OK)
+```json
+{
+  "alternativesAvailable": false,
+  "best": {
+    "origin": { "lat": -8.7021, "lng": 115.1762 },
+    "destination": { "lat": -8.6882, "lng": 115.2635 },
+    "summary": {
+      "distanceMeters": 14200,
+      "walkingDistanceMeters": 680,
+      "walkingDurationSeconds": 540,
+      "transitDistanceMeters": 13520,
+      "busLegCount": 1,
+      "transferCount": 0
+    },
+    "segments": [
+      {
+        "type": "walk",
+        "from": { "lat": -8.7021, "lng": 115.1762, "name": "Current Location" },
+        "to": { "lat": -8.7050, "lng": 115.1780, "name": "Halte Tuban 1", "stopId": "stop_1" },
+        "distanceMeters": 350,
+        "durationSeconds": 280,
+        "geometry": [[115.1762, -8.7021], [115.1780, -8.7050]],
+        "steps": []
+      },
+      {
+        "type": "bus",
+        "routeId": "route_k2b",
+        "routeRef": "K2B",
+        "routeName": "GOR Ngurah Rai - Bandara",
+        "routeColor": "#0073b2",
+        "from": { "lat": -8.7050, "lng": 115.1780, "name": "Halte Tuban 1" },
+        "to": { "lat": -8.6882, "lng": 115.2635, "name": "Halte Sanur 2" },
+        "stops": [...],
+        "distanceMeters": 13520,
+        "durationSeconds": 1800,
+        "geometry": [...]
+      }
+    ],
+    "steps": [
+      { "type": "walk", "durationMinutes": 5 },
+      { "type": "ride", "routeRef": "K2B", "routeName": "GOR Ngurah Rai - Bandara", "durationMinutes": 30 }
+    ]
+  }
+}
+```
+
+---
+
+## 5. Live Journey (Go Mode) Lifecycle
+
+### `POST /api/private/journey/go`
+Starts a live Go Mode session for a specific quest.
+
+- **Auth**: Required
+- **Request Body**:
+  ```json
+  {
+    "questId": "9d136db8-9c86-4222-8c2c-80240c44b85c"
+  }
+  ```
+
+#### Response (200 OK)
+```json
+{
+  "journeyAttempt": {
+    "id": "attempt_9988",
+    "questId": "9d136db8-9c86-4222-8c2c-80240c44b85c",
+    "questName": "Sanur Sunrise Quest",
+    "status": "started",
+    "startedAt": "2026-08-21T08:00:00.000Z"
+  },
+  "steps": [
+    {
+      "id": "step_1",
+      "actionName": "Board K2B at Tuban",
+      "status": "waiting",
+      "sequence": 1,
+      "lat": -8.7050,
+      "lng": 115.1780,
+      "radiusMeters": 69
+    }
+  ],
+  "geofences": [
+    {
+      "stepId": "step_1",
+      "sequence": 1,
+      "lat": -8.7050,
+      "lng": 115.1780,
+      "radiusMeters": 69
+    }
+  ]
+}
+```
+
+---
+
+### `POST /api/private/journey/{id}/advance`
+Advances a step within an ongoing attempt when a geofence is triggered or user taps "I'm Here".
+
+- **Auth**: Required
+- **Request Body**:
+  ```json
+  {
+    "stepId": "step_1",
+    "lat": -8.70502,
+    "lng": 115.17801
+  }
+  ```
+
+#### Response (200 OK)
+Returns the updated `journeyAttempt` and updated `steps` array with the target step marked `.done`.
+
+---
+
+### `POST /api/private/journey/{id}/complete`
+Finalizes an attempt once all steps are completed, awarding XP, badges, and recording trip metrics.
+
+- **Auth**: Required
+- **Request Body**:
+  ```json
+  {
+    "stepsTaken": 1840,
+    "distanceMeters": 14200,
+    "calorie": 92.5,
+    "startPoint": "Jl. Raya Tuban",
+    "finishPoint": "Sanur Beach",
+    "path": [
+      { "lat": -8.7021, "lng": 115.1762, "recordedAt": "2026-08-21T08:00:00Z" },
+      { "lat": -8.6882, "lng": 115.2635, "recordedAt": "2026-08-21T08:35:00Z" }
+    ]
+  }
+  ```
+
+#### Response (200 OK)
+```json
+{
+  "journeyAttempt": {
+    "id": "attempt_9988",
+    "status": "completed",
+    "completedAt": "2026-08-21T08:35:10Z"
+  },
+  "summary": {
+    "distanceMeters": 14200,
+    "stepsTaken": 1840,
+    "calorie": 92.5,
+    "startPoint": "Jl. Raya Tuban",
+    "finishPoint": "Sanur Beach",
+    "rideHailingMotorcycleSavedIdr": 40000
+  },
+  "badgesAwarded": [
+    {
+      "id": "badge_earned_1",
+      "badgeName": "Sanoored",
+      "badgeImageUrl": "/media/system/badge/.../badge.png"
+    }
+  ]
+}
+```
+
+---
+
+## 6. Bookmark Endpoints
+
+- **`GET /api/private/bookmark`**: Lists all saved quest bookmarks for the authenticated user.
+- **`POST /api/private/bookmark/{questId}`**: Adds a quest to user bookmarks.
+- **`DELETE /api/private/bookmark/{questId}`**: Removes a quest from user bookmarks.

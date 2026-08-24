@@ -62,6 +62,14 @@ public protocol APIClientProtocol: Sendable {
         multipart: MultipartFormData,
         requiresAuth: Bool
     ) async throws -> T
+
+    /// For endpoints that return a raw byte stream (e.g. `image/*`) rather than JSON.
+    func requestData(
+        path: String,
+        method: HTTPMethod,
+        queryItems: [URLQueryItem]?,
+        requiresAuth: Bool
+    ) async throws -> Data
 }
 
 public final class APIClient: APIClientProtocol, @unchecked Sendable {
@@ -72,9 +80,21 @@ public final class APIClient: APIClientProtocol, @unchecked Sendable {
     private let jsonEncoder: JSONEncoder
     private let jsonDecoder: JSONDecoder
 
+    public static func defaultSession() -> URLSession {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 20.0
+        config.timeoutIntervalForResource = 45.0
+        config.waitsForConnectivity = true
+        config.httpAdditionalHeaders = [
+            "Accept": "application/json",
+            "Connection": "keep-alive"
+        ]
+        return URLSession(configuration: config)
+    }
+
     public init(
         baseURL: URL = APIConfiguration.apiBaseURL,
-        session: URLSession = .shared
+        session: URLSession = defaultSession()
     ) {
         self.baseURL = baseURL
         self.session = session
@@ -159,6 +179,25 @@ public final class APIClient: APIClientProtocol, @unchecked Sendable {
             logDecodingFailure(decoding: T.self, path: path, error: error, data: data)
             throw TransiumAPIError.decodingError(error)
         }
+    }
+
+    public func requestData(
+        path: String,
+        method: HTTPMethod = .get,
+        queryItems: [URLQueryItem]? = nil,
+        requiresAuth: Bool = true
+    ) async throws -> Data {
+        let request = try makeRequest(
+            path: path,
+            method: method,
+            queryItems: queryItems,
+            body: nil,
+            requiresAuth: requiresAuth
+        )
+
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response: response, data: data)
+        return data
     }
 
     // MARK: - Private Helpers

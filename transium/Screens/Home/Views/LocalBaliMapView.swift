@@ -204,8 +204,21 @@ struct LocalBaliMapView: UIViewRepresentable {
         var lastPinFocusCoordinate: CLLocationCoordinate2D?
 
         func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
-            guard isPinningActive else { return }
-            onPinCenterChanged?(mapView.centerCoordinate)
+            if isPinningActive {
+                onPinCenterChanged?(mapView.centerCoordinate)
+            }
+            syncMarkerTilt(on: mapView)
+        }
+
+        /// Keeps the user-location marker's 3D lean matched to the map's own live camera
+        /// pitch — flat/planar at a top-down pitch, progressively leaning into perspective as
+        /// the camera tilts, whether from Go Mode's third-person camera or the user manually
+        /// pinching/dragging the pitch by hand. Fired on every camera change (this delegate
+        /// method runs continuously through an interactive gesture, not just once it settles),
+        /// so the marker tracks the tilt live instead of jumping between fixed states.
+        func syncMarkerTilt(on mapView: MLNMapView) {
+            guard let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView else { return }
+            userView.updateTilt(pitch: mapView.camera.pitch, animated: true)
         }
 
         // MARK: - Go Mode third-person camera
@@ -349,7 +362,7 @@ struct LocalBaliMapView: UIViewRepresentable {
                 lastRenderedLocation = nil
                 return
             }
-            
+
             if let previousLoc = lastRenderedLocation {
                 let distance = previousLoc.distance(from: location)
                 if distance < 5.0 {
@@ -361,13 +374,14 @@ struct LocalBaliMapView: UIViewRepresentable {
                     return
                 }
             }
-            
+
             lastRenderedLocation = location
             userAnnotation.heading = heading
-            
+
             if mapView.annotations?.contains(where: { $0 === userAnnotation }) != true {
                 userAnnotation.coordinate = location.coordinate
                 mapView.addAnnotation(userAnnotation)
+                syncMarkerTilt(on: mapView)
             } else {
                 UIView.animate(withDuration: 0.6, delay: 0, options: [.beginFromCurrentState, .curveEaseInOut]) {
                     self.userAnnotation.coordinate = location.coordinate
@@ -530,27 +544,27 @@ struct LocalBaliMapView: UIViewRepresentable {
                 style.addSource(source)
             }
             
-            // Pass 1 (Bottom Layers): Add walking & transfer routes first
+            // Pass 1 (Bottom Layers): Add walking & transfer routes first (clean sleek solid line with rounded joints)
             for (index, segment) in activeJourney.segments.enumerated() where segment.type != "bus" {
                 let sourceId = "route-source-\(index)"
                 let lineLayerId = "route-line-\(index)"
                 let casingLayerId = "route-casing-\(index)"
                 guard let source = style.source(withIdentifier: sourceId) else { continue }
                 
+                // Crisp white casing
                 let casingLayer = MLNLineStyleLayer(identifier: casingLayerId, source: source)
-                casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white.withAlphaComponent(0.85))
-                casingLayer.lineWidth = NSExpression(forConstantValue: 4.8)
+                casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white)
+                casingLayer.lineWidth = NSExpression(forConstantValue: 6.0)
                 casingLayer.lineCap = NSExpression(forConstantValue: "round")
                 casingLayer.lineJoin = NSExpression(forConstantValue: "round")
                 style.addLayer(casingLayer)
                 
                 let lineLayer = MLNLineStyleLayer(identifier: lineLayerId, source: source)
-                let walkColor = UIColor(red: 0.20, green: 0.50, blue: 0.98, alpha: 1.0)
+                let walkColor = UIColor(red: 0.06, green: 0.72, blue: 0.51, alpha: 1.0)
                 lineLayer.lineColor = NSExpression(forConstantValue: walkColor)
-                lineLayer.lineWidth = NSExpression(forConstantValue: 3.2)
+                lineLayer.lineWidth = NSExpression(forConstantValue: 3.8)
                 lineLayer.lineCap = NSExpression(forConstantValue: "round")
                 lineLayer.lineJoin = NSExpression(forConstantValue: "round")
-                lineLayer.lineDashPattern = NSExpression(forConstantValue: [0.15, 1.6])
                 style.addLayer(lineLayer)
             }
             
@@ -938,6 +952,10 @@ struct LocalBaliMapView: UIViewRepresentable {
         private let arrowContainerView = UIView()
         private let arrowLayer = CAShapeLayer()
         private var currentHeadingAngle: CGFloat = 0
+        private var currentPitch: CGFloat = 0
+        /// MapLibre's own default ceiling for `MLNMapView.camera.pitch` — used to normalize
+        /// the live pitch into the 0...1 fraction `updateTilt` scales its transform by.
+        private static let maxPitch: CGFloat = 60
         
         override init(reuseIdentifier: String?) {
             super.init(reuseIdentifier: reuseIdentifier)
@@ -996,6 +1014,45 @@ struct LocalBaliMapView: UIViewRepresentable {
         
         func configure(heading: CLLocationDirection) {
             updateHeading(heading, animated: false)
+        }
+
+        /// Leans the marker in 3D proportionally to the map's own live camera `pitch` — flat
+        /// (identity transform) at a top-down pitch, progressively rotating/scaling into
+        /// perspective as pitch climbs toward `maxPitch`, so it visually tracks the map's own
+        /// tilt continuously rather than jumping between two fixed looks.
+        func updateTilt(pitch: CGFloat, animated: Bool = true) {
+            let clampedPitch = max(0, min(pitch, Self.maxPitch))
+            guard abs(clampedPitch - currentPitch) > 0.5 else { return }
+            currentPitch = clampedPitch
+
+            let animations = {
+                let fraction = clampedPitch / Self.maxPitch
+                if clampedPitch > 0.5 {
+                    var transform = CATransform3DIdentity
+                    transform.m34 = -1.0 / 450.0
+                    transform = CATransform3DRotate(transform, clampedPitch * .pi / 180.0, 1.0, 0.0, 0.0)
+                    let scale = 1.0 + fraction * 0.15
+                    transform = CATransform3DScale(transform, scale, scale, scale)
+                    self.layer.transform = transform
+                } else {
+                    self.layer.transform = CATransform3DIdentity
+                }
+                self.coreView.layer.shadowOffset = CGSize(width: 0, height: 2 + 5 * fraction)
+                self.coreView.layer.shadowRadius = 5 + 3 * fraction
+                self.coreView.layer.shadowOpacity = Float(0.28 + 0.14 * fraction)
+                self.outerPulseView.alpha = 1.0 - 0.5 * fraction
+            }
+
+            if animated {
+                UIView.animate(
+                    withDuration: 0.35,
+                    delay: 0,
+                    options: [.beginFromCurrentState, .curveEaseOut, .allowUserInteraction],
+                    animations: animations
+                )
+            } else {
+                animations()
+            }
         }
         
         func updateHeading(_ heading: CLLocationDirection, animated: Bool = true) {

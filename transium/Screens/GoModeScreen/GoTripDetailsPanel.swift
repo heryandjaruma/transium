@@ -2,13 +2,14 @@
 //  GoTripDetailsPanel.swift
 //  transium
 //
-//  Go Mode's bottom sheet — one persistent white docked surface (styled after
-//  NavigationBottomSheet, the pre-Go overview's own bottom sheet), not a modal .sheet().
-//  Collapsed, it's just the drag handle + "Trip Details" label peeking up; dragging it up
-//  (or tapping the handle) expands the SAME sheet into the full itinerary, exactly like
-//  NavigationBottomSheet's isCollapsed toggle — so it never covers the map/top bar the way
-//  a system sheet would, and the handle/label are always part of a real sheet surface
-//  rather than floating bare on the map.
+//  Go Mode's bottom sheet — presented by GoComponentMode as a real, native .sheet with
+//  presentationDetents (collapsed "Trip Details" peek vs. the full itinerary) and
+//  presentationBackgroundInteraction(.enabled), so the map/top bar stay interactive
+//  underneath it while dragging still gets genuine system sheet physics (live finger
+//  tracking, rubber-banding, velocity-based settle) instead of a hand-rolled DragGesture.
+//  This view is just the sheet's content — no background/corner/shadow chrome of its own,
+//  and no expanded/collapsed branching: it always lays out the full itinerary and lets the
+//  sheet's current detent height decide how much of it is visible.
 //
 //  The current leg is highlighted as a blue "active" card; the quest's own photo-checkpoint
 //  steps (from POST /private/journey/go, unrelated in the API to the route's segments) are
@@ -23,7 +24,6 @@ struct GoTripDetailsPanel: View {
     let currentSegmentIndex: Int
     let steps: [JourneyAttemptStep]
     var currentLocation: CLLocationCoordinate2D? = nil
-    @Binding var isExpanded: Bool
     var geofenceMonitor: JourneyGeofenceMonitor = JourneyGeofenceMonitor()
     var goStartResult: JourneyGoResult? = nil
     /// POST /private/journey/{id}/advance's own doc calls this "a geofence trigger, or a
@@ -90,13 +90,6 @@ struct GoTripDetailsPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 2.5)
-                .fill(Color(.systemGray3))
-                .frame(width: 38, height: 5)
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
-                .onTapGesture { toggle() }
-
             HStack {
                 Text("Trip Details")
                     .font(TransiumFont.body(20, weight: .bold))
@@ -120,127 +113,43 @@ struct GoTripDetailsPanel: View {
                         .foregroundColor(.secondary)
                 }
                 #endif
+                Text("\(Int(round(totalSeconds / 60))) min")
+                    .font(TransiumFont.body(20, weight: .black))
+                    .foregroundColor(.black)
+                    .fixedSize()
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, isExpanded ? 10 : 16)
-
-            if isExpanded {
-                modeChipsRow
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
 
 //                leaveArriveBar
 //                    .padding(.horizontal, 20)
 //                    .padding(.bottom, 16)
 
-                ScrollView(.vertical, showsIndicators: false) {
-                    timeline
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 28)
-                }
-                .frame(maxHeight: 380)
-                .mask(
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: .black, location: 0.0),
-                            .init(color: .black, location: 0.9),
-                            .init(color: .clear, location: 1.0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            ScrollView(.vertical, showsIndicators: false) {
+                timeline
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 28)
             }
+            .frame(maxHeight: .infinity)
+            .mask(
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: .black, location: 0.0),
+                        .init(color: .black, location: 0.94),
+                        .init(color: .clear, location: 1.0)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
         }
-        .gesture(
-            DragGesture()
-                .onEnded { value in
-                    let dy = value.translation.height
-                    if dy > 35 {
-                        setExpanded(false)
-                    } else if dy < -35 {
-                        setExpanded(true)
-                    }
-                }
-        )
         .frame(maxWidth: .infinity)
-        .background(Color.white)
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 12, y: -4)
-        .overlay(alignment: .bottom) {
-            Color.white
-                .frame(height: 120)
-                .offset(y: 120)
-        }
         #if DEBUG
         .sheet(item: $debugShareItem) { item in
             ActivityShareSheet(activityItems: [item.url])
         }
         #endif
-    }
-
-    private func toggle() {
-        setExpanded(!isExpanded)
-    }
-
-    private func setExpanded(_ expanded: Bool) {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-            isExpanded = expanded
-        }
-    }
-
-    // MARK: - Header
-
-    private var modeChipsRow: some View {
-        HStack(alignment: .center, spacing: 0) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 4) {
-                    ForEach(Array(journey.steps.enumerated()), id: \.offset) { index, step in
-                        if index > 0 {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundColor(.gray.opacity(0.5))
-                        }
-
-                        if step.type == "walk" {
-                            HStack(spacing: 3) {
-                                Image(systemName: "figure.walk")
-                                    .font(.system(size: 13))
-                                Text("\(Int(step.durationMinutes ?? 0)) m")
-                                    .font(TransiumFont.body(11, weight: .medium))
-                            }
-                            .foregroundColor(.gray)
-                        } else if step.isMission {
-                            // No duration to show, just a marker that a mission sits here in
-                            // the itinerary — its own card further down has the instructions.
-                            Image(systemName: "questionmark.app.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(TransiumColor.primaryYellow)
-                        } else {
-                            HStack(spacing: 4) {
-                                Image(systemName: "bus.fill")
-                                    .font(.system(size: 11))
-                                Text((step.routeRef ?? "Bus").truncatedAtDash)
-                                    .font(TransiumFont.body(11, weight: .bold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
-                            .background(TransiumTransitColor.color(for: step.routeRef))
-                            .cornerRadius(6)
-                        }
-                    }
-                }
-            }
-
-            Spacer(minLength: 12)
-
-            Text("\(Int(round(totalSeconds / 60))) min")
-                .font(TransiumFont.body(20, weight: .black))
-                .foregroundColor(.black)
-                .fixedSize()
-        }
     }
 
 //    private var leaveArriveBar: some View {
@@ -330,7 +239,7 @@ struct GoTripDetailsPanel: View {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.turn.down.right")
                             .font(.system(size: 11, weight: .semibold))
-                        Text("Wait for \(boardingSegment.routeRef ?? "the bus") towards \(boardingSegment.to?.name ?? "destination")")
+                        Text("Wait for \(boardingSegment.routeRef?.truncatedAtDash ?? "the bus") towards \(boardingSegment.to?.name ?? "destination")")
                             .font(TransiumFont.body(13))
                     }
                     HStack(spacing: 8) {
@@ -344,7 +253,7 @@ struct GoTripDetailsPanel: View {
                 .padding(.leading, 8)
             } else if segment.type == "bus" {
                 Divider().overlay(Color.white.opacity(0.3))
-                stopsMiniTimeline(segment, textColor: .white, mutedColor: .white.opacity(0.75), chipBackground: .white.opacity(0.18))
+                stopsMiniTimeline(segment, textColor: .white, mutedColor: .white.opacity(0.75), chipBackground: .white.opacity(0.18), liveLocation: currentLocation)
 
                 if let matched = matchedSteps[segment.id] {
                     Divider().overlay(Color.white.opacity(0.3))
@@ -362,16 +271,36 @@ struct GoTripDetailsPanel: View {
 
     // MARK: - Stops Mini-Timeline (shared between the active and inactive bus cards)
 
-    private func stopsMiniTimeline(_ segment: JourneySegment, textColor: Color, mutedColor: Color, chipBackground: Color) -> some View {
+    /// `liveLocation` is only meaningful for the currently-active leg — pass it from
+    /// `activeCard` to grey out/checkmark stops already behind the device; `inactiveBusCard`
+    /// (a leg not yet reached, or already fully completed) leaves it nil, so nothing here reads
+    /// as "passed" independent of the segment's own already-done styling.
+    private func stopsMiniTimeline(_ segment: JourneySegment, textColor: Color, mutedColor: Color, chipBackground: Color, liveLocation: CLLocationCoordinate2D? = nil) -> some View {
         let routeColor = TransiumTransitColor.color(for: segment.routeRef, hex: segment.routeColor)
-        let stopCount = segment.stops?.count ?? 0
+        let stops = segment.stops ?? []
+        let stopCount = stops.count
         let isExpanded = isStopsExpanded[segment.id] ?? false
+        let passedIndex = liveLocation.flatMap { segment.liveStopIndex(from: $0) } ?? 0
+        let lineHeight: CGFloat = isExpanded ? CGFloat(max(1, stopCount - 2) * 22) : 24
+        let progress: CGFloat = stopCount > 1 ? CGFloat(min(max(passedIndex, 0), stopCount - 1)) / CGFloat(stopCount - 1) : 0
 
         return HStack(alignment: .top, spacing: 12) {
             VStack(spacing: 0) {
-                Circle().fill(routeColor).frame(width: 12, height: 12)
-                Rectangle().fill(routeColor.opacity(0.7)).frame(width: 3, height: isExpanded ? CGFloat(max(1, stopCount - 2) * 22) : 24)
-                Circle().fill(routeColor).frame(width: 12, height: 12)
+                ZStack {
+                    Circle().fill(routeColor).frame(width: 12, height: 12)
+                    if passedIndex > 0 {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 7, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                }
+
+                ZStack(alignment: .top) {
+                    Rectangle().fill(routeColor.opacity(0.25)).frame(width: 3, height: lineHeight)
+                    Rectangle().fill(routeColor).frame(width: 3, height: lineHeight * progress)
+                }
+
+                Circle().fill(routeColor).opacity(passedIndex >= stopCount - 1 ? 1 : 0.3).frame(width: 12, height: 12)
             }
             .padding(.top, 3)
 
@@ -379,6 +308,8 @@ struct GoTripDetailsPanel: View {
                 Text(segment.from?.name ?? "")
                     .font(TransiumFont.body(13, weight: .semibold))
                     .foregroundColor(textColor)
+                    .strikethrough(passedIndex > 0, color: mutedColor)
+                    .opacity(passedIndex > 0 ? 0.55 : 1)
 
                 if stopCount > 2 {
                     Button(action: {
@@ -400,12 +331,21 @@ struct GoTripDetailsPanel: View {
                     }
                     .buttonStyle(.transiumNoOpacity)
 
-                    if isExpanded, let stops = segment.stops {
+                    if isExpanded {
                         VStack(alignment: .leading, spacing: 4) {
-                            ForEach(Array(stops.dropFirst().dropLast().enumerated()), id: \.offset) { _, stop in
-                                Text("• \(stop.name)")
-                                    .font(TransiumFont.body(12))
-                                    .foregroundColor(mutedColor)
+                            ForEach(Array(stops.dropFirst().dropLast().enumerated()), id: \.offset) { offset, stop in
+                                let isPassed = (offset + 1) < passedIndex
+                                HStack(spacing: 6) {
+                                    Image(systemName: isPassed ? "checkmark.circle.fill" : "circle.fill")
+                                        .font(.system(size: isPassed ? 10 : 4, weight: .bold))
+                                        .foregroundColor(isPassed ? routeColor : mutedColor.opacity(0.5))
+                                        .frame(width: 10)
+                                    Text(stop.name)
+                                        .font(TransiumFont.body(12))
+                                        .foregroundColor(mutedColor)
+                                        .strikethrough(isPassed, color: mutedColor)
+                                        .opacity(isPassed ? 0.55 : 1)
+                                }
                             }
                         }
                         .padding(.leading, 4)
@@ -482,10 +422,22 @@ struct GoTripDetailsPanel: View {
                         .cornerRadius(8)
                 }
 
-                Text("Get off at **\(segment.to?.name ?? "destination")**")
-                    .font(TransiumFont.body(15, weight: .bold))
-                    .foregroundColor(.black)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    Text("Get off at")
+                        .font(TransiumFont.body(15, weight: .bold))
+                        .foregroundColor(.black)
+                        .layoutPriority(1)
+
+                    Image("LineIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+
+                    Text(segment.to?.name ?? "destination")
+                        .font(TransiumFont.body(15, weight: .bold))
+                        .foregroundColor(.black)
+                        .lineLimit(1)
+                }
 
                 Spacer()
 

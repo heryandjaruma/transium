@@ -1,0 +1,131 @@
+//
+//  HomeTicketSection.swift
+//  transium
+//
+
+import CoreLocation
+import SwiftUI
+
+struct HomeTicketSection: View {
+    let areaGroups: [AreaQuestsGroup]
+    @Binding var visibleTicketPage: Int?
+    let currentLocationLabel: String
+    let currentLocation: CLLocation
+    var onSelectArea: (Area) -> Void
+    var onEditLocation: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ticketRail
+            
+            ticketPageIndicator
+            
+            currentLocationPill
+                .padding(.top, 2)
+        }
+        .padding(.bottom, 16)
+    }
+
+    private var ticketRail: some View {
+        ScrollView(.horizontal) {
+            HStack(alignment: .bottom, spacing: 14) {
+                if !areaGroups.isEmpty {
+                    ForEach(Array(areaGroups.enumerated()), id: \.offset) { index, group in
+                        let variant: TransiumTicketVariant = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .mint : .coral)
+                        let isRecommended = (index == 0)
+
+                        VStack(alignment: .leading, spacing: 0) {
+                            if isRecommended {
+                                TransiumRecommendedSeal(style: .ticketTab)
+                                    .padding(.leading, 8)
+                                    .padding(.bottom, -12)
+                                    .zIndex(1)
+                            }
+
+                            TransiumTicketCard(
+                                title: group.area.name,
+                                subtitle: group.area.description ?? group.quests.first?.description ?? "\(group.area.name), Bali",
+                                distance: HomeLocationFormatter.distanceText(for: group, currentLocation: currentLocation),
+                                price: "Rp. 4,4k",
+                                imageUrl: group.area.photoUrl ?? group.area.thumbnails.first?.url ?? group.quests.first?.thumbnails.first?.url,
+                                fallbackImageName: isRecommended ? "kintamani" : "sanoored",
+                                variant: variant
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                onSelectArea(group.area)
+                            }
+                        }
+                        .frame(width: 336)
+                        .id(index)
+                    }
+                } else {
+                    ForEach(0..<2, id: \.self) { index in
+                        let isRecommended = (index == 0)
+                        let variant: TransiumTicketVariant = isRecommended ? .blue : .mint
+
+                        VStack(alignment: .leading, spacing: 0) {
+                            if isRecommended {
+                                TransiumRecommendedSeal(style: .ticketTab)
+                                    .padding(.leading, 10)
+                                    .padding(.bottom, -8)
+                                    .zIndex(1)
+                            }
+
+                            TransiumTicketSkeletonCard(variant: variant)
+                        }
+                        .frame(width: 336)
+                        .id(index)
+                    }
+                }
+            }
+            .animation(.easeInOut(duration: 0.35), value: areaGroups.isEmpty)
+            .scrollTargetLayout()
+            .padding(.horizontal, 20)
+        }
+        .frame(height: 172)
+        .scrollIndicators(.hidden)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $visibleTicketPage)
+        .accessibilityLabel("Recommended destinations")
+    }
+
+    private var ticketPageIndicator: some View {
+        PageIndicator(
+            currentPage: visibleTicketPage ?? 0,
+            totalPages: max(areaGroups.count, 2),
+            activeColor: TransiumColor.primaryBlue,
+            inactiveColor: TransiumColor.ticketInk.opacity(0.26)
+        )
+        .accessibilityLabel("Ticket \(min((visibleTicketPage ?? 0) + 1, max(areaGroups.count, 2))) of \(max(areaGroups.count, 2))")
+    }
+
+    private var currentLocationPill: some View {
+        Button(action: onEditLocation) {
+            HStack(spacing: 10) {
+                Image(systemName: "location.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(TransiumColor.primaryBlue)
+
+                Text(currentLocationLabel)
+                    .font(TransiumFont.body(14, weight: .semibold))
+                    .foregroundStyle(TransiumColor.ticketInk)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(TransiumColor.primaryBlue)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(Color.white.opacity(0.92))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+        }
+        .buttonStyle(.transiumNoOpacity)
+        .padding(.horizontal, 20)
+    }
+}

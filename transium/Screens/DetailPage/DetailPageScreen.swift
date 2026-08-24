@@ -14,6 +14,7 @@ struct DetailPlaceScreen: View {
     struct Quest: Identifiable {
         let id: String
         let imageUrl: String?
+        let badgeImageUrls: [String]
         let fallbackImageName: String
         let title: String
         let description: String
@@ -23,6 +24,7 @@ struct DetailPlaceScreen: View {
         init(
             id: String = UUID().uuidString,
             imageUrl: String? = nil,
+            badgeImageUrls: [String] = [],
             fallbackImageName: String = "sanoored",
             title: String,
             description: String,
@@ -31,6 +33,7 @@ struct DetailPlaceScreen: View {
         ) {
             self.id = id
             self.imageUrl = imageUrl
+            self.badgeImageUrls = badgeImageUrls
             self.fallbackImageName = fallbackImageName
             self.title = title
             self.description = description
@@ -41,6 +44,7 @@ struct DetailPlaceScreen: View {
         init(
             id: String = UUID().uuidString,
             imageName: String,
+            badgeImageUrls: [String] = [],
             title: String,
             description: String,
             points: Int = 10,
@@ -49,6 +53,7 @@ struct DetailPlaceScreen: View {
             self.init(
                 id: id,
                 imageUrl: nil,
+                badgeImageUrls: badgeImageUrls,
                 fallbackImageName: imageName,
                 title: title,
                 description: description,
@@ -76,23 +81,28 @@ struct DetailPlaceScreen: View {
     
     // MARK: - Properties & State
     
-    var kelurahan: Kelurahan = Kelurahan(id: "7760985", kelurahanName: "Benoa", kecamatanName: "Kuta Selatan")
+    var area: Area = Area(id: "7760985", name: "Benoa", lat: -8.7981, lng: 115.2185)
     var initialQuests: [Quest] = []
     var onBack: (() -> Void)? = nil
     var onStartQuest: ((String) -> Void)? = nil
-    
+
     @Environment(\.dismiss) private var dismiss
     @State private var selectedImageIndex: Int = 0
     @State private var headerImageUrls: [String] = []
     @State private var quests: [Quest] = []
     @State private var isLoadingQuests: Bool = false
-    
-    private var isBenoa: Bool {
-        kelurahan.kelurahanName.localizedCaseInsensitiveContains("benoa")
+    @State private var activeArea: Area?
+
+    private var currentArea: Area {
+        activeArea ?? area
     }
-    
+
+    private var isBenoa: Bool {
+        currentArea.name.localizedCaseInsensitiveContains("benoa")
+    }
+
     private var isUbud: Bool {
-        kelurahan.kelurahanName.localizedCaseInsensitiveContains("ubud")
+        currentArea.name.localizedCaseInsensitiveContains("ubud")
     }
     
     // MARK: - Body
@@ -109,20 +119,28 @@ struct DetailPlaceScreen: View {
             }
             .ignoresSafeArea(edges: .top)
             
-            // Top Floating Back Button
-            Button {
-                dismissScreen()
-            } label: {
-                Image(systemName: "arrow.left")
-                    .foregroundColor(.black)
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 44, height: 44)
-                    .background(Color.white)
-                    .clipShape(Circle())
-                    .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+            // Top Floating Back Button (aligned with HomeScreen toolbar buttons)
+            VStack {
+                HStack {
+                    Button {
+                        dismissScreen()
+                    } label: {
+                        Image(systemName: "arrow.left")
+                            .foregroundColor(.black)
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.18), radius: 8, y: 3)
+                    }
+                    .padding(.leading, 20)
+                    .padding(.top, 6)
+                    
+                    Spacer()
+                }
+                
+                Spacer()
             }
-            .padding(.leading, 20)
-            .padding(.top, 56)
         }
         .background(Color.white)
         .navigationBarBackButtonHidden(true)
@@ -263,7 +281,7 @@ struct DetailPlaceScreen: View {
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
-                Text("\(kelurahan.kelurahanName) Quests")
+                Text("\(currentArea.name) Quests")
                     .font(TransiumFont.display(28, weight: .bold))
                     .foregroundColor(.black)
                 
@@ -288,10 +306,7 @@ struct DetailPlaceScreen: View {
                     }
                 } else {
                     HStack(spacing: 8) {
-                        Image(categoryBadgeImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 95, height: 30)
+                        TransiumCategoryPaperBadge(category: resolvedCategory)
                         
                         Image("BusFee")
                             .resizable()
@@ -310,23 +325,27 @@ struct DetailPlaceScreen: View {
                     shimmerHighlight: Color.white.opacity(0.55)
                 )
             } else {
-                Text("\(kelurahan.kecamatanName) • \(kelurahanTagline)")
+                Text(areaTagline)
                     .font(TransiumFont.body(14))
                     .foregroundColor(.gray)
             }
         }
     }
-    
-    private var categoryBadgeImage: String {
-        if isBenoa { return "Beach" }
-        if isUbud { return "kintamani" }
+
+    private var resolvedCategory: String {
+        if let cat = currentArea.category, !cat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return cat
+        }
         return "Beach"
     }
-    
-    private var kelurahanTagline: String {
+
+    private var areaTagline: String {
+        if let desc = currentArea.description, !desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return desc
+        }
         if isBenoa { return "Where earlybirds relax 🌊" }
         if isUbud { return "Rice fields, art walks & mountain air 🌿" }
-        return "Where earlybirds relax 🌊"
+        return "Explore local quests & transit routes 🌴"
     }
     
     // MARK: - Data Loading
@@ -342,31 +361,44 @@ struct DetailPlaceScreen: View {
         defer { isLoadingQuests = false }
         
         do {
-            let detail = try await QuestService.shared.getKelurahanQuests(id: kelurahan.id)
+            let detail = try await QuestService.shared.getAreaQuests(id: area.id)
+            self.activeArea = detail.area
+
+            // Prioritize the area's hero photo and thumbnails for the carousel, followed by quest thumbnails
+            let areaThumbs = ([detail.area.photoUrl].compactMap { $0 }) + detail.area.thumbnails.map(\.url)
+            let questThumbs = detail.quests.flatMap { $0.thumbnails.map(\.url) }
+            headerImageUrls = !areaThumbs.isEmpty ? areaThumbs : questThumbs
+            
             if !detail.quests.isEmpty {
-                // Collect header carousel thumbnails from all quests in this kelurahan
-                let allThumbUrls = detail.quests.flatMap { $0.thumbnails.map { $0.url } }
-                headerImageUrls = allThumbUrls
-                
                 var loaded: [Quest] = []
                 for (index, q) in detail.quests.enumerated() {
                     let theme: QuestTheme = (index % 3 == 0) ? .blue : ((index % 3 == 1) ? .red : .green)
                     let thumbUrl = q.thumbnails.first?.url
+                    
+                    // Extract badges' image URLs from the quest's badges (capped to max 3)
+                    let badgeUrls: [String] = q.badges.compactMap { badge in
+                        if let img = badge.badgeImageUrl, !img.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            return img
+                        }
+                        return nil
+                    }
+                    
                     let fallbackImg: String = {
-                        let cat = q.category.lowercased()
-                        if cat.contains("beach") || cat.contains("leisure") { return "Beach" }
-                        if cat.contains("nature") { return "kintamani" }
-                        if cat.contains("cult") { return "gwk" }
-                        return "sanoored"
+                        switch theme {
+                        case .red: return "gwk"
+                        case .green: return "kintamani"
+                        case .blue: return "sanoored"
+                        }
                     }()
                     
                     loaded.append(Quest(
                         id: q.id,
                         imageUrl: thumbUrl,
+                        badgeImageUrls: Array(badgeUrls.prefix(3)),
                         fallbackImageName: fallbackImg,
                         title: q.name,
                         description: "\(q.category) • \(q.description)",
-                        points: 10,
+                        points: q.xp ?? 10,
                         theme: theme
                     ))
                 }
@@ -377,8 +409,48 @@ struct DetailPlaceScreen: View {
                 }
             }
         } catch {
-            print("Failed to load kelurahan quests: \(error)")
+            print("Failed to load area quests: \(error)")
         }
+    }
+}
+
+// MARK: - Category Paper Badge
+struct TransiumCategoryPaperBadge: View {
+    let category: String
+    
+    var body: some View {
+        let normalized = category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let (icon, bg): (String, Color) = {
+            if normalized.contains("beach") || normalized.contains("leisure") || normalized.contains("sea") || normalized.contains("coastal") {
+                return ("beach.umbrella", Color(red: 0.14, green: 0.35, blue: 0.85))
+            } else if normalized.contains("nature") || normalized.contains("forest") || normalized.contains("green") || normalized.contains("mountain") {
+                return ("leaf.fill", Color(red: 0.10, green: 0.55, blue: 0.32))
+            } else if normalized.contains("cult") || normalized.contains("temple") || normalized.contains("heritage") || normalized.contains("art") {
+                return ("sparkles", Color(red: 0.82, green: 0.35, blue: 0.22))
+            } else {
+                return ("mappin.and.ellipse", Color(red: 0.20, green: 0.42, blue: 0.95))
+            }
+        }()
+        
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .bold))
+            Text(category)
+                .font(TransiumFont.display(12, weight: .semibold))
+                .tracking(0.8)
+                .lineLimit(1)
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .frame(height: 30)
+        .background(
+            Image(TransiumAsset.Ticket.paperBadge)
+                .resizable(capInsets: EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10), resizingMode: .stretch)
+                .renderingMode(.template)
+                .foregroundStyle(bg)
+                .shadow(color: .black.opacity(0.12), radius: 0, x: 0, y: 1.5)
+        )
     }
 }
 

@@ -2,82 +2,62 @@
 
 ## Purpose
 
-This repository is a brand-new native iOS app built with SwiftUI. Treat this
+This repository is a native iOS transit and discovery app built with SwiftUI. Treat this
 file as the default operating agreement for any agent working here.
 
 ## Project Snapshot
 
 - App name: `transium`
-- Platform: iOS
-- UI stack: SwiftUI
+- Platform: iOS (18.0+)
+- UI stack: SwiftUI (Strict Concurrency compatible)
 - Entry point: `transium/transiumApp.swift`
 - Root flow: `transium/ContentView.swift`
 - Current launch order: onboarding first, then Apple-only authentication
 - Local map assets live in `transium/Resources/Maps`
-- Existing map notes live in `transium/Resources/Maps/guidelines.md`
+- Backend origin: `https://transium-api.heryandjaruma.workers.dev`
 
 ## Current Reality
 
-- The app has an onboarding flow, an Apple-only authentication screen, and
-  a post-auth MapLibre home map backed by bundled PMTiles.
-- There are no tests yet.
+- The app has a complete onboarding flow, Sign in with Apple backed by Better Auth, offline MapLibre Native basemaps backed by PMTiles, live Geofence-driven Go Mode navigation, and gamified celebration summary cards.
 - MapLibre Native is installed through Swift Package Manager.
-- The project uses Xcode's file-system-synchronized layout, so source files are
-  discovered from the `transium/` folder instead of being manually listed one
-  by one in the project file.
+- The project uses Xcode's file-system-synchronized layout, so source files are discovered from the `transium/` folder automatically.
+- Live Xcode Canvas Previews (`#Preview`) automatically inject `"debug-token-123"` via `SessionTokenStore.read()`.
 
 ## Code Structure
 
-- `transium/Screens/<Feature>` contains screen-level SwiftUI views.
-- `transium/UI/System` contains shared fonts, colors, asset names, and
-  app-wide constants. The current file is `DesignTokens.swift`.
-- `transium/UI/Components` contains reusable UI pieces that are not tied to one
-  feature.
-- `transium/Features/<Feature>` contains domain models and feature services.
-- `transium/Backend` contains backend contracts only until the backend/database
-  is chosen.
-- `transium/Resources/Fonts` stores font files registered through
-  `transium/Info.plist`.
-- `transium/Resources/Maps` stores bundled PMTiles used by the initial
-  MapLibre home screen.
+- `transium/Screens/<Feature>` contains screen-level SwiftUI views and local `Views/` subfolders (e.g. `Screens/Home/Views/`, `Screens/Summary/Views/`).
+- `transium/UI/System` contains shared fonts, colors, asset names, and app-wide constants (`DesignTokens.swift`).
+- `transium/UI/Components` contains reusable UI pieces (buttons, toast center, postage stamp cards).
+- `transium/Features/<Feature>` contains domain models, services, and business logic (`Auth`, `Bookmark`, `Device`, `Journey`, `Location`, `Map`, `Profile`, `Quest`).
+- `transium/Backend` contains the `APIClient`, Better Auth implementation, multipart uploaders, and configuration.
+- `transium/Resources/Fonts` stores Londrina Solid and Poppins font binaries registered through `Info.plist`.
+- `transium/Resources/Maps` stores bundled PMTiles used by MapLibre.
+- `docs/` contains comprehensive API references, authentication guides, architecture notes, and Go Mode documentation.
 
 ## App Flow Rules
 
 - Onboarding must run before authentication.
 - `ContentView` owns the one-time onboarding gate with `@AppStorage`.
-- `AppEnvironment.DEV_MODE` in `UI/System/DesignTokens.swift`
-  resets `hasCompletedOnboarding` to `false` once from `transiumApp.init()`.
-  Do not use `DEV_MODE` directly in the onboarding/auth routing condition, or
-  the final onboarding button will never reach authentication.
-- Keep Sign in with Apple as the only authentication method unless the user
-  explicitly changes product direction.
-- Do not show Apple identifiers, identity tokens, authorization codes, or nonce
-  values in user-facing toast copy.
+- `AppEnvironment.DEV_MODE` in `UI/System/DesignTokens.swift` resets `hasCompletedOnboarding` to `false` once from `transiumApp.init()`. Do not use `DEV_MODE` directly in the onboarding/auth routing condition.
+- Keep Sign in with Apple as the only authentication method unless the user explicitly changes product direction.
+- Do not show Apple identifiers, identity tokens, authorization codes, or nonce values in user-facing toast copy.
 - After successful local Apple sign-in persistence, route to `HomeScreen`.
-- Do not trust client-provided user IDs on a future backend; verify Apple
-  identity tokens and enforce owner-only profile access server-side.
+- Do not trust client-provided user IDs on a future backend; verify Apple identity tokens and enforce owner-only profile access server-side.
 
 ## UI System Rules
 
-- The current app UI is light-mode only. Do not add dark-mode-specific styling
-  until the user explicitly asks for dark mode.
+- The current app UI is light-mode only. Do not add dark-mode-specific styling until the user explicitly asks for dark mode.
 - Use `TransiumFont.display` for Londrina Solid headings.
 - Use `TransiumFont.body` for Poppins body, subtitle, button, and terms text.
-- Use `TransiumColor` and `TransiumAsset` from `UI/System/DesignTokens.swift`
-  instead of raw asset strings in screens when practical.
-- Keep auth terms copy visually compact; it should target two lines on the
-  current phone layout.
-- Keep auth hero artwork large and slightly clipped by the white auth panel,
-  matching the supplied reference direction.
+- Use `TransiumColor` and `TransiumAsset` from `UI/System/DesignTokens.swift` instead of raw asset strings in screens when practical.
+- Use `TransiumStampCard` and `QuestBadgePostageStack` for postage stamp and badge rendering with consistent rotation (`-4°` / `-5°`).
 - Use `AppToastCenter.shared` for global success, warning, and error feedback.
-- Keep toast messages human-readable and action-oriented; do not surface raw
-  error payloads, IDs, tokens, or implementation details.
+- Keep toast messages human-readable and action-oriented; do not surface raw error payloads, IDs, tokens, or implementation details.
 
 ## Non-Negotiable Git Rules
 
 - Never push unless the user explicitly asks for a push.
-- Never create a PR, merge, rebase, or force-push unless the user explicitly
-  asks for it.
+- Never create a PR, merge, rebase, or force-push unless the user explicitly asks for it.
 - Never commit by default. Commit only when the user asks for a commit.
 - Before any commit, make sure the staged diff matches the requested scope.
 - Prefer small, reviewable commits over large mixed commits.
@@ -99,48 +79,4 @@ When the user asks for a commit, use a semantic prefix:
 - `style:` for formatting or naming-only cleanup
 - `revert:` for reverting a prior change
 
-Format:
-
-`<type>: <short imperative summary>`
-
-Examples:
-
-- `feat: add first transit map shell`
-- `core: introduce map resource loader`
-- `docs: add agent workflow and project context`
-
-## Working Style
-
-- Read the repository before making architectural assumptions.
-- Preserve SwiftUI-first patterns unless there is a clear reason to introduce
-  UIKit.
-- Keep changes aligned with Apple platform conventions and accessibility
-  expectations.
-- Prefer small vertical slices that can run in the simulator quickly.
-- When a task touches product feel or UI polish, actively apply design taste
-  instead of stopping at bare functionality.
-- Do not add new screen files at the app root. Use `Screens`, `UI`,
-  `Features`, `Backend`, and `Resources` consistently.
-- Use `TransiumFont` and `TransiumColor` for shared typography/color choices
-  instead of scattering raw custom font names or asset colors.
-
-## Skills To Prefer
-
-Use the most relevant installed skill when the task matches it:
-
-- `swiftui-expert-skill` for modern SwiftUI implementation
-- `swiftui-pro` for SwiftUI reviews and refactors
-- `update-swiftui-apis` when checking for newer SwiftUI APIs
-- `taste` for stronger aesthetic judgment and polish
-- `ios-hig-design` for Apple-aligned iOS design decisions
-- `ios-accessibility` for VoiceOver, Dynamic Type, and accessibility quality
-- `swiftui-patterns` for architecture and state management
-- `swiftui-performance-audit` for render/update performance work
-- `swiftui-animation` for motion and transition work
-- `swift-testing` when tests are added
-- `swiftdata` if persistence is introduced
-
-## Known Oddity
-
-- The current Xcode project includes `.gitignore` in the app resources build
-  phase. Treat that as accidental unless the user says otherwise.
+Format: `<type>: <short imperative summary>`

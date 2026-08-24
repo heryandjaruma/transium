@@ -1,84 +1,122 @@
-# Authentication And Profile
+# Authentication & User Profile Reference
 
-## Scope
+## 1. Authentication Architecture
 
-Transium currently supports one authentication method: Sign in with Apple.
-Backend and database choices are intentionally undecided, so this document stops
-at model contracts and security requirements.
+Transium uses **Sign in with Apple** exchanged through a **Better Auth** backend service (`https://transium-api.heryandjaruma.workers.dev/api/auth`).
 
-## Pre-Auth Flow
+```
+┌────────────────────────┐      ┌─────────────────────────┐      ┌─────────────────────────┐
+│     SwiftUI Client     │ ---> │   Better Auth Backend   │ ---> │     Apple ID Server     │
+│ (AppleSignInDelegate)  │      │  (POST /sign-in/social) │      │ (Public Key Validation) │
+└────────────────────────┘      └─────────────────────────┘      └─────────────────────────┘
+            │                                │
+            ▼ (Session Token)                │
+┌────────────────────────┐                   │
+│   SessionTokenStore    │                   │
+│ (iOS Keychain Access)  │ <─────────────────┘
+└────────────────────────┘
+```
 
-- `ContentView` shows onboarding before authentication.
-- Onboarding completion is stored in `@AppStorage("hasCompletedOnboarding")`.
-- `AppEnvironment.DEV_MODE` can be set to `true` during development to replay
-  onboarding on each fresh launch by resetting `hasCompletedOnboarding` once
-  from `transiumApp.init()`. It must not be used as part of the live routing
-  condition after onboarding completes.
-- Authentication must remain inaccessible until onboarding completes, except
-  when onboarding is skipped/completed through the onboarding controls.
-- After successful Sign in with Apple handling and local profile persistence,
-  `ContentView` routes to `HomeScreen`.
-- The auth screen is light-mode only for now and uses shared `UI/System`
-  typography/color tokens.
-- Auth success, warning, and error feedback uses the global top-screen toast
-  component from `UI/Components/AppToast.swift`.
+---
 
-## Local Device Models
+## 2. Session Management (`SessionTokenStore`)
 
-SwiftData is used only for private on-device state.
+Session tokens and cached user profiles are stored in the iOS device's secure Keychain (`si.transporta.transium-app.auth`) via `SessionTokenStore.swift`.
 
-- `Features/Profile/ProfileModel.swift` defines `LocalProfile`, which mirrors the first profile model:
-  `id`, `firstName`, `lastName`, `method`, and `level`.
-- `Features/Auth/AuthModels.swift` defines `LocalAuthIdentity`, which stores the local Apple identity mapping separately from the
-  profile so authentication metadata does not pollute the profile shape.
-- Do not persist Apple identity tokens or authorization codes in SwiftData.
-  Treat them as short-lived values to send to the backend verification layer.
+### Methods
+- `SessionTokenStore.save(token:profile:)`: Persists bearer token and profile DTO to Keychain.
+- `SessionTokenStore.read() -> String?`: Reads bearer token.
+  - **Preview Mode**: Returns `"debug-token-123"` when running in Xcode SwiftUI Canvas Previews (`AppEnvironment.DEV_MODE`).
+  - **Runtime**: Fetches decrypted token data from Keychain.
+- `SessionTokenStore.readProfile() -> BackendProfile?`: Reads cached profile metadata.
+- `SessionTokenStore.clear()`: Deletes session token and cached profile on sign-out.
 
-## Backend Contracts
+---
 
-The backend must eventually implement `AuthBackend` from
-`Backend/AuthBackendContract.swift`.
+## 3. Bearer Token Injection (`APIClient`)
 
-Minimum Apple verification requirements:
+`APIClient.swift` automatically injects the Authorization header into all requests where `requiresAuth == true`:
 
-- Verify the identity-token signature using Apple's public keys.
-- Verify the nonce sent with the original authorization request.
-- Verify issuer is Apple's issuer.
-- Verify audience matches Transium's configured client identifier.
-- Verify token expiration.
-- Exchange the single-use authorization code server-side.
-- Store refresh tokens only on the server side if the backend uses them.
+```swift
+if requiresAuth, let token = SessionTokenStore.read(), !token.isEmpty {
+    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+}
+```
 
-## Private Profile Access
+---
 
-Every profile endpoint must be authenticated.
+## 4. Endpoints & Payloads
 
-Required middleware behavior:
+### `POST /api/auth/sign-in/social`
+Exchanges Apple ID authorization tokens for a Better Auth session.
 
-- Resolve the authenticated backend user from a verified session token.
-- Reject unauthenticated requests before profile lookup.
-- Enforce owner-only profile reads and writes.
-- Never accept a user ID from the client as proof of ownership.
-- Sanitize first and last name before server storage.
-- Return only the requesting user's private profile.
+- **Request Body**:
+  ```json
+  {
+    "provider": "apple",
+    "idToken": "<raw-apple-identity-token>",
+    "authorizationCode": "<raw-apple-auth-code>",
+    "user": {
+      "name": { "firstName": "Wayan", "lastName": "Bali" },
+      "email": "user@privaterelay.appleid.com"
+    }
+  }
+  ```
 
-## Apple Sign-In Notes
+- **Response (200 OK)**:
+  ```json
+  {
+    "token": "sess_89412abc...",
+    "user": {
+      "id": "usr_1029",
+      "name": "Wayan Bali",
+      "email": "user@privaterelay.appleid.com",
+      "image": null
+    }
+  }
+  ```
 
-- Use Apple's stable user identifier, not email, as the account identifier.
-- Request `fullName` and `email` during initial authorization.
-- Expect `fullName` to be available only during initial account creation.
-- Check local Apple credential state for existing sessions.
-- If Apple reports revoked, not found, or transferred credentials, clear the
-  local session and ask the user to sign in again.
-- Do not show Apple's stable user identifier, identity token, authorization
-  code, nonce, or backend-only data in user-facing toast copy.
-- A backend must still verify the identity token and authorization code
-  server-side before trusting the Apple account.
+---
 
-## Future Backend Decision Points
+### `GET /api/private/profile`
+Retrieves authenticated user profile information, XP level, and awarded badges.
 
-- Database provider
-- Server auth/session token format
-- Token refresh and revocation strategy
-- Row-level security or equivalent owner-policy implementation
-- Account deletion and Apple token revocation flow
+- **Auth**: Required (`Bearer <token>`)
+
+#### Response (200 OK)
+```json
+{
+  "profile": {
+    "id": "usr_1029",
+    "name": "Wayan Bali",
+    "email": "user@privaterelay.appleid.com",
+    "avatarUrl": "https://storage.googleapis.com/.../avatar.jpg",
+    "level": 4,
+    "xp": 450,
+    "badges": [
+      {
+        "id": "badge_1",
+        "badgeName": "Sanur Explorer",
+        "badgeImageUrl": "/media/system/badge/sanur.png"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### `POST /api/private/profile/image`
+Uploads a user avatar image via multipart form-data.
+
+- **Auth**: Required (`Bearer <token>`)
+- **Content-Type**: `multipart/form-data; boundary=...`
+- **Field**: `image` (`image/jpeg` or `image/png`)
+
+---
+
+## 5. Security & Privacy Rules
+
+1. **Client-Server Trust**: Client-provided user IDs are never trusted on the backend; all resource operations derive ownership strictly from the verified session token.
+2. **Token Sanitization**: Apple identifiers, raw identity tokens, and authorization codes are never surfaced in user-facing toasts or error alerts.
+3. **Keychain Scope**: Tokens are saved with `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` to prevent cross-device migration.

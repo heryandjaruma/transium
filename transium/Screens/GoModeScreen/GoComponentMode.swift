@@ -9,12 +9,14 @@
 //  to be overlaid directly on top of HomeScreen's existing LocalBaliMapView, the same way
 //  the pre-Go "Navigation Mode" overlay works.
 //
-//  The bottom panel is: a floating current-step card (no background, matching the map
-//  behind it) sitting above GoTripDetailsPanel, an always-present docked white sheet
-//  (like NavigationBottomSheet's) that toggles between a collapsed "Trip Details" peek and
-//  the full itinerary — dragging or tapping its handle never covers the map/top bar the way
-//  a modal .sheet() would. The floating card hides while the sheet is expanded, since the
-//  expanded itinerary already shows the current leg as its own highlighted card.
+//  The bottom panel is GoTripDetailsPanel presented as a real, always-up .sheet (constant
+//  `isPresented: true`, interactive dismiss disabled) toggling between a collapsed "Trip
+//  Details" peek and the full itinerary via presentationDetents — presentationBackgroundInteraction(.enabled)
+//  keeps the map/top bar interactive underneath it, and dragging gets genuine system sheet
+//  physics (live finger tracking, rubber-banding, velocity-based settle) for free, instead of
+//  a hand-rolled DragGesture. A floating current-step card sits just above the sheet's
+//  collapsed edge and hides once the sheet reaches its expanded detent, since the expanded
+//  itinerary already shows the current leg as its own highlighted card.
 
 import CoreLocation
 import SwiftUI
@@ -48,7 +50,18 @@ struct GoComponentMode: View {
     /// straight through to GoTripDetailsPanel — see its own doc comment for why this exists.
     var onManualAdvance: (String) -> Void = { _ in }
 
-    @State private var isTripDetailsExpanded = false
+    /// Height of the sheet's collapsed "peek" detent — just tall enough for its drag
+    /// indicator + "Trip Details" header row. Shared with the floating current-step card's
+    /// bottom padding so it sits just above the sheet's collapsed top edge.
+    private static let collapsedSheetHeight: CGFloat = 110
+    private static let collapsedDetent: PresentationDetent = .height(collapsedSheetHeight)
+    private static let expandedDetent: PresentationDetent = .fraction(0.55)
+
+    @State private var tripDetailsDetent: PresentationDetent = Self.collapsedDetent
+
+    private var isTripDetailsExpanded: Bool {
+        tripDetailsDetent == Self.expandedDetent
+    }
 
     /// Matches `HomeScreen.segmentArrivalProximityMeters`, which owns the actual leg-to-leg
     /// advance (this view only reads `currentSegmentIndex`, it doesn't change it) — used here
@@ -91,32 +104,28 @@ struct GoComponentMode: View {
 
             Spacer()
 
-            bottomPanel
-        }
-    }
-
-    private var bottomPanel: some View {
-        VStack(alignment: .leading, spacing: 10) {
             if !isTripDetailsExpanded {
                 currentStepCard
                     .padding(.horizontal, 16)
+                    .padding(.bottom, Self.collapsedSheetHeight + 8)
             }
-
-            // No horizontal padding here — the sheet's white surface should span the full
-            // screen width edge-to-edge, matching NavigationBottomSheet in the overview;
-            // its own content is padded internally instead.
+        }
+        .sheet(isPresented: .constant(true)) {
             GoTripDetailsPanel(
                 journey: journey,
                 currentSegmentIndex: currentSegmentIndex,
                 steps: steps,
                 currentLocation: currentLocation,
-                isExpanded: $isTripDetailsExpanded,
                 geofenceMonitor: geofenceMonitor,
                 goStartResult: goStartResult,
                 onManualAdvance: onManualAdvance
             )
+            .presentationDetents([Self.collapsedDetent, Self.expandedDetent], selection: $tripDetailsDetent)
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled)
+            .presentationBackground(.thickMaterial)
+            .interactiveDismissDisabled()
         }
-        .padding(.bottom, 8)
     }
 
     // Blue/Yellow card showing whatever's current in the trip — a travel leg, or a mission.
@@ -190,14 +199,31 @@ struct GoComponentMode: View {
 
     /// Shown once the user is assumed to have boarded (see `isNearBoardingStop`) — the
     /// device's own GPS doubles as a rough proxy for the bus's position while riding, so this
-    /// still recomputes distance/time to the alighting stop live, using the segment's own pace.
+    /// still recomputes distance/time to the alighting stop live, using the segment's own pace,
+    /// and how many stops remain via `liveStopsRemaining`.
     private func rideCard(_ segment: JourneySegment) -> some View {
-        GoStepCard(
+        let stopsRemaining = segment.liveStopsRemaining(from: currentLocation)
+        let liveDuration = segment.liveRemaining(from: currentLocation).durationSeconds
+        let timeBadge = liveDuration.map { "\(max(0, Int(round($0 / 60)))) min" }
+
+        return GoStepCard(
             mode: .bus(providerCode: segment.routeRef ?? "BUS"),
             verb: "Ride to",
             destination: segment.to?.name ?? "your destination",
-            metrics: metrics(for: segment)
+            metrics: metrics(for: segment),
+            caption: estimatedArrivalCaption(for: segment),
+            stopsRemaining: stopsRemaining,
+            cornerBadge: timeBadge
         )
+    }
+
+    /// "Est. arrival 9:52 PM" — the live ETA (see `liveRemaining`) projected onto a wall-clock
+    /// time, shown as the tiny caption under a bus leg's ride card.
+    private func estimatedArrivalCaption(for segment: JourneySegment) -> String? {
+        guard let duration = segment.liveRemaining(from: currentLocation).durationSeconds else { return nil }
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return "Est. arrival \(formatter.string(from: Date().addingTimeInterval(duration)))"
     }
 
     private var arrivedCard: some View {

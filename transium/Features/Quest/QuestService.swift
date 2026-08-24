@@ -15,11 +15,11 @@ public protocol QuestServiceProtocol: Sendable {
     /// Lists badges attached to a specific quest.
     func listQuestBadges(id: String) async throws -> [QuestBadgeEntry]
     
-    /// Returns each kelurahan that has at least one reachable quest paired with those quests.
-    func listKelurahanQuests() async throws -> [KelurahanQuestsGroup]
-    
-    /// Returns the quests reachable in a specific kelurahan with badges.
-    func getKelurahanQuests(id: String) async throws -> KelurahanDetailQuestsResponse
+    /// Returns each area that has at least one reachable quest paired with those quests.
+    func listAreaQuests() async throws -> [AreaQuestsGroup]
+
+    /// Returns the quests reachable in a specific area with badges.
+    func getAreaQuests(id: String) async throws -> AreaDetailQuestsResponse
 }
 
 public final class QuestService: QuestServiceProtocol, Sendable {
@@ -64,9 +64,9 @@ public final class QuestService: QuestServiceProtocol, Sendable {
         return response.questBadges
     }
 
-    public func listKelurahanQuests() async throws -> [KelurahanQuestsGroup] {
-        let response: KelurahanQuestGroupsResponse = try await apiClient.request(
-            path: "/kelurahan/quests",
+    public func listAreaQuests() async throws -> [AreaQuestsGroup] {
+        let response: AreaQuestGroupsResponse = try await apiClient.request(
+            path: "/area/quests",
             method: .get,
             queryItems: nil,
             body: nil,
@@ -75,9 +75,9 @@ public final class QuestService: QuestServiceProtocol, Sendable {
         return response.groups
     }
 
-    public func getKelurahanQuests(id: String) async throws -> KelurahanDetailQuestsResponse {
-        return try await apiClient.request(
-            path: "/kelurahan/\(id)/quests",
+    public func getAreaQuests(id: String) async throws -> AreaDetailQuestsResponse {
+        try await apiClient.request(
+            path: "/area/\(id)/quests",
             method: .get,
             queryItems: nil,
             body: nil,

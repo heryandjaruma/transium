@@ -11,20 +11,61 @@ public nonisolated struct Quest: Codable, Identifiable, Sendable, Equatable {
     public let name: String
     public let category: String
     public let description: String
+    public let xp: Int?
+    public let label: String?
     public let thumbnails: [MediaAsset]
+    public let distanceMeters: Double?
 
     public init(
         id: String,
         name: String,
         category: String,
         description: String,
-        thumbnails: [MediaAsset] = []
+        xp: Int? = nil,
+        label: String? = nil,
+        thumbnails: [MediaAsset] = [],
+        distanceMeters: Double? = nil
     ) {
         self.id = id
         self.name = name
         self.category = category
         self.description = description
+        self.xp = xp
+        self.label = label
         self.thumbnails = thumbnails
+        self.distanceMeters = distanceMeters
+    }
+}
+
+// MARK: - QuestWithUserStatus
+public nonisolated struct QuestWithUserStatus: Codable, Identifiable, Sendable, Equatable {
+    public let id: String
+    public let name: String
+    public let category: String
+    public let description: String
+    public let xp: Int?
+    public let label: String?
+    public let thumbnails: [MediaAsset]
+    public let userQuestStatus: String?
+
+    public init(
+        id: String,
+        name: String,
+        category: String,
+        description: String,
+        xp: Int? = nil,
+        label: String? = nil,
+        thumbnails: [MediaAsset] = [],
+        userQuestStatus: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.category = category
+        self.description = description
+        self.xp = xp
+        self.label = label
+        self.thumbnails = thumbnails
+        self.userQuestStatus = userQuestStatus
     }
 }
 
@@ -63,7 +104,7 @@ public nonisolated struct BadgeActionStep: Codable, Identifiable, Sendable, Equa
     public let badgeId: String
     public let actionId: String
     public let actionName: String
-    public let actionType: String
+    public let type: String?
     public let sequence: Int
     public let lat: Double?
     public let lng: Double?
@@ -74,7 +115,7 @@ public nonisolated struct BadgeActionStep: Codable, Identifiable, Sendable, Equa
         badgeId: String,
         actionId: String,
         actionName: String,
-        actionType: String,
+        type: String? = nil,
         sequence: Int,
         lat: Double? = nil,
         lng: Double? = nil,
@@ -84,7 +125,7 @@ public nonisolated struct BadgeActionStep: Codable, Identifiable, Sendable, Equa
         self.badgeId = badgeId
         self.actionId = actionId
         self.actionName = actionName
-        self.actionType = actionType
+        self.type = type
         self.sequence = sequence
         self.lat = lat
         self.lng = lng
@@ -127,6 +168,8 @@ public nonisolated struct QuestDetail: Codable, Identifiable, Sendable, Equatabl
     public let name: String
     public let category: String
     public let description: String
+    public let xp: Int?
+    public let label: String?
     public let thumbnails: [MediaAsset]
     public let badges: [QuestBadgeWithSteps]
     public let origin: LatLng?
@@ -137,6 +180,8 @@ public nonisolated struct QuestDetail: Codable, Identifiable, Sendable, Equatabl
         name: String,
         category: String,
         description: String,
+        xp: Int? = nil,
+        label: String? = nil,
         thumbnails: [MediaAsset] = [],
         badges: [QuestBadgeWithSteps] = [],
         origin: LatLng? = nil,
@@ -146,6 +191,8 @@ public nonisolated struct QuestDetail: Codable, Identifiable, Sendable, Equatabl
         self.name = name
         self.category = category
         self.description = description
+        self.xp = xp
+        self.label = label
         self.thumbnails = thumbnails
         self.badges = badges
         self.origin = origin
@@ -159,6 +206,8 @@ public nonisolated struct QuestWithBadges: Codable, Identifiable, Sendable, Equa
     public let name: String
     public let category: String
     public let description: String
+    public let xp: Int?
+    public let label: String?
     public let thumbnails: [MediaAsset]
     public let badges: [QuestBadgeEntry]
 
@@ -167,6 +216,8 @@ public nonisolated struct QuestWithBadges: Codable, Identifiable, Sendable, Equa
         name: String,
         category: String,
         description: String,
+        xp: Int? = nil,
+        label: String? = nil,
         thumbnails: [MediaAsset] = [],
         badges: [QuestBadgeEntry] = []
     ) {
@@ -174,18 +225,87 @@ public nonisolated struct QuestWithBadges: Codable, Identifiable, Sendable, Equa
         self.name = name
         self.category = category
         self.description = description
+        self.xp = xp
+        self.label = label
         self.thumbnails = thumbnails
         self.badges = badges
     }
 }
 
-// MARK: - KelurahanQuestsGroup
-public nonisolated struct KelurahanQuestsGroup: Codable, Sendable, Equatable {
-    public let kelurahan: Kelurahan
+// MARK: - QuestWithDistance
+public nonisolated struct QuestWithDistance: Codable, Identifiable, Sendable, Equatable {
+    public let id: String
+    public let name: String
+    public let category: String
+    public let description: String
+    public let xp: Int?
+    public let label: String?
+    public let thumbnails: [MediaAsset]
+    public let distanceMeters: Double?
+
+    public init(
+        id: String,
+        name: String,
+        category: String,
+        description: String,
+        xp: Int? = nil,
+        label: String? = nil,
+        thumbnails: [MediaAsset] = [],
+        distanceMeters: Double? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.category = category
+        self.description = description
+        self.xp = xp
+        self.label = label
+        self.thumbnails = thumbnails
+        self.distanceMeters = distanceMeters
+    }
+}
+
+// MARK: - QuestWithBadgesAndDistance
+public nonisolated struct QuestWithBadgesAndDistance: Codable, Identifiable, Sendable, Equatable {
+    public let id: String
+    public let name: String
+    public let category: String
+    public let description: String
+    public let xp: Int?
+    public let label: String?
+    public let thumbnails: [MediaAsset]
+    public let badges: [QuestBadgeEntry]
+    public let distanceMeters: Double?
+
+    public init(
+        id: String,
+        name: String,
+        category: String,
+        description: String,
+        xp: Int? = nil,
+        label: String? = nil,
+        thumbnails: [MediaAsset] = [],
+        badges: [QuestBadgeEntry] = [],
+        distanceMeters: Double? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.category = category
+        self.description = description
+        self.xp = xp
+        self.label = label
+        self.thumbnails = thumbnails
+        self.badges = badges
+        self.distanceMeters = distanceMeters
+    }
+}
+
+// MARK: - AreaQuestsGroup
+public nonisolated struct AreaQuestsGroup: Codable, Sendable, Equatable {
+    public let area: Area
     public let quests: [Quest]
 
-    public init(kelurahan: Kelurahan, quests: [Quest]) {
-        self.kelurahan = kelurahan
+    public init(area: Area, quests: [Quest]) {
+        self.area = area
         self.quests = quests
     }
 }
@@ -203,11 +323,11 @@ nonisolated struct QuestBadgesResponse: Codable {
     let questBadges: [QuestBadgeEntry]
 }
 
-nonisolated struct KelurahanQuestGroupsResponse: Codable {
-    let groups: [KelurahanQuestsGroup]
+nonisolated struct AreaQuestGroupsResponse: Codable {
+    let groups: [AreaQuestsGroup]
 }
 
-public nonisolated struct KelurahanDetailQuestsResponse: Codable, Sendable, Equatable {
-    public let kelurahan: Kelurahan
+public nonisolated struct AreaDetailQuestsResponse: Codable, Sendable, Equatable {
+    public let area: Area
     public let quests: [QuestWithBadges]
 }

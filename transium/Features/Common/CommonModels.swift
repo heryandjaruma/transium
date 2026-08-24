@@ -34,6 +34,8 @@ public nonisolated struct MediaAsset: Codable, Identifiable, Sendable, Equatable
     public let mimeType: String?
     public let sizeBytes: Int?
     public let createdAt: String?
+    public let alt: String?
+    public let copyright: String?
 
     public init(
         id: String,
@@ -41,7 +43,9 @@ public nonisolated struct MediaAsset: Codable, Identifiable, Sendable, Equatable
         type: String? = nil,
         mimeType: String? = nil,
         sizeBytes: Int? = nil,
-        createdAt: String? = nil
+        createdAt: String? = nil,
+        alt: String? = nil,
+        copyright: String? = nil
     ) {
         self.id = id
         self.url = url
@@ -49,23 +53,44 @@ public nonisolated struct MediaAsset: Codable, Identifiable, Sendable, Equatable
         self.mimeType = mimeType
         self.sizeBytes = sizeBytes
         self.createdAt = createdAt
+        self.alt = alt
+        self.copyright = copyright
     }
 }
 
-// MARK: - Kelurahan
-public nonisolated struct Kelurahan: Codable, Identifiable, Sendable, Equatable {
+// MARK: - Area
+public nonisolated struct Area: Codable, Identifiable, Sendable, Equatable {
     public let id: String
-    public let kelurahanName: String
-    public let kecamatanName: String
+    public let name: String
+    public let description: String?
+    public let category: String?
+    public let lat: Double
+    public let lng: Double
+    public let photoUrl: String?
+    public let thumbnails: [MediaAsset]
 
     public init(
         id: String,
-        kelurahanName: String,
-        kecamatanName: String
+        name: String,
+        description: String? = nil,
+        category: String? = nil,
+        lat: Double,
+        lng: Double,
+        photoUrl: String? = nil,
+        thumbnails: [MediaAsset] = []
     ) {
         self.id = id
-        self.kelurahanName = kelurahanName
-        self.kecamatanName = kecamatanName
+        self.name = name
+        self.description = description
+        self.category = category
+        self.lat = lat
+        self.lng = lng
+        self.photoUrl = photoUrl
+        self.thumbnails = thumbnails
+    }
+
+    public var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: lat, longitude: lng)
     }
 }
 

@@ -12,7 +12,12 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		B67F14DD303708BA00F03EEE /* 0_Sanur_happy_Walk2Stop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = 0_Sanur_happy_Walk2Stop.gpx; path = "../gpx-testcases/Sanur/0_Sanur_happy_Walk2Stop.gpx"; sourceTree = "<group>"; };
+		B67F29AF303BB87600F03EEE /* 0_Sanur_happy_Walk2Stop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = 0_Sanur_happy_Walk2Stop.gpx; path = "../gpx-testcases/Sanur/0_Sanur_happy_Walk2Stop.gpx"; sourceTree = "<group>"; };
+		B67F29B0303BB87600F03EEE /* 1-1_Sanur_happy_RideBus.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "1-1_Sanur_happy_RideBus.gpx"; path = "../gpx-testcases/Sanur/1-1_Sanur_happy_RideBus.gpx"; sourceTree = "<group>"; };
+		B67F29B1303BB87600F03EEE /* 1_Sanur_happy_RideBus.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = 1_Sanur_happy_RideBus.gpx; path = "../gpx-testcases/Sanur/1_Sanur_happy_RideBus.gpx"; sourceTree = "<group>"; };
+		B67F29B2303BB87600F03EEE /* 0-1_Sanur_happy_Walk2Stop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "0-1_Sanur_happy_Walk2Stop.gpx"; path = "../gpx-testcases/Sanur/0-1_Sanur_happy_Walk2Stop.gpx"; sourceTree = "<group>"; };
+		B67F29B3303BB87600F03EEE /* 2_Sanur_happy_Walk2Dest.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = 2_Sanur_happy_Walk2Dest.gpx; path = "../gpx-testcases/Sanur/2_Sanur_happy_Walk2Dest.gpx"; sourceTree = "<group>"; };
+		B67F29B4303BB87600F03EEE /* 2-1_Sanur_happy_Walk2Dest.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "2-1_Sanur_happy_Walk2Dest.gpx"; path = "../gpx-testcases/Sanur/2-1_Sanur_happy_Walk2Dest.gpx"; sourceTree = "<group>"; };
 		B685FCA43028DCB5005B7C1E /* transium.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = transium.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B685FCB23028DD88005B7C1E /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -53,7 +58,12 @@
 		B685FC9B3028DCB5005B7C1E = {
 			isa = PBXGroup;
 			children = (
-				B67F14DD303708BA00F03EEE /* 0_Sanur_happy_Walk2Stop.gpx */,
+				B67F29AF303BB87600F03EEE /* 0_Sanur_happy_Walk2Stop.gpx */,
+				B67F29B2303BB87600F03EEE /* 0-1_Sanur_happy_Walk2Stop.gpx */,
+				B67F29B1303BB87600F03EEE /* 1_Sanur_happy_RideBus.gpx */,
+				B67F29B0303BB87600F03EEE /* 1-1_Sanur_happy_RideBus.gpx */,
+				B67F29B3303BB87600F03EEE /* 2_Sanur_happy_Walk2Dest.gpx */,
+				B67F29B4303BB87600F03EEE /* 2-1_Sanur_happy_Walk2Dest.gpx */,
 				B685FCB23028DD88005B7C1E /* .gitignore */,
 				B685FCA63028DCB5005B7C1E /* transium */,
 				B685FCA53028DCB5005B7C1E /* Products */,
@@ -290,7 +300,7 @@
 				CODE_SIGN_ENTITLEMENTS = transium/transium.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 9VBW89A4U3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -299,6 +309,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Transium needs camera access to capture memories throughout your Journey.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Transium reads your steps count and calories from Health to summarize your journey.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Transium does not use Health data. This description is required because a linked library references HealthKit APIs.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Transium needs background location access to detect when you arrive at a quest checkpoint, even while the app isn't open.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Transium uses your location to show where you are on the Bali transit map.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Transium needs Galery access to import images.";
@@ -338,7 +349,7 @@
 				CODE_SIGN_ENTITLEMENTS = transium/transium.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 9VBW89A4U3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -347,6 +358,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Transium needs camera access to capture memories throughout your Journey.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Transium reads your steps count and calories from Health to summarize your journey.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Transium does not use Health data. This description is required because a linked library references HealthKit APIs.";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Transium needs background location access to detect when you arrive at a quest checkpoint, even while the app isn't open.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Transium uses your location to show where you are on the Bali transit map.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Transium needs Galery access to import images.";

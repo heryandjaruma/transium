@@ -23,19 +23,6 @@ struct ProfileScreen: View {
         }
     }
 
-    struct GalleryPhoto: Identifiable, Equatable {
-        let id = UUID()
-        let imageName: String
-    }
-
-    struct Badge: Identifiable {
-        let id = UUID()
-        let imageName: String
-        let title: String
-        let date: String
-        let borderColor: Color
-    }
-
     @Environment(\.dismiss) private var dismiss
     @Environment(SessionController.self) private var session
 
@@ -58,15 +45,13 @@ struct ProfileScreen: View {
     @State private var isDeletingAccount: Bool = false
 
     // Gallery
-    @State private var galleryPhotos: [GalleryPhoto] = [
-        GalleryPhoto(imageName: "gallery-1"),
-        GalleryPhoto(imageName: "gallery-2"),
-        GalleryPhoto(imageName: "gallery-3"),
-    ]
-//    @State private var photoPendingDelete: GalleryPhoto? = nil
+    @State private var galleryPhotos: [GalleryItem] = []
+    @State private var galleryPagination: GalleryPagination?
+    @State private var isLoadingGallery: Bool = false
+    @State private var isLoadingMoreGallery: Bool = false
+//    @State private var photoPendingDelete: GalleryItem? = nil
 //    @State private var showDeleteConfirmation: Bool = false
-    @State private var likedPhotoIDs: Set<UUID> = []
-    @State private var viewingPhoto: GalleryPhoto? = nil
+    @State private var viewingPhoto: GalleryItem? = nil
 
     // Photo download (save to Photos library)
     @State private var isSavingPhoto: Bool = false
@@ -80,12 +65,14 @@ struct ProfileScreen: View {
     @State private var isSettingsPresented: Bool = false
 
     // Badges
-    private let badges: [Badge] = [
-        Badge(imageName: "sanoored", title: "Sanoored", date: "27 Aug 2026", borderColor: .black),
-        Badge(imageName: "kintamani", title: "Kintamani", date: "27 Aug 2026", borderColor: .blue),
-        Badge(imageName: "gwk", title: "GWK", date: "27 Aug 2026", borderColor: .green),
-        Badge(imageName: "traveling", title: "Traveling", date: "27 Aug 2026", borderColor: .red)
-    ]
+    @State private var earnedBadges: [EarnedBadge] = []
+    @State private var isLoadingBadges: Bool = false
+
+    private static let badgeDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM yyyy"
+        return formatter
+    }()
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -126,6 +113,12 @@ struct ProfileScreen: View {
         .task {
             await loadProfile()
         }
+        .task {
+            await loadGallery()
+        }
+        .task {
+            await loadBadges()
+        }
         .sheet(isPresented: $isEditingAccount) {
             editAccountSheet
         }
@@ -134,10 +127,10 @@ struct ProfileScreen: View {
         }
         .fullScreenCover(item: $viewingPhoto) { photo in
             PhotoViewer(
-                imageName: photo.imageName,
+                imageURL: resolvedImageURL(photo.url),
                 isSaving: isSavingPhoto,
                 onClose: { viewingPhoto = nil },
-                onDownload: { downloadPhoto(photo) }
+                onDownload: { Task { await downloadPhoto(photo) } }
             )
         }
         .alert("Save Photo", isPresented: $showSaveResultAlert) {
@@ -171,12 +164,90 @@ struct ProfileScreen: View {
         }
     }
 
+    // MARK: - Remote Gallery
+
+    private func loadGallery() async {
+        guard galleryPhotos.isEmpty else { return }
+        isLoadingGallery = true
+        defer { isLoadingGallery = false }
+
+        do {
+            let page = try await GalleryService.shared.listGallery(page: 1, limit: 30)
+            galleryPhotos = page.media
+            galleryPagination = page.pagination
+        } catch {
+            AppToastCenter.shared.showError(
+                title: "Couldn't load gallery",
+                message: "Please try again in a moment."
+            )
+        }
+    }
+
+    private func loadMoreGalleryIfNeeded() async {
+        guard let pagination = galleryPagination, pagination.hasNextPage, !isLoadingMoreGallery else { return }
+        isLoadingMoreGallery = true
+        defer { isLoadingMoreGallery = false }
+
+        do {
+            let nextPage = try await GalleryService.shared.listGallery(page: pagination.page + 1, limit: pagination.limit)
+            galleryPhotos.append(contentsOf: nextPage.media)
+            galleryPagination = nextPage.pagination
+        } catch {
+            AppToastCenter.shared.showError(
+                title: "Couldn't load more photos",
+                message: "Please try again in a moment."
+            )
+        }
+    }
+
+    // MARK: - Remote Badges
+
+    private func loadBadges() async {
+        guard earnedBadges.isEmpty else { return }
+        isLoadingBadges = true
+        defer { isLoadingBadges = false }
+
+        do {
+            earnedBadges = try await BadgeService.shared.listEarnedBadges()
+        } catch {
+            AppToastCenter.shared.showError(
+                title: "Couldn't load badges",
+                message: "Please try again in a moment."
+            )
+        }
+    }
+
     private func resolvedImageURL(_ raw: String) -> URL? {
         if raw.hasPrefix("http") {
             return URL(string: raw)
         }
         return APIConfiguration.origin.appending(path: raw.hasPrefix("/") ? String(raw.dropFirst()) : raw)
     }
+
+    /// `earnedBadges` arrives most-recently-earned first, so this interpolates each badge's
+    /// postage-frame from a faded, vintage sepia tone at the oldest end of the list to a vivid
+    /// fresh blue at the newest — a color gradient across the whole collection rather than one
+    /// fixed look, since the frame art is a template SVG that takes any tint.
+    private func stampVariant(forBadgeAt index: Int) -> TransiumStampVariant {
+        guard earnedBadges.count > 1 else { return .blue }
+        let recency = 1 - (CGFloat(index) / CGFloat(earnedBadges.count - 1)) // 1 = most recent, 0 = oldest
+
+        return TransiumStampVariant(
+            frameColor: Self.vintageFrame.interpolated(to: Self.freshFrame, fraction: recency),
+            paperColor: Self.vintagePaper.interpolated(to: Self.freshPaper, fraction: recency),
+            shadowColor: Self.vintageShadow.interpolated(to: Self.freshShadow, fraction: recency),
+            imageBackground: Self.vintageImageBackground.interpolated(to: Self.freshImageBackground, fraction: recency)
+        )
+    }
+
+    private static let vintageFrame = Color(red: 0.93, green: 0.86, blue: 0.72)
+    private static let freshFrame = Color(red: 0.74, green: 0.88, blue: 1.0)
+    private static let vintagePaper = Color(red: 0.98, green: 0.95, blue: 0.87)
+    private static let freshPaper = Color(red: 0.95, green: 0.98, blue: 1.0)
+    private static let vintageImageBackground = Color(red: 0.87, green: 0.74, blue: 0.52)
+    private static let freshImageBackground = Color(red: 0.74, green: 0.88, blue: 1.0)
+    private static let vintageShadow = Color(red: 0.45, green: 0.32, blue: 0.12).opacity(0.22)
+    private static let freshShadow = TransiumColor.ticketInk.opacity(0.18)
 
     private func presentEditAccount() {
         editedFirstName = profile?.firstName ?? ""
@@ -253,7 +324,7 @@ struct ProfileScreen: View {
 
     private func uploadAvatar(_ image: UIImage) async {
         guard let imageData = await Task.detached(priority: .userInitiated, operation: {
-            Self.compressedAvatarData(from: image)
+            image.compressedJPEGData()
         }).value else {
             AppToastCenter.shared.showError(
                 title: "Couldn't update photo",
@@ -312,44 +383,12 @@ struct ProfileScreen: View {
         )
     }
 
-    /// Re-encodes (and, if needed, downscales) the image until it fits under
-    /// `maxBytes`. Runs off the main actor since repeated JPEG encoding of a
-    /// full-resolution photo can take a noticeable amount of CPU time.
-    private static func compressedAvatarData(from image: UIImage, maxBytes: Int = 1_000_000) -> Data? {
-        var candidate = image
-        var quality: CGFloat = 0.9
-
-        for _ in 0..<6 {
-            var data = candidate.jpegData(compressionQuality: quality)
-
-            while let currentData = data, currentData.count > maxBytes, quality > 0.1 {
-                quality -= 0.15
-                data = candidate.jpegData(compressionQuality: quality)
-            }
-
-            if let data, data.count <= maxBytes {
-                return data
-            }
-
-            // Still too big even at low quality; shrink the dimensions and try again.
-            let smallerSize = CGSize(width: candidate.size.width * 0.7, height: candidate.size.height * 0.7)
-            guard smallerSize.width > 50, smallerSize.height > 50, let resized = candidate.resized(to: smallerSize) else {
-                return data
-            }
-
-            candidate = resized
-            quality = 0.8
-        }
-
-        return candidate.jpegData(compressionQuality: 0.3)
-    }
-
     // MARK: - Header
     private var header: some View {
         VStack(spacing: 16) {
             ZStack {
                 Text("Profile")
-                    .font(TransiumFont.display(27, weight: .bold))
+                    .font(TransiumFont.display(32, weight: .bold))
                     .foregroundColor(.white)
 
                 HStack {
@@ -362,12 +401,13 @@ struct ProfileScreen: View {
                             .frame(width: 44, height: 44)
                             .background(Color.white)
                             .clipShape(Circle())
+                            .shadow(color: Color.black.opacity(0.12), radius: 6, y: 3)
                     }
                     Spacer()
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 8)
+            .padding(.top, 24)
 
             ZStack(alignment: .bottomTrailing) {
                 avatarView
@@ -519,38 +559,61 @@ struct ProfileScreen: View {
                     .font(TransiumFont.body(17, weight: .bold))
                     .foregroundColor(.black)
                 Spacer()
-                Text("\(badges.count) Badges")
+                Text("\(earnedBadges.count) Badges")
                     .font(TransiumFont.body(17, weight: .bold))
                     .foregroundColor(TransiumColor.primaryBlue)
             }
 
-            LazyVGrid(
-                columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
-                spacing: 10
-            ) {
-                ForEach(badges) { badge in
-                    VStack(spacing: 8) {
-                        Image(badge.imageName)
-                            .resizable()
-                            .scaledToFill()
-                            .aspectRatio(1, contentMode: .fill)   // square, bukan .infinity
-                            .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .clipped()
-                            .onTapGesture {
-                                // optional: open badge detail
+            if isLoadingBadges && earnedBadges.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+            } else if earnedBadges.isEmpty {
+                Text("No badges yet — complete a quest to earn your first one.")
+                    .font(TransiumFont.body(14))
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+            } else {
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                    spacing: 10
+                ) {
+                    ForEach(Array(earnedBadges.enumerated()), id: \.element.id) { index, badge in
+                        VStack(spacing: 8) {
+                            TransiumStampCard(
+                                size: 92,
+                                tilt: .degrees(index.isMultiple(of: 2) ? -3 : 3),
+                                variant: stampVariant(forBadgeAt: index)
+                            ) {
+                                AsyncImage(url: badge.badgeImageUrl.flatMap(resolvedImageURL)) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                    default:
+                                        Image(systemName: "rosette")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .padding(10)
+                                            .foregroundColor(.white.opacity(0.85))
+                                    }
+                                }
                             }
+                            .frame(maxWidth: .infinity)
 
-                        VStack(spacing: 0) {
-                            Text(badge.title)
-                                .font(TransiumFont.body(14, weight: .semibold))
-                                .foregroundColor(.black)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                            VStack(spacing: 0) {
+                                Text(badge.badgeName)
+                                    .font(TransiumFont.body(14, weight: .semibold))
+                                    .foregroundColor(.black)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
 
-                            Text(badge.date)
-                                .font(TransiumFont.body(11).weight(.medium))
-                                .foregroundColor(.gray)
+                                Text(Self.badgeDateFormatter.string(from: badge.earnedAt))
+                                    .font(TransiumFont.body(11).weight(.medium))
+                                    .foregroundColor(.gray)
+                            }
                         }
                     }
                 }
@@ -565,69 +628,110 @@ struct ProfileScreen: View {
                 .font(TransiumFont.body(17, weight: .semibold))
                 .foregroundColor(.black)
 
-            LazyVGrid(
-                columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
-                spacing: 10
-            ) {
-                ForEach(galleryPhotos) { photo in
-                    ZStack(alignment: .bottomTrailing) {
-                        Image(photo.imageName)
-                            .resizable()
-                            .scaledToFill()
+            if isLoadingGallery && galleryPhotos.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+            } else if galleryPhotos.isEmpty {
+                Text("No photos yet — they'll show up here once you snap some on a quest.")
+                    .font(TransiumFont.body(14))
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+            } else {
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
+                    spacing: 10
+                ) {
+                    ForEach(galleryPhotos) { photo in
+                        ZStack(alignment: .bottomTrailing) {
+                            AsyncImage(url: resolvedImageURL(photo.url)) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                case .empty:
+                                    Rectangle().fill(Color(.systemGray5))
+                                default:
+                                    Rectangle().fill(Color(.systemGray4))
+                                }
+                            }
                             .frame(height: 145)
                             .frame(maxWidth: .infinity)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .clipped()
                             .onTapGesture {
                                 viewingPhoto = photo
                             }
 
-                        Button {
-                            downloadPhoto(photo)
-                        } label: {
-                            Image(systemName: "arrow.down.to.line")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
-                                .padding(6)
-                                .background(Color.black.opacity(0.35))
-                                .clipShape(Circle())
+                            Button {
+                                Task { await downloadPhoto(photo) }
+                            } label: {
+                                Image(systemName: "arrow.down.to.line")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(6)
+                                    .background(Color.black.opacity(0.35))
+                                    .clipShape(Circle())
+                            }
+                            .padding(6)
                         }
-                        .padding(6)
                     }
+                }
+
+                if galleryPagination?.hasNextPage == true {
+                    Button {
+                        Task { await loadMoreGalleryIfNeeded() }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isLoadingMoreGallery {
+                                ProgressView()
+                            } else {
+                                Text("Load More")
+                                    .font(TransiumFont.body(14, weight: .semibold))
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                    }
+                    .disabled(isLoadingMoreGallery)
                 }
             }
         }
     }
 
-    private func toggleLike(for photo: GalleryPhoto) {
-        if likedPhotoIDs.contains(photo.id) {
-            likedPhotoIDs.remove(photo.id)
-        } else {
-            likedPhotoIDs.insert(photo.id)
-        }
-    }
-
     // MARK: - Photo Download
 
-    /// Saves a gallery photo (by asset name) into the user's Photos library.
-    private func downloadPhoto(_ photo: GalleryPhoto) {
-        guard let uiImage = UIImage(named: photo.imageName) else {
-            saveResultMessage = "Couldn't find that photo to download."
-            showSaveResultAlert = true
-            return
-        }
-
+    /// Downloads a gallery photo's raw bytes via `GET /private/gallery/{id}` and saves it into
+    /// the user's Photos library.
+    private func downloadPhoto(_ photo: GalleryItem) async {
         isSavingPhoto = true
-        ImageSaver { success, error in
-            isSavingPhoto = false
-            if success {
-                saveResultMessage = "Saved to your Photos."
-            } else if let error {
-                saveResultMessage = "Couldn't save the photo: \(error.localizedDescription)"
-            } else {
-                saveResultMessage = "Couldn't save the photo. Check that Transium has permission to add photos in Settings."
+        defer { isSavingPhoto = false }
+
+        do {
+            let data = try await GalleryService.shared.downloadPhoto(id: photo.id)
+            guard let uiImage = UIImage(data: data) else {
+                saveResultMessage = "Couldn't process that photo."
+                showSaveResultAlert = true
+                return
             }
+
+            ImageSaver { success, error in
+                if success {
+                    saveResultMessage = "Saved to your Photos."
+                } else if let error {
+                    saveResultMessage = "Couldn't save the photo: \(error.localizedDescription)"
+                } else {
+                    saveResultMessage = "Couldn't save the photo. Check that Transium has permission to add photos in Settings."
+                }
+                showSaveResultAlert = true
+            }.save(uiImage)
+        } catch {
+            saveResultMessage = "Couldn't download that photo. Please try again."
             showSaveResultAlert = true
-        }.save(uiImage)
+        }
     }
 
     // MARK: - Edit Account Sheet
@@ -741,7 +845,7 @@ struct ProfileScreen: View {
 // MARK: - Photo Viewer
 
 private struct PhotoViewer: View {
-    let imageName: String
+    let imageURL: URL?
     let isSaving: Bool
     let onClose: () -> Void
     let onDownload: () -> Void
@@ -750,10 +854,22 @@ private struct PhotoViewer: View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
 
-            Image(imageName)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            AsyncImage(url: imageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                case .empty:
+                    ProgressView()
+                        .tint(.white)
+                default:
+                    Image(systemName: "photo")
+                        .font(.system(size: 40, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             HStack {
                 Button(action: onDownload) {
@@ -817,11 +933,32 @@ final class ImageSaver: NSObject {
 // MARK: - Image Resize Helper
 
 extension UIImage {
-    func resized(to targetSize: CGSize) -> UIImage? {
+    nonisolated func resized(to targetSize: CGSize) -> UIImage? {
         let renderer = UIGraphicsImageRenderer(size: targetSize)
         return renderer.image { _ in
             draw(in: CGRect(origin: .zero, size: targetSize))
         }
+    }
+}
+
+// MARK: - Color Interpolation Helper
+
+extension Color {
+    /// Linear RGBA interpolation toward `other`, `fraction` clamped to 0...1 — used to build a
+    /// smooth color gradient across a collection (e.g. the badges grid's oldest-to-newest
+    /// postage frame tint) rather than picking from a fixed palette.
+    func interpolated(to other: Color, fraction: CGFloat) -> Color {
+        let t = min(max(fraction, 0), 1)
+        var (r1, g1, b1, a1): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        var (r2, g2, b2, a2): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        UIColor(self).getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        UIColor(other).getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        return Color(
+            red: r1 + (r2 - r1) * t,
+            green: g1 + (g2 - g1) * t,
+            blue: b1 + (b2 - b1) * t,
+            opacity: a1 + (a2 - a1) * t
+        )
     }
 }
 

@@ -173,10 +173,12 @@ struct AuthScreen: View {
                 .refreshStoredAppleCredentialState(using: appleSignInService)
 
         } catch AuthError.credentialRevoked, AuthError.credentialNotFound, AuthError.credentialTransferred {
-            AppToastCenter.shared.showWarning(
-                title: "Session needs refresh",
-                message: "Please sign in again with Apple."
-            )
+            if showErrors {
+                AppToastCenter.shared.showWarning(
+                    title: "Session needs refresh",
+                    message: "Please sign in again with Apple."
+                )
+            }
         } catch {
             if showErrors {
                 AppToastCenter.shared.showError(
