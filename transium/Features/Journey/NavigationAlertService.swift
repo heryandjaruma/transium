@@ -1,16 +1,12 @@
-//
-//  NavigationAlertService.swift
-//  transium
-//
-
+import AudioToolbox
 import CoreLocation
 import Foundation
 import UIKit
 import UserNotifications
 
-/// Playful haptic feedback patterns for transit and navigation milestones.
+/// Playful haptic and audio feedback patterns for transit and navigation milestones.
 public enum TransiumHapticPattern: Sendable {
-    /// Playful light double tap when approaching a stop or waypoint.
+    /// Playful light tap when approaching a stop or waypoint.
     case approaching
     /// Celebratory success chime when reaching/arriving at a stop or checkpoint.
     case arrived
@@ -26,19 +22,11 @@ public enum TransiumHapticPattern: Sendable {
             let light = UIImpactFeedbackGenerator(style: .light)
             light.prepare()
             light.impactOccurred()
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(110))
-                let medium = UIImpactFeedbackGenerator(style: .medium)
-                medium.impactOccurred()
-            }
+            AudioServicesPlaySystemSound(1057)
 
         case .arrived:
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(130))
-                let medium = UIImpactFeedbackGenerator(style: .medium)
-                medium.impactOccurred()
-            }
+            AudioServicesPlaySystemSound(1003)
 
         case .passingStop:
             let soft = UIImpactFeedbackGenerator(style: .soft)
@@ -49,17 +37,12 @@ public enum TransiumHapticPattern: Sendable {
             let rigid = UIImpactFeedbackGenerator(style: .rigid)
             rigid.prepare()
             rigid.impactOccurred()
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(90))
-                let second = UIImpactFeedbackGenerator(style: .medium)
-                second.impactOccurred()
-            }
+            AudioServicesPlaySystemSound(1075)
         }
     }
 }
 
-/// Coordinates in-app toasts (when foreground) and phone local notifications (when background),
-/// paired with playful haptics for proximity, arrivals, and passing bus stops during Go Mode.
+/// Coordinates sensory haptics and sounds when foregrounded, and phone local notifications when backgrounded.
 @MainActor
 public final class NavigationAlertService {
     public static let shared = NavigationAlertService()
@@ -74,7 +57,7 @@ public final class NavigationAlertService {
         firedAlertKeys.removeAll()
     }
 
-    /// Dispatches an alert using in-app toast + haptic when foregrounded, or local push notification when backgrounded.
+    /// Dispatches audio-haptics when foregrounded, or native local push notifications when backgrounded.
     public func dispatchAlert(
         key: String,
         title: String,
@@ -87,11 +70,10 @@ public final class NavigationAlertService {
         let isAppActive = UIApplication.shared.applicationState == .active
 
         if isAppActive {
-            // Foreground: Playful haptic feedback + in-app toast
+            // Foreground: Sensory haptics + pleasant system sounds (no intrusive toasts)
             haptic.play()
-            AppToastCenter.shared.showSuccess(title: title, message: message)
         } else {
-            // Background: System local notification banner + sound
+            // Background: System local notification banner + system sound
             PushNotificationManager.shared.postLocalNotification(
                 title: title,
                 body: message,
