@@ -116,7 +116,7 @@ struct HomeScreen: View {
     private var mapLayer: some View {
         LocalBaliMapView(
             displayLocation: vm.resolvedCurrentLocation,
-            markerHeading: vm.previewLocation == nil ? vm.locationStore.currentHeading : 22,
+            markerHeading: vm.previewLocation == nil ? vm.currentHeading : 22,
             centerRequestID: vm.mapCenterRequestID,
             activeJourney: vm.activeJourney,
             checkpoints: vm.goGeofences,

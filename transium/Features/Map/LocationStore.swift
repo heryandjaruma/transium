@@ -22,8 +22,9 @@ final class LocationStore: NSObject, ObservableObject {
 
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
-        locationManager.distanceFilter = 5.0
-        locationManager.headingFilter = 3.0
+        locationManager.distanceFilter = kCLDistanceFilterNone
+        locationManager.headingFilter = kCLHeadingFilterNone
+        locationManager.headingOrientation = .portrait
         
         if authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse {
             locationManager.startUpdatingLocation()
@@ -69,15 +70,9 @@ extension LocationStore: CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else {
-            return
-        }
+        guard let location = locations.last else { return }
 
         Task { @MainActor in
-            if let current = self.currentLocation {
-                let distance = current.distance(from: location)
-                guard distance >= 5.0 else { return }
-            }
             self.currentLocation = location
         }
     }
@@ -86,25 +81,11 @@ extension LocationStore: CLLocationManagerDelegate {
         guard newHeading.headingAccuracy >= 0 else { return }
         let heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
         Task { @MainActor in
-            var diff = (heading - currentHeading).truncatingRemainder(dividingBy: 360)
-            if diff > 180 { diff -= 360 }
-            if diff < -180 { diff += 360 }
-            
-            // Ignore small compass jitter (< 2.5 degrees)
-            guard abs(diff) >= 2.5 else { return }
-            
-            var target = currentHeading + diff
-            if target < 0 { target += 360 }
-            currentHeading = target.truncatingRemainder(dividingBy: 360)
+            self.currentHeading = heading
         }
     }
-
+    
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        Task { @MainActor in
-            AppToastCenter.shared.showWarning(
-                title: "Location not found",
-                message: "Move to an open area or try again in a moment."
-            )
-        }
+        print("Location manager failed with error: \(error.localizedDescription)")
     }
 }

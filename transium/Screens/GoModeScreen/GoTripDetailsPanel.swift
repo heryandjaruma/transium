@@ -122,10 +122,6 @@ struct GoTripDetailsPanel: View {
             .padding(.top, 20)
             .padding(.bottom, 12)
 
-//                leaveArriveBar
-//                    .padding(.horizontal, 20)
-//                    .padding(.bottom, 16)
-
             ScrollView(.vertical, showsIndicators: false) {
                 timeline
                     .padding(.horizontal, 20)

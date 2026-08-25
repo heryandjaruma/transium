@@ -112,7 +112,9 @@ struct LocalBaliMapView: UIViewRepresentable {
         context.coordinator.syncUserAnnotation(
             on: mapView,
             location: displayLocation,
-            heading: markerHeading
+            heading: markerHeading,
+            isGoMode: isGoMode,
+            activeJourney: activeJourney
         )
         
         context.coordinator.syncRouteOverlays(
@@ -152,12 +154,23 @@ struct LocalBaliMapView: UIViewRepresentable {
 
         let isExplicitFocusRequest = context.coordinator.lastCenterRequestID != centerRequestID
 
-        // Entering Go Mode always starts in third-person follow, regardless of whatever
-        // free-wander state (see below) was left over from an earlier trip.
+        let didExitGoMode = !isGoMode && context.coordinator.wasGoMode
         if isGoMode, !context.coordinator.wasGoMode {
             context.coordinator.isFollowing = true
         }
         context.coordinator.wasGoMode = isGoMode
+
+        if didExitGoMode {
+            context.coordinator.isFollowing = false
+            let targetCamera = MLNMapCamera(
+                lookingAtCenter: displayLocation.coordinate,
+                altitude: 1600,
+                pitch: 0,
+                heading: 0
+            )
+            mapView.setCamera(targetCamera, animated: true)
+            return
+        }
 
         if isGoMode {
             context.coordinator.lastCenterRequestID = centerRequestID
@@ -196,6 +209,9 @@ struct LocalBaliMapView: UIViewRepresentable {
         var roadPolylineCache: [String: [CLLocationCoordinate2D]] = [:]
         private let userAnnotation = PreviewUserPointAnnotation()
         private var lastRenderedLocation: CLLocation?
+        private var lastRenderedCoordinate: CLLocationCoordinate2D?
+        private var lastRenderedHeading: CLLocationDirection?
+        private weak var activeUserAnnotationView: PreviewUserAnnotationView?
 
         // MARK: - Pin-drop (search sheet)
 
@@ -350,46 +366,107 @@ struct LocalBaliMapView: UIViewRepresentable {
             return (radiansBearing * 180 / .pi + 360).truncatingRemainder(dividingBy: 360)
         }
 
+        func findActiveBusSegmentPolyline(
+            location: CLLocationCoordinate2D,
+            activeJourney: JourneyResult?
+        ) -> [CLLocationCoordinate2D]? {
+            guard let activeJourney else { return nil }
+            let userLoc = CLLocation(latitude: location.latitude, longitude: location.longitude)
+            
+            var bestPolyline: [CLLocationCoordinate2D]?
+            var minDistance: CLLocationDistance = .infinity
+            
+            for segment in activeJourney.segments where segment.type == "bus" {
+                let cacheKey = "\(segment.type)-\(segment.id)"
+                let poly = roadPolylineCache[cacheKey] ?? parseCoordinates(from: segment.geometry)
+                guard poly.count >= 2 else { continue }
+                
+                for i in 0..<(poly.count - 1) {
+                    let proj = RoadSnapper.project(point: location, ontoSegmentA: poly[i], b: poly[i + 1])
+                    let dist = userLoc.distance(from: CLLocation(latitude: proj.latitude, longitude: proj.longitude))
+                    if dist < minDistance {
+                        minDistance = dist
+                        bestPolyline = poly
+                    }
+                }
+            }
+            
+            if minDistance <= 100.0 {
+                return bestPolyline
+            }
+            return nil
+        }
+
         func syncUserAnnotation(
             on mapView: MLNMapView,
             location: CLLocation?,
-            heading: CLLocationDirection
+            heading: CLLocationDirection,
+            isGoMode: Bool = false,
+            activeJourney: JourneyResult? = nil
         ) {
             guard let location else {
                 if mapView.annotations?.contains(where: { $0 === userAnnotation }) == true {
                     mapView.removeAnnotation(userAnnotation)
                 }
                 lastRenderedLocation = nil
+                lastRenderedCoordinate = nil
+                lastRenderedHeading = nil
                 return
             }
+            
+            let rawCoord = location.coordinate
+            let extraPolylines = Array(roadPolylineCache.values)
+            let snappedCoord = RoadSnapper.snapToRoad(
+                coordinate: rawCoord,
+                mapView: mapView,
+                extraRoadPolylines: extraPolylines
+            )
 
-            if let previousLoc = lastRenderedLocation {
-                let distance = previousLoc.distance(from: location)
-                if distance < 5.0 {
-                    // Update only compass heading smoothly, avoid coordinate jitter
-                    userAnnotation.heading = heading
-                    if let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView {
-                        userView.updateHeading(heading, animated: true)
-                    }
-                    return
-                }
+            let shouldUpdateCoord: Bool
+            if let lastCoord = lastRenderedCoordinate {
+                let dLat = abs(lastCoord.latitude - snappedCoord.latitude)
+                let dLng = abs(lastCoord.longitude - snappedCoord.longitude)
+                shouldUpdateCoord = dLat > 0.000003 || dLng > 0.000003
+            } else {
+                shouldUpdateCoord = true
             }
 
-            lastRenderedLocation = location
-            userAnnotation.heading = heading
+            if shouldUpdateCoord {
+                userAnnotation.coordinate = snappedCoord
+                lastRenderedCoordinate = snappedCoord
+            }
+            
+            // When in bus (on active bus segment or within bus corridor), orient the indicator
+            // strictly to the direction of the bus/road forward, not the device's phone orientation
+            var effectiveHeading = heading
+            if let busPolyline = findActiveBusSegmentPolyline(location: snappedCoord, activeJourney: activeJourney) {
+                if let ahead = pointAhead(of: CLLocation(latitude: snappedCoord.latitude, longitude: snappedCoord.longitude), on: busPolyline, lookahead: Self.headingLookaheadMeters) {
+                    effectiveHeading = bearing(from: snappedCoord, to: ahead)
+                }
+            }
+            
+            userAnnotation.heading = effectiveHeading
 
             if mapView.annotations?.contains(where: { $0 === userAnnotation }) != true {
-                userAnnotation.coordinate = location.coordinate
                 mapView.addAnnotation(userAnnotation)
                 syncMarkerTilt(on: mapView)
-            } else {
-                UIView.animate(withDuration: 0.6, delay: 0, options: [.beginFromCurrentState, .curveEaseInOut]) {
-                    self.userAnnotation.coordinate = location.coordinate
-                }
-                if let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView {
-                    userView.updateHeading(heading, animated: true)
-                }
             }
+            
+            let userView = (mapView.view(for: userAnnotation) as? PreviewUserAnnotationView) ?? activeUserAnnotationView
+            if let userView {
+                let shouldUpdateHeading: Bool
+                if let lastHeading = lastRenderedHeading {
+                    shouldUpdateHeading = abs(lastHeading - effectiveHeading) > 0.4
+                } else {
+                    shouldUpdateHeading = true
+                }
+                if shouldUpdateHeading {
+                    userView.updateHeading(effectiveHeading, animated: true)
+                    lastRenderedHeading = effectiveHeading
+                }
+                userView.updateTilt(pitch: mapView.camera.pitch, animated: true)
+            }
+            lastRenderedLocation = location
         }
         
         func syncRouteOverlays(
@@ -456,9 +533,6 @@ struct LocalBaliMapView: UIViewRepresentable {
             
             // 3. Add segment route lines and compact stop annotations
             for (index, segment) in activeJourney.segments.enumerated() {
-                // Mission entries are a quest step, not a travel leg — no from/to/geometry to
-                // draw a route line for, so they're skipped on the map (they still get their
-                // own card in the trip details panel).
                 guard let from = segment.from, let to = segment.to else { continue }
 
                 let sourceId = "route-source-\(index)"
@@ -466,33 +540,7 @@ struct LocalBaliMapView: UIViewRepresentable {
                 let fromCoord = CLLocationCoordinate2D(latitude: from.lat, longitude: from.lng)
                 let toCoord = CLLocationCoordinate2D(latitude: to.lat, longitude: to.lng)
 
-                if segment.type == "bus" {
-                    // Add compact stop annotations for boarding, intermediate, alighting stops
-                    if let stops = segment.stops, !stops.isEmpty {
-                        for (stopIndex, stop) in stops.enumerated() {
-                            let coord = CLLocationCoordinate2D(latitude: stop.lat, longitude: stop.lng)
-                            let key = String(format: "%.5f,%.5f", stop.lat, stop.lng)
-                            if !addedStopCoords.contains(key) {
-                                addedStopCoords.insert(key)
-                                let pointType: RoutePointType = (stopIndex == 0) ? .boarding : ((stopIndex == stops.count - 1) ? .alighting : .intermediate)
-                                mapView.addAnnotation(RoutePointAnnotation(coordinate: coord, type: pointType, title: stop.name, subtitle: segment.routeRef, routeColor: busColor))
-                            }
-                        }
-                    } else {
-                        let boardKey = String(format: "%.5f,%.5f", from.lat, from.lng)
-                        if !addedStopCoords.contains(boardKey) {
-                            addedStopCoords.insert(boardKey)
-                            mapView.addAnnotation(RoutePointAnnotation(coordinate: fromCoord, type: .boarding, title: from.name, subtitle: segment.routeRef, routeColor: busColor))
-                        }
-                        let alightKey = String(format: "%.5f,%.5f", to.lat, to.lng)
-                        if !addedStopCoords.contains(alightKey) {
-                            addedStopCoords.insert(alightKey)
-                            mapView.addAnnotation(RoutePointAnnotation(coordinate: toCoord, type: .alighting, title: to.name, subtitle: segment.routeRef, routeColor: busColor))
-                        }
-                    }
-                }
-
-                // Get road-following polyline coordinates
+                // Get road-following polyline coordinates first
                 let cacheKey = "\(segment.type)-\(segment.id)"
                 var coords: [CLLocationCoordinate2D] = []
                 
@@ -530,6 +578,35 @@ struct LocalBaliMapView: UIViewRepresentable {
                                     source.shape = MLNPolylineFeature(coordinates: &pts, count: UInt(pts.count))
                                 }
                             }
+                        }
+                    }
+                }
+
+                // Add compact stop annotations snapped EXACTLY inside the active route polyline
+                if segment.type == "bus" {
+                    if let stops = segment.stops, !stops.isEmpty {
+                        for (stopIndex, stop) in stops.enumerated() {
+                            let rawCoord = CLLocationCoordinate2D(latitude: stop.lat, longitude: stop.lng)
+                            let snappedCoord = RoadSnapper.snapToPolyline(coordinate: rawCoord, polyline: coords)
+                            let key = String(format: "%.5f,%.5f", snappedCoord.latitude, snappedCoord.longitude)
+                            if !addedStopCoords.contains(key) {
+                                addedStopCoords.insert(key)
+                                let pointType: RoutePointType = (stopIndex == 0) ? .boarding : ((stopIndex == stops.count - 1) ? .alighting : .intermediate)
+                                mapView.addAnnotation(RoutePointAnnotation(coordinate: snappedCoord, type: pointType, title: stop.name, subtitle: segment.routeRef, routeColor: busColor))
+                            }
+                        }
+                    } else {
+                        let snappedFrom = RoadSnapper.snapToPolyline(coordinate: fromCoord, polyline: coords)
+                        let boardKey = String(format: "%.5f,%.5f", snappedFrom.latitude, snappedFrom.longitude)
+                        if !addedStopCoords.contains(boardKey) {
+                            addedStopCoords.insert(boardKey)
+                            mapView.addAnnotation(RoutePointAnnotation(coordinate: snappedFrom, type: .boarding, title: from.name, subtitle: segment.routeRef, routeColor: busColor))
+                        }
+                        let snappedTo = RoadSnapper.snapToPolyline(coordinate: toCoord, polyline: coords)
+                        let alightKey = String(format: "%.5f,%.5f", snappedTo.latitude, snappedTo.longitude)
+                        if !addedStopCoords.contains(alightKey) {
+                            addedStopCoords.insert(alightKey)
+                            mapView.addAnnotation(RoutePointAnnotation(coordinate: snappedTo, type: .alighting, title: to.name, subtitle: segment.routeRef, routeColor: busColor))
                         }
                     }
                 }
@@ -752,24 +829,7 @@ struct LocalBaliMapView: UIViewRepresentable {
         }
         
         func resolveRouteColor(routeColor: String?, routeRef: String?) -> UIColor {
-            if let colorHex = routeColor?.trimmingCharacters(in: .whitespacesAndNewlines), !colorHex.isEmpty {
-                return parseColor(from: colorHex)
-            }
-            guard let ref = routeRef?.trimmingCharacters(in: .whitespacesAndNewlines), !ref.isEmpty else {
-                return UIColor(red: 0.19, green: 0.43, blue: 0.91, alpha: 1.0)
-            }
-            let baseRef = ref.components(separatedBy: "-").first?.uppercased() ?? ref.uppercased()
-            switch baseRef {
-            case "K1B": return parseColor(from: "#0072B2")
-            case "K2B": return parseColor(from: "#0073B2")
-            case "K3B": return parseColor(from: "#164C64")
-            case "K4B": return parseColor(from: "#40B0A6")
-            case "K5B": return parseColor(from: "#E69F00")
-            case "K6B": return parseColor(from: "#57B4E9")
-            case "I1":  return parseColor(from: "#05ACC1")
-            case "TS1": return parseColor(from: "#019E73")
-            default:    return parseColor(from: ref)
-            }
+            TransiumTransitColor.uiColor(for: routeRef, hex: routeColor)
         }
         
         func mapView(_ mapView: MLNMapView, viewFor annotation: any MLNAnnotation) -> MLNAnnotationView? {
@@ -779,6 +839,7 @@ struct LocalBaliMapView: UIViewRepresentable {
                 ?? PreviewUserAnnotationView(reuseIdentifier: reuseIdentifier)
                 view.configure(heading: userAnnotation.heading)
                 view.layer.zPosition = 1000
+                self.activeUserAnnotationView = view
                 return view
             }
             
@@ -1061,13 +1122,10 @@ struct LocalBaliMapView: UIViewRepresentable {
             if delta > .pi { delta -= 2 * .pi }
             if delta < -.pi { delta += 2 * .pi }
             
-            // Ignore micro-tremors under ~2 degrees (0.035 rad)
-            if abs(delta) < 0.035 { return }
-            
             currentHeadingAngle += delta
             if animated {
                 UIView.animate(
-                    withDuration: 0.35,
+                    withDuration: 0.2,
                     delay: 0,
                     options: [.beginFromCurrentState, .curveEaseOut, .allowUserInteraction]
                 ) {

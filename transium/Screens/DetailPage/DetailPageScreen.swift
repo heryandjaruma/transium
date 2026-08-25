@@ -173,10 +173,10 @@ struct DetailPlaceScreen: View {
                 TabView(selection: $selectedImageIndex) {
                     if !headerImageUrls.isEmpty {
                         ForEach(Array(headerImageUrls.enumerated()), id: \.offset) { index, urlString in
-                            let fullUrl = urlString.hasPrefix("http") ? urlString : "https://transium-api.heryandjaruma.workers.dev\(urlString)"
+                            let resolvedUrl = APIConfiguration.resolveURL(urlString)
                             
                             GeometryReader { proxy in
-                                AsyncImage(url: URL(string: fullUrl)) { phase in
+                                AsyncImage(url: resolvedUrl) { phase in
                                     switch phase {
                                     case .success(let image):
                                         image

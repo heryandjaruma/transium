@@ -13,6 +13,18 @@
 
 ## 2. Go Mode Architecture
 
+### Native Sheet & UI Presentation (`GoComponentMode`)
+- Presented as a native SwiftUI `.sheet` with `presentationDetents([.height(110), .fraction(0.55)])` and `presentationBackgroundInteraction(.enabled)`.
+- Map and navigation controls remain fully interactive underneath while the user drags between the collapsed "Trip Details" peek and the full itinerary timeline.
+
+### Real-Time `stopsLeft` Count
+- While on an active bus leg, `GoComponentMode` calculates the remaining stops count in real time based on the user's distance and passed intermediate bus stop checkpoints.
+
+### Road Snapping & Bus Heading Alignment (`RoadSnapper`)
+- Snaps user GPS location to active route polylines and vector road tile layers within $\le 20\text{m}$.
+- Snaps all intermediate, boarding, and alighting stop circles directly onto the centerline of the active route polyline.
+- Locks marker cone and camera heading to the forward road geometry while on a bus to avoid compass jitters.
+
 ### Geofence Lifecycle
 - `JourneyGeofenceMonitor` manages dynamic CoreLocation circular regions based on `step.lat`, `step.lng`, and `step.radiusMeters` (default ~69m).
 - When a user enters a geofenced area, `handleGeofenceEntered` triggers:

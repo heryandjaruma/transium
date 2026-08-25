@@ -18,4 +18,14 @@ public nonisolated enum APIConfiguration {
     public static var authBaseURL: URL {
         origin.appending(path: "api/auth")
     }
+
+    /// Resolves an absolute or relative image/media URL path against the API origin
+    public static func resolveURL(_ raw: String?) -> URL? {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+        if raw.hasPrefix("http://") || raw.hasPrefix("https://") {
+            return URL(string: raw)
+        }
+        let sanitized = raw.hasPrefix("/") ? String(raw.dropFirst()) : raw
+        return origin.appending(path: sanitized)
+    }
 }

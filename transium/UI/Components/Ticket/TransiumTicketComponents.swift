@@ -470,7 +470,7 @@ extension TransiumTicketCard where Stamp == TransiumStampCard<AnyView>, BodyCont
             TransiumStampCard(size: 104, tilt: .degrees(-4), variant: stampVariant) {
                 AnyView(
                     Group {
-                        if let imageUrl, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
+                        if let url = APIConfiguration.resolveURL(imageUrl) {
                             AsyncImage(url: url) { phase in
                                 switch phase {
                                 case .success(let img):

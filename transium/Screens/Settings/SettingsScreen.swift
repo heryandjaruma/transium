@@ -99,34 +99,41 @@ struct SettingsScreen: View {
     // MARK: - Language Card
     private var languageCard: some View {
         SettingsCard {
-            SettingsSectionLabel(icon: "translate", title: "Language")
+            SettingsSectionLabel(icon: "character.bubble.fill", title: "Language")
 
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 ForEach(Language.allCases, id: \.self) { language in
+                    let isSelected = selectedLanguage == language
                     Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             selectedLanguage = language
                         }
                     } label: {
                         HStack(spacing: 8) {
                             Text(language.flag)
-                                .font(.system(size: 18))
+                                .font(.system(size: 16))
                             Text(language.rawValue)
-                                .font(TransiumFont.body(15, weight: selectedLanguage == language ? .bold : .medium))
-                                .foregroundColor(selectedLanguage == language ? TransiumColor.primaryBlue : .white.opacity(0.85))
+                                .font(TransiumFont.body(14, weight: isSelected ? .bold : .semibold))
+                                .foregroundColor(isSelected ? TransiumColor.primaryBlue : .white.opacity(0.85))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(selectedLanguage == language ? Color.white : Color.white.opacity(0.12))
-                        .clipShape(Capsule())
-                        .shadow(color: selectedLanguage == language ? Color.black.opacity(0.1) : .clear, radius: 4, y: 2)
+                        .frame(height: 44)
+                        .background {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Color.white)
+                                    .shadow(color: Color.black.opacity(0.12), radius: 6, y: 2)
+                            }
+                        }
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(4)
-            .background(Color.black.opacity(0.15))
-            .clipShape(Capsule())
+            .background(Color.white.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
     }
 

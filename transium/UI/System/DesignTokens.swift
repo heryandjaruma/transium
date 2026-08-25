@@ -8,19 +8,27 @@ import SwiftUI
 enum TransiumAsset {
     enum Illustration {
         static let authHero = "hero"
-        static let onboardingExplore = "onboard-1"
-        static let onboardingAdventure = "onboard-2"
-        static let onboardingShare = "onboard-3"
+        static let onboardingExplore = "onboarding-explore"
+        static let onboardingAdventure = "onboarding-adventure"
+        static let onboardingShare = "onboarding-explore"
         
-        static let onboard3trophy = "onboard3trophy"
-        static let onboard3photo1 = "onboard3photo1"
-        static let onboard3photo2 = "onboard3photo2"
-        static let onboard3photo3 = "onboard3photo3"
+        static let onboardingTrophy = "onboarding-trophy"
+        static let onboardingStampMonkey = "onboarding-stamp-monkey"
+        static let onboardingStampTemple = "onboarding-stamp-temple"
+        static let onboardingStampStatue = "onboarding-stamp-statue"
         
-        static let permissionOnboarding = "Permission_onboarding"
+        // Aliases for compatibility
+        static let onboard3trophy = onboardingTrophy
+        static let onboard3photo1 = onboardingStampMonkey
+        static let onboard3photo2 = onboardingStampTemple
+        static let onboard3photo3 = onboardingStampStatue
+        
+        static let permissionOnboarding = "permission-onboarding"
         static let payment = "Payment"
-        static let sanur_beach = "sanur_beach"
-        static let ubud_forest = "ubud_forest"
+        static let sanurBeach = "sanur_beach"
+        static let sanur_beach = sanurBeach
+        static let ubudForest = "ubud_forest"
+        static let ubud_forest = ubudForest
         static let wow = "Wow"
     }
     
@@ -70,15 +78,15 @@ enum TransiumTransitColor {
         }
         let baseRef = ref.components(separatedBy: "-").first?.uppercased() ?? ref.uppercased()
         switch baseRef {
-        case "K1B": return parseHex("#0072B2")
-        case "K2B": return parseHex("#0073B2")
-        case "K3B": return parseHex("#164C64")
-        case "K4B": return parseHex("#40B0A6")
-        case "K5B": return parseHex("#E69F00")
-        case "K6B": return parseHex("#57B4E9")
-        case "I1":  return parseHex("#05ACC1")
-        case "TS1": return parseHex("#019E73")
-        default:    return parseHex("#0073B2")
+        case "K1B": return parseHex("#2563EB") // Royal Blue (Koridor 1)
+        case "K2B": return parseHex("#DC2626") // Coral Crimson Red (Koridor 2)
+        case "K3B": return parseHex("#0D9488") // Deep Teal (Koridor 3)
+        case "K4B": return parseHex("#7C3AED") // Purple Amethyst (Koridor 4)
+        case "K5B": return parseHex("#D97706") // Amber Gold (Koridor 5)
+        case "K6B": return parseHex("#0284C7") // Sky Blue (Koridor 6)
+        case "I1":  return parseHex("#05ACC1") // Turquoise Aqua
+        case "TS1": return parseHex("#019E73") // Emerald Jade
+        default:    return parseHex("#2563EB")
         }
     }
     

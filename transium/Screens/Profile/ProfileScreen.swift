@@ -218,10 +218,7 @@ struct ProfileScreen: View {
     }
 
     private func resolvedImageURL(_ raw: String) -> URL? {
-        if raw.hasPrefix("http") {
-            return URL(string: raw)
-        }
-        return APIConfiguration.origin.appending(path: raw.hasPrefix("/") ? String(raw.dropFirst()) : raw)
+        APIConfiguration.resolveURL(raw)
     }
 
     /// `earnedBadges` arrives most-recently-earned first, so this interpolates each badge's

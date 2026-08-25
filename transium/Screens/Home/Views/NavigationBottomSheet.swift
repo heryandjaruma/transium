@@ -14,7 +14,95 @@ struct NavigationBottomSheet: View {
                 RoundedRectangle(cornerRadius: 2.5)
                     .fill(Color(.systemGray3))
                     .frame(width: 38, height: 5)
-                    .padding(.vertical, 10)
+                    .padding(.top, 10)
+                    .padding(.bottom, 8)
+                
+                // Header summary row
+                HStack(alignment: .center, spacing: 0) {
+                    // Horizontal timeline chips
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Array(timelineChips.enumerated()), id: \.offset) { index, chip in
+                                if index > 0 {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundColor(.gray.opacity(0.45))
+                                }
+
+                                switch chip {
+                                case .walk(let minutes, let isMissionWalk):
+                                    if isMissionWalk {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "figure.walk")
+                                                .font(.system(size: 12, weight: .bold))
+                                            Text("\(minutes) m")
+                                                .font(TransiumFont.body(11, weight: .bold))
+                                        }
+                                        .foregroundColor(Color(red: 0.05, green: 0.62, blue: 0.42))
+                                        .padding(.horizontal, 8)
+                                        .frame(height: 28)
+                                        .background(Color(red: 0.05, green: 0.62, blue: 0.42).opacity(0.12))
+                                        .clipShape(Capsule())
+                                    } else {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "figure.walk")
+                                                .font(.system(size: 13, weight: .medium))
+                                            Text("\(minutes) m")
+                                                .font(TransiumFont.body(11, weight: .semibold))
+                                        }
+                                        .foregroundColor(.gray)
+                                        .padding(.horizontal, 6)
+                                        .frame(height: 28)
+                                    }
+
+                                case .bus(let routeRef):
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "bus.fill")
+                                            .font(.system(size: 11, weight: .semibold))
+                                        Text(routeRef.truncatedAtDash)
+                                            .font(TransiumFont.body(11, weight: .bold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .frame(height: 28)
+                                    .background(TransiumTransitColor.color(for: routeRef))
+                                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+                                case .missionPoint(let name, let number):
+                                    HStack(spacing: 4) {
+                                        Circle()
+                                            .fill(Color(red: 0.98, green: 0.72, blue: 0.12))
+                                            .frame(width: 6, height: 6)
+
+                                        Image(systemName: "flag.fill")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(Color(red: 0.85, green: 0.55, blue: 0.05))
+
+                                        Text(name.count > 16 ? "Mission \(number)" : name)
+                                            .font(TransiumFont.body(11, weight: .bold))
+                                            .foregroundColor(Color(red: 0.82, green: 0.52, blue: 0.04))
+                                            .lineLimit(1)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .frame(height: 28)
+                                    .background(Color(red: 0.98, green: 0.72, blue: 0.12).opacity(0.15))
+                                    .clipShape(Capsule())
+                                }
+                            }
+                        }
+                        .frame(height: 28)
+                    }
+                    
+                    Spacer(minLength: 12)
+                    
+                    // Formatted Duration (e.g. "1h 3m" or "25 min")
+                    Text(formattedDuration)
+                        .font(TransiumFont.body(20, weight: .black))
+                        .foregroundColor(.black)
+                        .fixedSize()
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, isCollapsed ? 14 : 10)
             }
             .contentShape(Rectangle())
             .onTapGesture {
@@ -22,132 +110,30 @@ struct NavigationBottomSheet: View {
                     isCollapsed.toggle()
                 }
             }
-            
-            // Header summary row
-            HStack(alignment: .center, spacing: 0) {
-                // Horizontal timeline chips
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(Array(timelineChips.enumerated()), id: \.offset) { index, chip in
-                            if index > 0 {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundColor(.gray.opacity(0.45))
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        let verticalAmount = value.translation.height
+                        if verticalAmount > 25 {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                isCollapsed = true
                             }
-
-                            switch chip {
-                            case .walk(let minutes, let isMissionWalk):
-                                if isMissionWalk {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "figure.walk")
-                                            .font(.system(size: 12, weight: .bold))
-                                        Text("\(minutes) m")
-                                            .font(TransiumFont.body(11, weight: .bold))
-                                    }
-                                    .foregroundColor(Color(red: 0.05, green: 0.62, blue: 0.42))
-                                    .padding(.horizontal, 8)
-                                    .frame(height: 28)
-                                    .background(Color(red: 0.05, green: 0.62, blue: 0.42).opacity(0.12))
-                                    .clipShape(Capsule())
-                                } else {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "figure.walk")
-                                            .font(.system(size: 13, weight: .medium))
-                                        Text("\(minutes) m")
-                                            .font(TransiumFont.body(11, weight: .semibold))
-                                    }
-                                    .foregroundColor(.gray)
-                                    .padding(.horizontal, 6)
-                                    .frame(height: 28)
-                                }
-
-                            case .bus(let routeRef):
-                                HStack(spacing: 5) {
-                                    Image(systemName: "bus.fill")
-                                        .font(.system(size: 11, weight: .semibold))
-                                    Text(routeRef.truncatedAtDash)
-                                        .font(TransiumFont.body(11, weight: .bold))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .frame(height: 28)
-                                .background(TransiumTransitColor.color(for: routeRef))
-                                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-
-                            case .missionPoint(let name, let number):
-                                HStack(spacing: 4) {
-                                    Circle()
-                                        .fill(Color(red: 0.98, green: 0.72, blue: 0.12))
-                                        .frame(width: 6, height: 6)
-
-                                    Image(systemName: "flag.fill")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundColor(Color(red: 0.85, green: 0.55, blue: 0.05))
-
-                                    Text(name.count > 16 ? "Mission \(number)" : name)
-                                        .font(TransiumFont.body(11, weight: .bold))
-                                        .foregroundColor(Color(red: 0.82, green: 0.52, blue: 0.04))
-                                        .lineLimit(1)
-                                }
-                                .padding(.horizontal, 8)
-                                .frame(height: 28)
-                                .background(Color(red: 0.98, green: 0.72, blue: 0.12).opacity(0.15))
-                                .clipShape(Capsule())
+                        } else if verticalAmount < -25 {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                isCollapsed = false
                             }
                         }
                     }
-                    .frame(height: 28)
-                }
-                
-                Spacer(minLength: 12)
-                
-                // Formatted Duration (e.g. "1h 3m" or "25 min")
-                Text(formattedDuration)
-                    .font(TransiumFont.body(20, weight: .black))
-                    .foregroundColor(.black)
-                    .fixedSize()
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 12)
-            
-//             Leave sub-header card
-//            HStack {
-//                Text("Leave within **1 min**")
-//                    .font(TransiumFont.body(14))
-//                    .foregroundColor(.black)
-//                
-//                Spacer()
-//                
-//                Text("Arrive **\(arrivalTime)**")
-//                    .font(TransiumFont.body(14))
-//                    .foregroundColor(.black)
-//            }
-//            .padding(.horizontal, 16)
-//            .frame(height: 46)
-//            .background(Color(.systemGray6))
-//            .cornerRadius(12)
-//            .padding(.horizontal, 20)
-//            .padding(.bottom, isCollapsed ? 12 : 16)
+            )
             
             // Scrollable detailed steps timeline (collapsible)
             if !isCollapsed {
-                ScrollView(.vertical, showsIndicators: false) {
+                ScrollView(.vertical, showsIndicators: true) {
                     StepTimelineView(journey: journey)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 28)
                 }
                 .frame(maxHeight: 330)
-                .mask(
-                    LinearGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: .black, location: 0.0),
-                            .init(color: .black, location: 0.86),
-                            .init(color: .clear, location: 1.0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }

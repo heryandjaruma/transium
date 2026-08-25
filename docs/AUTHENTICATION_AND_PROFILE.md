@@ -115,7 +115,22 @@ Uploads a user avatar image via multipart form-data.
 
 ---
 
-## 5. Security & Privacy Rules
+## 5. Badges & Adventure Moments Gallery
+
+### Badges (`BadgeService`)
+- Fetches all user badges via `GET /api/private/badge`.
+- Renders badges inside `TransiumStampCard` with dynamic vintage-to-fresh color gradient interpolation based on earn recency.
+- Dynamically loads remote badge art via `APIConfiguration.resolveURL(_:)`.
+
+### Moments Gallery (`GalleryService`)
+- Fetches paginated photos via `GET /api/private/gallery`.
+- Supports pagination with `loadMoreGalleryIfNeeded()`.
+- Supports photo download to device Photos library via `GET /api/private/gallery/{id}` using `ImageSaver`.
+- Auto-compresses uploaded photos before sending via `UIImage.compressedJPEGData(...)`.
+
+---
+
+## 6. Security & Privacy Rules
 
 1. **Client-Server Trust**: Client-provided user IDs are never trusted on the backend; all resource operations derive ownership strictly from the verified session token.
 2. **Token Sanitization**: Apple identifiers, raw identity tokens, and authorization codes are never surfaced in user-facing toasts or error alerts.

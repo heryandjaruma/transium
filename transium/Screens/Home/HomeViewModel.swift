@@ -76,9 +76,29 @@ final class HomeViewModel: ObservableObject {
     @Published var selectedArea: Area = Area(id: "7760985", name: "Benoa", lat: -8.73704, lng: 115.17570)
     @Published var bookmarkedQuestIds: Set<String> = []
     @Published var isTogglingBookmark: Bool = false
+    @Published var currentHeading: CLLocationDirection = 0
+    @Published var currentLocation: CLLocation? = nil
+    private var cancellables = Set<AnyCancellable>()
 
     private static let segmentArrivalProximityMeters: Double = 69
     private static let autoCameraGracePeriodSeconds: Double = 5
+
+    init() {
+        locationStore.$currentHeading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] heading in
+                self?.currentHeading = heading
+            }
+            .store(in: &cancellables)
+
+        locationStore.$currentLocation
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] loc in
+                self?.currentLocation = loc
+                self?.handleLocationChange()
+            }
+            .store(in: &cancellables)
+    }
 
     // MARK: - Lifecycle Setup
 
@@ -436,7 +456,12 @@ final class HomeViewModel: ObservableObject {
 
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
             showGoMode = false
-            showNavigationSheet = true
+            if cancelAttempt {
+                activeJourney = nil
+                showNavigationSheet = false
+            } else {
+                showNavigationSheet = true
+            }
             goCurrentSegmentIndex = 0
         }
         goStartDebugResult = nil

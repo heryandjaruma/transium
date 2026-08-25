@@ -256,8 +256,7 @@ struct QuestBadgePostageStack: View {
 
     @ViewBuilder
     private func badgeImageContent(imageSource: String) -> some View {
-        if imageSource.hasPrefix("http") || imageSource.hasPrefix("/"),
-           let url = URL(string: imageSource.hasPrefix("http") ? imageSource : "https://transium-api.heryandjaruma.workers.dev\(imageSource)") {
+        if let url = APIConfiguration.resolveURL(imageSource) {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
@@ -410,7 +409,7 @@ struct RecommendedQuestCard: View {
                     tilt: .degrees(0),
                     variant: .green
                 ) {
-                    if let imageUrl, !imageUrl.isEmpty, let url = URL(string: imageUrl.hasPrefix("http") ? imageUrl : "https://transium-api.heryandjaruma.workers.dev\(imageUrl)") {
+                    if let url = APIConfiguration.resolveURL(imageUrl) {
                         AsyncImage(url: url) { phase in
                             switch phase {
                             case .success(let image):

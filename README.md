@@ -21,10 +21,11 @@
 - 🎯 **Kelurahan & Quest Discovery**
   - Discover curated local quests grouped by Bali's kelurahan administrative boundaries.
   - Horizontal paging ticket rail with serrated postage cards, dynamic price tags, and authentic Bali artwork.
-  - Detail page with badge image carousels, photo galleries, and multi-badge stacked postage stamp indicators.
+  - Detail page with dynamic remote badge image carousels, photo galleries, and multi-badge stacked postage stamp indicators.
 
 - 🚶‍♂️ **Interactive Go Mode Navigation**
-  - Step-by-step turn-by-turn and transit alighting guidance.
+  - Step-by-step turn-by-turn and transit alighting guidance with real-time remaining `stopsLeft` count.
+  - 20m intelligent road-snapping (`RoadSnapper`) and automatic bus travel orientation alignment.
   - Live geofence-based mission check-in and photo keepsake capture at scenic Bali checkpoints.
   - Passive HealthKit integration calculating accurate steps and active calories burned during transit walks.
 
@@ -33,10 +34,11 @@
   - Rotated `-4°` postage stamp frames with authentic badge art, starburst effects, and confetti.
   - Shareable trip summary cards featuring distance, cost savings, calories, and step metrics.
 
-- 🔒 **Apple Authentication & Bookmarking**
+- 🔒 **Apple Authentication & Profile Moments**
   - Streamlined Sign in with Apple integration backed by Better Auth.
   - Secure Keychain storage for session tokens (`SessionTokenStore`).
-  - Live quest route bookmarking and synchronization.
+  - Adventure Moments photo gallery with on-device photo library saving (`GalleryService`).
+  - Earned badges collection with dynamic recency gradient frames (`BadgeService`).
 
 ---
 
@@ -46,7 +48,7 @@
 transium/
 ├── Backend/                 # Networking, BetterAuth contracts, Multipart uploaders, API configuration
 │   ├── APIClient.swift          # Core async/await URLSession engine with Bearer token injection
-│   ├── APIConfiguration.swift   # Base URLs and backend endpoint paths
+│   ├── APIConfiguration.swift   # Base URLs, endpoint paths, and dynamic media URL resolvers
 │   ├── APIErrors.swift          # Categorized network and server error mapping
 │   ├── AuthBackendContract.swift# Authentication DTOs and protocols
 │   ├── BetterAuthBackend.swift  # BetterAuth Apple exchange implementation
@@ -54,13 +56,15 @@ transium/
 │
 ├── Features/                # Domain models, services, and business logic
 │   ├── Auth/                    # SessionController, SessionTokenStore (Keychain), AppleSignInService
+│   ├── Badge/                   # User earned badges catalog and BadgeService
 │   ├── Bookmark/                # User quest bookmark models and services
-│   ├── Camera/                  # AVFoundation CameraModel and UIKit preview integration
+│   ├── Camera/                  # AVFoundation CameraModel, UIImage+Compression, and photo preview
 │   ├── Common/                  # Shared nonisolated models (LatLng, MediaAsset, Kelurahan, APIErrorResponse)
 │   ├── Device/                  # APNs device token registration and push testing
+│   ├── Gallery/                 # Moments gallery models, pagination, download, and GalleryService
 │   ├── Journey/                 # Door-to-door transit overview, multi-leg segments, and step models
 │   ├── Location/                # Geocoding, reverse-geocoding, and token resolvers
-│   ├── Map/                     # LocationStore, TransiumMapStyleFactory, RoadGeometryResolver (Actor)
+│   ├── Map/                     # LocationStore, TransiumMapStyleFactory, RoadSnapper, RoadGeometryResolver (Actor)
 │   ├── Profile/                 # User profile models, SwiftData LocalProfile, and profile service
 │   └── Quest/                   # Quest discovery catalogs, badge progression, and kelurahan grouping
 │

@@ -373,8 +373,95 @@ Finalizes an attempt once all steps are completed, awarding XP, badges, and reco
 
 ---
 
-## 6. Bookmark Endpoints
+## 6. Badge & Achievement Endpoints
+
+### `GET /api/private/badge`
+Lists all badges earned by the authenticated user across completed journeys and quests.
+
+- **Auth**: Required (`Bearer <token>`)
+
+#### Response (200 OK)
+```json
+{
+  "badges": [
+    {
+      "id": "badge_earned_1",
+      "badgeId": "b101",
+      "badgeName": "Sanoored",
+      "badgeCategory": "Explore",
+      "badgeImageUrl": "/media/system/badge/sanur.png",
+      "earnedAt": "2026-08-21T08:35:10Z"
+    }
+  ]
+}
+```
+
+---
+
+## 7. Adventure Moments & Gallery Endpoints
+
+### `GET /api/private/gallery`
+Lists paginated photos captured and uploaded by the user during quest checkpoints.
+
+- **Auth**: Required (`Bearer <token>`)
+- **Query Parameters**:
+  - `page` (int, default: 1): Page index.
+  - `limit` (int, default: 30): Items per page.
+
+#### Response (200 OK)
+```json
+{
+  "media": [
+    {
+      "id": "gal_01",
+      "url": "/media/user/usr_1029/moment_01.jpg",
+      "type": "image/jpeg",
+      "createdAt": "2026-08-21T08:15:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 30,
+    "total": 1,
+    "totalPages": 1,
+    "hasNextPage": false
+  }
+}
+```
+
+### `GET /api/private/gallery/{id}`
+Downloads raw binary photo data for saving to the user's Photos library.
+
+- **Auth**: Required (`Bearer <token>`)
+- **Response (200 OK)**: Raw binary image payload (`image/jpeg` or `image/png`).
+
+### `POST /api/private/gallery`
+Uploads a compressed checkpoint image captured on a journey.
+
+- **Auth**: Required (`Bearer <token>`)
+- **Content-Type**: `multipart/form-data`
+- **Form Data**:
+  - `file`: Compressed JPEG image binary (`UIImage.compressedJPEGData(maxDimension: 1600, targetBytes: 800_000)`).
+  - `questId` (optional): Quest ID.
+  - `stepId` (optional): Step ID.
+
+---
+
+## 8. Bookmark Endpoints
 
 - **`GET /api/private/bookmark`**: Lists all saved quest bookmarks for the authenticated user.
 - **`POST /api/private/bookmark/{questId}`**: Adds a quest to user bookmarks.
 - **`DELETE /api/private/bookmark/{questId}`**: Removes a quest from user bookmarks.
+
+---
+
+## 9. Dynamic Media & URL Resolution
+
+All relative media URLs (`/media/...`) and absolute CDN URLs returned by the API are resolved centrally through `APIConfiguration.resolveURL(_:)`:
+
+```swift
+if let url = APIConfiguration.resolveURL(urlString) {
+    AsyncImage(url: url) { ... }
+}
+```
+Static local asset names are only used as fallback placeholders when network connectivity is lost or an image is missing on the server.

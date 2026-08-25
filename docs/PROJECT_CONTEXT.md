@@ -25,13 +25,15 @@ transium/
 │
 ├── Features/                # Domain models, services, and business logic
 │   ├── Auth/                    # SessionController, SessionTokenStore (Keychain), AppleSignInService
+│   ├── Badge/                   # User earned badges catalog and BadgeService
 │   ├── Bookmark/                # User quest bookmark models and BookmarkService
-│   ├── Camera/                  # AVFoundation CameraModel and UIKit preview integration
+│   ├── Camera/                  # AVFoundation CameraModel, UIImage+Compression, and photo preview
 │   ├── Common/                  # Shared nonisolated models (LatLng, MediaAsset, Kelurahan, APIErrorResponse)
 │   ├── Device/                  # APNs device token registration and push testing
+│   ├── Gallery/                 # Moments gallery models, pagination, download, and GalleryService
 │   ├── Journey/                 # Door-to-door transit overview, multi-leg segments, and step models
 │   ├── Location/                # Geocoding, reverse-geocoding, and token resolvers
-│   ├── Map/                     # LocationStore, TransiumMapStyleFactory, RoadGeometryResolver (Actor)
+│   ├── Map/                     # LocationStore, TransiumMapStyleFactory, RoadSnapper, RoadGeometryResolver (Actor)
 │   ├── Profile/                 # User profile models, SwiftData LocalProfile, and profile service
 │   └── Quest/                   # Quest discovery catalogs, badge progression, and kelurahan grouping
 │
@@ -39,9 +41,10 @@ transium/
 │   ├── Auth/                    # Apple Sign-In screen with hero artwork and preview bypass
 │   ├── Camera/                  # CameraScreen viewfinder and PhotoPreviewScreen keepsake flow
 │   ├── DetailPage/              # DetailPlaceScreen with badge carousels, itinerary quest list, and bus fare badges
-│   ├── GoModeScreen/            # GoComponentMode active navigation panel and mission checkpoints
+│   ├── GoModeScreen/            # GoComponentMode active navigation panel, stopsLeft counter, and mission checkpoints
 │   ├── Home/                    # HomeScreen and Views/ (Ticket carousel, Pinning overlay, Quick menu)
 │   │   ├── HomeScreen.swift         # Main root coordinator
+│   │   ├── HomeViewModel.swift      # Combine-driven reactive map, location, and quest state
 │   │   ├── SearchSheetView.swift    # Place search & starting point picker sheet
 │   │   └── Views/
 │   │       ├── HomeBottomTicketCarousel.swift   # Ticket rail carousel & location pill
@@ -79,8 +82,16 @@ transium/
 
 ## Key Subsystems & Design Highlights
 
-### 1. Map & Transit Routing Engine
+### 1. Map, Road Snapping & Transit Routing Engine
 - **MapLibre Offline Foundation**: Powered by offline PMTiles vector layers (`bali_basemap.pmtiles` and `bali_transit.pmtiles`) via `TransiumMapStyleFactory`.
+- **20m Road-Snapping (`RoadSnapper`)**:
+  - Orthogonally projects user location and raw GTFS stop coordinates directly onto active route polylines and vector road tile layers (`roads`, `roads-casing`).
+  - Snaps when within $\le 20\text{m}$; allows free movement when beyond $20\text{m}$.
+  - Snaps all intermediate, boarding, and alighting stop circles directly onto the centerline of the active route polyline.
+- **Bus Travel Direction Lock**:
+  - When traversing a bus corridor in Go Mode, user annotation cone and camera heading lock to the forward direction along the bus road geometry, avoiding device compass spin while inside a bus.
+- **Dynamic 3D Marker Tilt**:
+  - Marker orientation dynamically leans into 3D perspective proportional to live MapLibre camera pitch.
 - **Concurrent Road Corridor Resolution (`RoadGeometryResolver`)**:
   - Pre-resolves all transit segments concurrently in parallel using `withTaskGroup`.
   - Calculates exact street-following geometry through consecutive stop pairs along `segment.stops` to follow real inland bus avenue corridors (Jl. Imam Bonjol, Jl. Teuku Umar, Jl. Sudirman) rather than toll bypasses.
