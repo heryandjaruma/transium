@@ -31,7 +31,9 @@ struct GoTripDetailsPanel: View {
     /// fire (GPS drift, being outside the server's own ~150m tolerance, etc.), wired by the
     /// caller to the exact same handler a real geofence trigger uses.
     var onManualAdvance: (String) -> Void = { _ in }
+    @Binding var isExpanded: Bool
 
+    @GestureState private var dragOffset: CGFloat = 0
     @State private var isStopsExpanded: [String: Bool] = [:]
     #if DEBUG
     @State private var debugShareItem: DebugShareItem?
@@ -90,57 +92,183 @@ struct GoTripDetailsPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Trip Details")
-                    .font(TransiumFont.body(20, weight: .bold))
-                    .foregroundStyle(TransiumColor.primaryBlue)
-                Spacer()
-                #if DEBUG
-                Button(action: shareGoStartResultJSON) {
-                    Image(systemName: "play.circle")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(goStartResult == nil ? Color(.systemGray4) : .secondary)
-                }
-                .disabled(goStartResult == nil)
-                Button(action: shareActiveGeofencesJSON) {
-                    Image(systemName: "location.circle")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
-                Button(action: shareJourneyDebugJSON) {
-                    Image(systemName: "ladybug")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
-                #endif
-                Text("\(Int(round(totalSeconds / 60))) min")
-                    .font(TransiumFont.body(20, weight: .black))
-                    .foregroundColor(.black)
-                    .fixedSize()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 12)
+            // Drag handle area (tappable & draggable)
+            VStack(spacing: 0) {
+                RoundedRectangle(cornerRadius: 2.5)
+                    .fill(Color(.systemGray3))
+                    .frame(width: 38, height: 5)
+                    .padding(.top, 10)
+                    .padding(.bottom, 8)
 
-            ScrollView(.vertical, showsIndicators: false) {
-                timeline
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
+                // Header summary row
+                HStack(alignment: .center, spacing: 0) {
+                    // Horizontal timeline chips
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Array(timelineChips.enumerated()), id: \.offset) { index, chip in
+                                if index > 0 {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundColor(.gray.opacity(0.45))
+                                }
+
+                                switch chip {
+                                case .walk(let minutes, let isMissionWalk):
+                                    if isMissionWalk {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "figure.walk")
+                                                .font(.system(size: 12, weight: .bold))
+                                            Text("\(minutes) m")
+                                                .font(TransiumFont.body(11, weight: .bold))
+                                        }
+                                        .foregroundColor(Color(red: 0.05, green: 0.62, blue: 0.42))
+                                        .padding(.horizontal, 8)
+                                        .frame(height: 28)
+                                        .background(Color(red: 0.05, green: 0.62, blue: 0.42).opacity(0.12))
+                                        .clipShape(Capsule())
+                                    } else {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "figure.walk")
+                                                .font(.system(size: 13, weight: .medium))
+                                            Text("\(minutes) m")
+                                                .font(TransiumFont.body(11, weight: .semibold))
+                                        }
+                                        .foregroundColor(.gray)
+                                        .padding(.horizontal, 6)
+                                        .frame(height: 28)
+                                    }
+
+                                case .bus(let routeRef):
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "bus.fill")
+                                            .font(.system(size: 11, weight: .semibold))
+                                        Text(routeRef.truncatedAtDash)
+                                            .font(TransiumFont.body(11, weight: .bold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .frame(height: 28)
+                                    .background(TransiumTransitColor.color(for: routeRef))
+                                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+                                case .missionPoint(let name, let number):
+                                    HStack(spacing: 4) {
+                                        Circle()
+                                            .fill(Color(red: 0.98, green: 0.72, blue: 0.12))
+                                            .frame(width: 6, height: 6)
+
+                                        Image(systemName: "flag.fill")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(Color(red: 0.85, green: 0.55, blue: 0.05))
+
+                                        Text(name.count > 16 ? "Mission \(number)" : name)
+                                            .font(TransiumFont.body(11, weight: .bold))
+                                            .foregroundColor(Color(red: 0.82, green: 0.52, blue: 0.04))
+                                            .lineLimit(1)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .frame(height: 28)
+                                    .background(Color(red: 0.98, green: 0.72, blue: 0.12).opacity(0.15))
+                                    .clipShape(Capsule())
+                                }
+                            }
+                        }
+                        .frame(height: 28)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    #if DEBUG
+                    HStack(spacing: 4) {
+                        Button(action: shareGoStartResultJSON) {
+                            Image(systemName: "play.circle")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(goStartResult == nil ? Color(.systemGray4) : .secondary)
+                        }
+                        .disabled(goStartResult == nil)
+                        Button(action: shareActiveGeofencesJSON) {
+                            Image(systemName: "location.circle")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                        Button(action: shareJourneyDebugJSON) {
+                            Image(systemName: "ladybug")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.trailing, 6)
+                    #endif
+
+                    Text(formattedDuration)
+                        .font(TransiumFont.body(20, weight: .black))
+                        .foregroundColor(.black)
+                        .fixedSize()
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, isExpanded ? 14 : 10)
             }
-            .frame(maxHeight: .infinity)
-            .mask(
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: .black, location: 0.0),
-                        .init(color: .black, location: 0.94),
-                        .init(color: .clear, location: 1.0)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                    isExpanded.toggle()
+                }
+            }
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        let verticalAmount = value.translation.height
+                        if verticalAmount > 25 {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                isExpanded = false
+                            }
+                        } else if verticalAmount < -25 {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                                isExpanded = true
+                            }
+                        }
+                    }
             )
+
+            // Scrollable detailed steps timeline (collapsible)
+            if isExpanded {
+                ScrollView(.vertical, showsIndicators: true) {
+                    timeline
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 50)
+                }
+                .frame(maxHeight: min(UIScreen.main.bounds.height * 0.58, 480))
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
         }
+        .gesture(
+            DragGesture()
+                .updating($dragOffset) { value, state, _ in
+                    state = value.translation.height
+                }
+                .onEnded { value in
+                    let verticalAmount = value.translation.height
+                    if verticalAmount > 35 {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                            isExpanded = false
+                        }
+                    } else if verticalAmount < -35 {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                            isExpanded = true
+                        }
+                    }
+                }
+        )
         .frame(maxWidth: .infinity)
+        .padding(.bottom, isExpanded ? 20 : 28)
+        .background(Color.white)
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 12, y: -4)
+        .overlay(alignment: .bottom) {
+            Color.white
+                .frame(height: 120)
+                .offset(y: 120)
+        }
         #if DEBUG
         .sheet(item: $debugShareItem) { item in
             ActivityShareSheet(activityItems: [item.url])
@@ -223,7 +351,7 @@ struct GoTripDetailsPanel: View {
                     ? segment.liveRemaining(from: currentLocation)
                     : (distanceMeters: segment.distanceMeters, durationSeconds: segment.durationSeconds)
                 if let dur = activeRemaining.durationSeconds {
-                    Text("\(max(0, Int(round(dur / 60)))) min")
+                    Text(formatDurationText(dur))
                         .font(TransiumFont.body(14, weight: .bold))
                         .foregroundColor(.white)
                 }
@@ -377,7 +505,7 @@ struct GoTripDetailsPanel: View {
                 Spacer()
 
                 if let dur = segment.durationSeconds {
-                    Text("\(Int(round(dur / 60))) min")
+                    Text(formatDurationText(dur))
                         .font(TransiumFont.body(14, weight: .bold))
                         .foregroundColor(.black)
                 }
@@ -677,11 +805,60 @@ struct GoTripDetailsPanel: View {
     }
     #endif
 
-    // MARK: - Timing
+    // MARK: - Timing & Timeline Chips
 
     private var totalSeconds: Double {
         let sum = journey.segments.compactMap { $0.durationSeconds }.reduce(0, +)
         return sum > 0 ? sum : Double(journey.summary.walkingDurationSeconds) + (journey.summary.transitDistanceMeters / 5.5)
+    }
+
+    private var formattedDuration: String {
+        let totalMinutes = Int(round(totalSeconds / 60))
+        if totalMinutes < 60 {
+            return "\(totalMinutes) min"
+        }
+        let hours = totalMinutes / 60
+        let mins = totalMinutes % 60
+        if mins == 0 {
+            return "\(hours)h"
+        }
+        return "\(hours)h \(mins)m"
+    }
+
+    private func formatDurationText(_ seconds: Double) -> String {
+        let totalMinutes = max(0, Int(round(seconds / 60)))
+        if totalMinutes < 60 {
+            return "\(totalMinutes) min"
+        }
+        let hours = totalMinutes / 60
+        let mins = totalMinutes % 60
+        if mins == 0 {
+            return "\(hours)h"
+        }
+        return "\(hours)h \(mins)m"
+    }
+
+    private var timelineChips: [JourneyTimelineChip] {
+        var chips: [JourneyTimelineChip] = []
+        var missionCount = 0
+        var hasSeenBus = false
+
+        let hasMissions = journey.steps.contains { $0.isMission } || journey.segments.contains { $0.isMission }
+
+        for (index, segment) in journey.segments.enumerated() {
+            if segment.isMission {
+                missionCount += 1
+                chips.append(.missionPoint(name: segment.instructions ?? "Mission", number: missionCount))
+            } else if segment.type == "bus" {
+                chips.append(.bus(routeRef: segment.routeRef ?? "Bus"))
+                hasSeenBus = true
+            } else {
+                let mins = max(1, Int(round((segment.durationSeconds ?? 0) / 60)))
+                let isMissionWalk = hasMissions && hasSeenBus && (index == journey.segments.count - 1 || index == journey.segments.count - 2)
+                chips.append(.walk(minutes: mins, isMissionWalk: isMissionWalk))
+            }
+        }
+        return chips
     }
 }
 

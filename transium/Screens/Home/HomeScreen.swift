@@ -187,6 +187,7 @@ struct HomeScreen: View {
                 onBack: { vm.exitToExploreMode() }
             )
         }
+        .ignoresSafeArea(edges: .bottom)
     }
 
     private var exploreModeLayer: some View {

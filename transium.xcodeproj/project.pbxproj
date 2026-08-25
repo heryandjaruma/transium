@@ -8,10 +8,36 @@
 
 /* Begin PBXBuildFile section */
 		9E61306EF41C5976FE50838A /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = 970EFECCF3C669B9A389005D /* MapLibre */; };
+		AA100010 /* TransiumLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA100001 /* TransiumLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B685FCB33028DD8A005B7C1E /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = B685FCB23028DD88005B7C1E /* .gitignore */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		AA100012 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B685FC9C3028DCB5005B7C1E /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA100003;
+			remoteInfo = TransiumLiveActivity;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AA100009 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA100010 /* TransiumLiveActivity.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		AA100001 /* TransiumLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TransiumLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B67F29AF303BB87600F03EEE /* 0_Sanur_happy_Walk2Stop.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = 0_Sanur_happy_Walk2Stop.gpx; path = "../gpx-testcases/Sanur/0_Sanur_happy_Walk2Stop.gpx"; sourceTree = "<group>"; };
 		B67F29B0303BB87600F03EEE /* 1-1_Sanur_happy_RideBus.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = "1-1_Sanur_happy_RideBus.gpx"; path = "../gpx-testcases/Sanur/1-1_Sanur_happy_RideBus.gpx"; sourceTree = "<group>"; };
 		B67F29B1303BB87600F03EEE /* 1_Sanur_happy_RideBus.gpx */ = {isa = PBXFileReference; lastKnownFileType = text.xml; name = 1_Sanur_happy_RideBus.gpx; path = "../gpx-testcases/Sanur/1_Sanur_happy_RideBus.gpx"; sourceTree = "<group>"; };
@@ -33,6 +59,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		AA100004 /* TransiumLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TransiumLiveActivity;
+			sourceTree = "<group>";
+		};
 		B685FCA63028DCB5005B7C1E /* transium */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -44,6 +75,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		AA100007 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B685FCA13028DCB5005B7C1E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -66,6 +104,7 @@
 				B67F29B4303BB87600F03EEE /* 2-1_Sanur_happy_Walk2Dest.gpx */,
 				B685FCB23028DD88005B7C1E /* .gitignore */,
 				B685FCA63028DCB5005B7C1E /* transium */,
+				AA100004 /* TransiumLiveActivity */,
 				B685FCA53028DCB5005B7C1E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -74,6 +113,7 @@
 			isa = PBXGroup;
 			children = (
 				B685FCA43028DCB5005B7C1E /* transium.app */,
+				AA100001 /* TransiumLiveActivity.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -81,6 +121,25 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		AA100003 /* TransiumLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA100005 /* Build configuration list for PBXNativeTarget "TransiumLiveActivity" */;
+			buildPhases = (
+				AA100006 /* Sources */,
+				AA100007 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA100004 /* TransiumLiveActivity */,
+			);
+			name = TransiumLiveActivity;
+			productName = TransiumLiveActivity;
+			productReference = AA100001 /* TransiumLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		B685FCA33028DCB5005B7C1E /* transium */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = B685FCAF3028DCB6005B7C1E /* Build configuration list for PBXNativeTarget "transium" */;
@@ -88,10 +147,12 @@
 				B685FCA03028DCB5005B7C1E /* Sources */,
 				B685FCA13028DCB5005B7C1E /* Frameworks */,
 				B685FCA23028DCB5005B7C1E /* Resources */,
+				AA100009 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AA100011 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B685FCA63028DCB5005B7C1E /* transium */,
@@ -145,6 +206,7 @@
 			projectRoot = "";
 			targets = (
 				B685FCA33028DCB5005B7C1E /* transium */,
+				AA100003 /* TransiumLiveActivity */,
 			);
 		};
 /* End PBXProject section */
@@ -161,6 +223,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		AA100006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		B685FCA03028DCB5005B7C1E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -170,7 +239,77 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		AA100011 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA100003 /* TransiumLiveActivity */;
+			targetProxy = AA100012 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		AA100013 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 9VBW89A4U3;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TransiumLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Transium Live Activity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "si.transporta.transium-app.TransiumLiveActivity";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		AA100014 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 4;
+				DEVELOPMENT_TEAM = 9VBW89A4U3;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TransiumLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Transium Live Activity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "si.transporta.transium-app.TransiumLiveActivity";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 		B685FCAD3028DCB6005B7C1E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -393,6 +532,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		AA100005 /* Build configuration list for PBXNativeTarget "TransiumLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA100013 /* Debug */,
+				AA100014 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		B685FC9F3028DCB5005B7C1E /* Build configuration list for PBXProject "transium" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

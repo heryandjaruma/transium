@@ -51,6 +51,33 @@ public final class PushNotificationManager {
         }
     }
 
+    /// Posts a local notification to alert the user even when the app is backgrounded or screen locked.
+    public func postLocalNotification(
+        title: String,
+        body: String,
+        identifier: String = UUID().uuidString,
+        sound: UNNotificationSound = .default
+    ) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = sound
+
+        let request = UNNotificationRequest(
+            identifier: identifier,
+            content: content,
+            trigger: nil // Immediate delivery
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            #if DEBUG
+            if let error {
+                print("PushNotificationManager: failed to schedule local notification: \(error)")
+            }
+            #endif
+        }
+    }
+
     /// Called from `AppDelegate` once APNs hands back a device token.
     public func handleDeviceToken(_ deviceToken: Data) async {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()

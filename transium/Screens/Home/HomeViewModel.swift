@@ -3,6 +3,7 @@
 //  transium
 //
 
+import ActivityKit
 import Combine
 import CoreLocation
 import MapLibre
@@ -339,10 +340,13 @@ final class HomeViewModel: ObservableObject {
             isStartingGoMode = true
         }
         Task { await healthKitStepService.requestAuthorization() }
+        Task { await PushNotificationManager.shared.requestAuthorizationAndRegister() }
 
         Task {
             do {
                 let result = try await journeyService.startJourney(questId: questId)
+
+                NavigationAlertService.shared.reset()
 
                 geofenceMonitor.onRegionEntered = { [weak self] stepId in
                     self?.handleGeofenceEntered(stepId: stepId, attemptId: result.journeyAttempt.id)
@@ -360,7 +364,12 @@ final class HomeViewModel: ObservableObject {
                 }
 
                 await MainActor.run {
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    NavigationAlertService.shared.dispatchAlert(
+                        key: "journey_started_\(result.journeyAttempt.id)",
+                        title: "Journey Started",
+                        message: "Navigation is active. Follow the highlighted route.",
+                        haptic: .arrived
+                    )
                     goJourneyAttempt = result.journeyAttempt
                     goJourneySteps = result.steps
                     goGeofences = result.geofences
@@ -370,6 +379,25 @@ final class HomeViewModel: ObservableObject {
                     hasSubmittedJourneyCompletion = false
                     if let activeJourney {
                         setupRandomPhotoOps(for: activeJourney)
+
+                        let initialEta = max(1, Int((activeJourney.summary.walkingDurationSeconds / 60.0).rounded()))
+                        let isBus = activeJourney.segments.first?.type == "bus"
+                        let initialState = TransiumNavigationActivityAttributes.ContentState(
+                            routeName: isBus ? (activeJourney.segments.first?.routeRef?.truncatedAtDash ?? "Bus") : "Walk",
+                            destinationName: activeJourney.destinationName,
+                            nextStopName: activeJourney.segments.first?.to?.name ?? activeJourney.destinationName,
+                            etaText: "\(initialEta) min",
+                            stopsRemainingText: nil,
+                            transportType: isBus ? "bus" : "walk",
+                            progressFraction: 0.05,
+                            isApproachingStop: false
+                        )
+                        LiveActivityManager.shared.startNavigationActivity(
+                            questTitle: activeJourney.destinationName,
+                            questId: questId,
+                            attemptId: result.journeyAttempt.id,
+                            initialState: initialState
+                        )
                     }
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         showGoMode = true
@@ -465,6 +493,7 @@ final class HomeViewModel: ObservableObject {
             goCurrentSegmentIndex = 0
         }
         goStartDebugResult = nil
+        LiveActivityManager.shared.endNavigationActivity(dismissalPolicy: .immediate)
 
         if cancelAttempt {
             cancelActiveJourneyAttempt()
@@ -474,6 +503,7 @@ final class HomeViewModel: ObservableObject {
     func cancelActiveJourneyAttempt() {
         guard let attempt = goJourneyAttempt, !isCancelingJourney else { return }
         isCancelingJourney = true
+        LiveActivityManager.shared.endNavigationActivity(dismissalPolicy: .immediate)
 
         Task {
             do {
@@ -505,16 +535,30 @@ final class HomeViewModel: ObservableObject {
     func handleGeofenceEntered(stepId: String, attemptId: String, isManualConfirmation: Bool = false) {
         let coordinate = locationStore.currentLocation?.coordinate ?? resolvedCurrentLocation.coordinate
 
-        if let step = goJourneySteps.first(where: { $0.id == stepId }),
-           step.isPhotoCheckpoint, step.status != .done {
-            if isManualConfirmation {
-                pendingPhotoStep = step
-            } else {
-                Task {
-                    try? await Task.sleep(for: .seconds(Self.autoCameraGracePeriodSeconds))
-                    await MainActor.run {
-                        guard showGoMode, goJourneySteps.first(where: { $0.id == stepId })?.status != .done else { return }
-                        pendingPhotoStep = step
+        if let step = goJourneySteps.first(where: { $0.id == stepId }) {
+            let placeName = step.name.isEmpty ? (step.description.isEmpty ? "Checkpoint" : step.description) : step.name
+            let title = step.isPhotoCheckpoint ? "Photo Spot Reached" : "Arrived at Stop"
+            let message = step.isPhotoCheckpoint
+                ? "You have reached \(placeName). Take a moment to capture a photo."
+                : "You have arrived at \(placeName)."
+
+            NavigationAlertService.shared.dispatchAlert(
+                key: "geofence_entered_\(stepId)",
+                title: title,
+                message: message,
+                haptic: step.isPhotoCheckpoint ? .photoOp : .arrived
+            )
+
+            if step.isPhotoCheckpoint, step.status != .done {
+                if isManualConfirmation {
+                    pendingPhotoStep = step
+                } else {
+                    Task {
+                        try? await Task.sleep(for: .seconds(Self.autoCameraGracePeriodSeconds))
+                        await MainActor.run {
+                            guard showGoMode, goJourneySteps.first(where: { $0.id == stepId })?.status != .done else { return }
+                            pendingPhotoStep = step
+                        }
                     }
                 }
             }
@@ -578,6 +622,7 @@ final class HomeViewModel: ObservableObject {
                 await MainActor.run {
                     goJourneyAttempt = result.journeyAttempt
                     geofenceMonitor.stopMonitoring()
+                    LiveActivityManager.shared.endNavigationActivity(dismissalPolicy: .default)
                     journeyCompletionResult = result
                 }
             } catch {
@@ -692,11 +737,21 @@ final class HomeViewModel: ObservableObject {
     }
 
     func recordPathPointIfNeeded() {
-        guard showGoMode, let coordinate = locationStore.currentLocation?.coordinate else { return }
+        guard showGoMode, let location = locationStore.currentLocation else { return }
+        let coordinate = location.coordinate
         goPathBreadcrumb.append(JourneyPathPointInput(lat: coordinate.latitude, lng: coordinate.longitude, recordedAt: Date()))
         if goPathBreadcrumb.count > 2000 {
             goPathBreadcrumb.removeFirst(goPathBreadcrumb.count - 2000)
         }
+
+        NavigationAlertService.shared.evaluateNavigationProximity(
+            userLocation: location,
+            journey: activeJourney,
+            steps: goJourneySteps,
+            currentSegmentIndex: goCurrentSegmentIndex
+        )
+
+        updateLiveActivityTelemetry()
     }
 
     func advanceGoSegmentIfNeeded() {
@@ -708,13 +763,73 @@ final class HomeViewModel: ObservableObject {
         if segment.isMission {
             guard goJourneySteps.attemptStep(for: segment)?.status == .done else { return }
             goCurrentSegmentIndex += 1
+            updateLiveActivityTelemetry()
             return
         }
 
         guard let coordinate = locationStore.currentLocation?.coordinate,
               let distance = segment.liveRemaining(from: coordinate).distanceMeters,
               distance <= Self.segmentArrivalProximityMeters else { return }
+
         goCurrentSegmentIndex += 1
+        updateLiveActivityTelemetry()
+
+        if journey.segments.indices.contains(goCurrentSegmentIndex) {
+            let nextSegment = journey.segments[goCurrentSegmentIndex]
+            let isBus = nextSegment.type == "bus"
+            let title = isBus ? "Boarding Transit" : "Next Leg"
+            let message = isBus
+                ? "Take \(nextSegment.routeRef?.truncatedAtDash ?? "the bus") toward \(nextSegment.to?.name ?? "your destination")."
+                : "Walk toward \(nextSegment.to?.name ?? "the next stop")."
+            NavigationAlertService.shared.dispatchAlert(
+                key: "segment_advanced_\(goCurrentSegmentIndex)",
+                title: title,
+                message: message,
+                haptic: .approaching
+            )
+        }
+    }
+
+    func updateLiveActivityTelemetry() {
+        guard showGoMode, let journey = activeJourney else { return }
+
+        let segment = journey.segments.indices.contains(goCurrentSegmentIndex)
+            ? journey.segments[goCurrentSegmentIndex]
+            : nil
+
+        let userCoord = locationStore.currentLocation?.coordinate ?? resolvedCurrentLocation.coordinate
+        let remaining = segment?.liveRemaining(from: userCoord)
+
+        let remainingSeconds = remaining?.durationSeconds ?? 0
+        let minutes = max(1, Int((remainingSeconds / 60.0).rounded()))
+        let etaText = "\(minutes) min"
+
+        let isBus = segment?.type == "bus"
+        let transportType = segment?.isMission == true ? "mission" : (isBus ? "bus" : "walk")
+        let routeName = isBus ? (segment?.routeRef?.truncatedAtDash ?? "Bus") : "Walk"
+        let destinationName = journey.destinationName
+        let nextStopName = segment?.to?.name ?? destinationName
+
+        let totalDuration = max(1.0, journey.summary.walkingDurationSeconds + (journey.summary.distanceMeters / 6.0))
+        let progress = min(1.0, max(0.0, 1.0 - (remainingSeconds / totalDuration)))
+
+        var stopsLeft: String? = nil
+        if isBus, let intermediate = segment?.stops {
+            stopsLeft = "\(intermediate.count + 1) stops"
+        }
+
+        let state = TransiumNavigationActivityAttributes.ContentState(
+            routeName: routeName,
+            destinationName: destinationName,
+            nextStopName: nextStopName,
+            etaText: etaText,
+            stopsRemainingText: stopsLeft,
+            transportType: transportType,
+            progressFraction: progress,
+            isApproachingStop: (remaining?.distanceMeters ?? 100) < 120
+        )
+
+        LiveActivityManager.shared.updateNavigationActivity(state: state)
     }
 
     // MARK: - Bookmarks

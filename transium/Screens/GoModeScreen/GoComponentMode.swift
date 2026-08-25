@@ -50,18 +50,7 @@ struct GoComponentMode: View {
     /// straight through to GoTripDetailsPanel — see its own doc comment for why this exists.
     var onManualAdvance: (String) -> Void = { _ in }
 
-    /// Height of the sheet's collapsed "peek" detent — just tall enough for its drag
-    /// indicator + "Trip Details" header row. Shared with the floating current-step card's
-    /// bottom padding so it sits just above the sheet's collapsed top edge.
-    private static let collapsedSheetHeight: CGFloat = 110
-    private static let collapsedDetent: PresentationDetent = .height(collapsedSheetHeight)
-    private static let expandedDetent: PresentationDetent = .fraction(0.55)
-
-    @State private var tripDetailsDetent: PresentationDetent = Self.collapsedDetent
-
-    private var isTripDetailsExpanded: Bool {
-        tripDetailsDetent == Self.expandedDetent
-    }
+    @State private var isTripDetailsExpanded: Bool = false
 
     /// Matches `HomeScreen.segmentArrivalProximityMeters`, which owns the actual leg-to-leg
     /// advance (this view only reads `currentSegmentIndex`, it doesn't change it) — used here
@@ -92,25 +81,24 @@ struct GoComponentMode: View {
     }
 
     var body: some View {
-        VStack {
-            GoTopBar(
-                onBack: onBack,
-                onEnd: onEnd,
-                onLocate: onLocate,
-                isMuted: isMuted,
-                onToggleMute: onToggleMute
-            )
-            .padding(.top, 6)
+        ZStack(alignment: .bottom) {
+            VStack {
+                GoTopBar(
+                    onBack: onBack,
+                    onEnd: onEnd,
+                    onLocate: onLocate,
+                    isMuted: isMuted,
+                    onToggleMute: onToggleMute
+                )
+                .padding(.top, 16)
 
-            Spacer()
+                Spacer()
 
-            if !isTripDetailsExpanded {
                 currentStepCard
                     .padding(.horizontal, 16)
-                    .padding(.bottom, Self.collapsedSheetHeight + 8)
+                    .padding(.bottom, 108)
             }
-        }
-        .sheet(isPresented: .constant(true)) {
+
             GoTripDetailsPanel(
                 journey: journey,
                 currentSegmentIndex: currentSegmentIndex,
@@ -118,14 +106,12 @@ struct GoComponentMode: View {
                 currentLocation: currentLocation,
                 geofenceMonitor: geofenceMonitor,
                 goStartResult: goStartResult,
-                onManualAdvance: onManualAdvance
+                onManualAdvance: onManualAdvance,
+                isExpanded: $isTripDetailsExpanded
             )
-            .presentationDetents([Self.collapsedDetent, Self.expandedDetent], selection: $tripDetailsDetent)
-            .presentationDragIndicator(.visible)
-            .presentationBackgroundInteraction(.enabled)
-            .presentationBackground(.thickMaterial)
-            .interactiveDismissDisabled()
         }
+        .ignoresSafeArea(edges: .bottom)
+        .transition(.move(edge: .bottom))
     }
 
     // Blue/Yellow card showing whatever's current in the trip — a travel leg, or a mission.

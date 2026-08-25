@@ -102,7 +102,7 @@ struct NavigationBottomSheet: View {
                         .fixedSize()
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, isCollapsed ? 14 : 10)
+                .padding(.bottom, 16)
             }
             .contentShape(Rectangle())
             .onTapGesture {
@@ -131,31 +131,14 @@ struct NavigationBottomSheet: View {
                 ScrollView(.vertical, showsIndicators: true) {
                     StepTimelineView(journey: journey)
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 28)
+                        .padding(.bottom, 40)
                 }
-                .frame(maxHeight: 330)
+                .frame(maxHeight: min(UIScreen.main.bounds.height * 0.58, 480))
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .gesture(
-            DragGesture()
-                .updating($dragOffset) { value, state, _ in
-                    state = value.translation.height
-                }
-                .onEnded { value in
-                    let verticalAmount = value.translation.height
-                    if verticalAmount > 35 {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-                            isCollapsed = true
-                        }
-                    } else if verticalAmount < -35 {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-                            isCollapsed = false
-                        }
-                    }
-                }
-        )
         .frame(maxWidth: .infinity)
+        .padding(.bottom, isCollapsed ? 14 : 20)
         .background(Color.white)
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24, style: .continuous))
         .shadow(color: .black.opacity(0.12), radius: 12, y: -4)
