@@ -82,7 +82,8 @@ struct SummaryScreen: View {
             return 250
         }()
         let jumpingJacks = max(1, calories * 4)
-        return "This trip burned \(calories) calories. That's like doing \(jumpingJacks) jumping jacks 🥵"
+//        return "This trip burned \(calories) calories. That's like doing \(jumpingJacks) jumping jacks 🥵"
+        return "If more people take public transportation, there’s higher chance we can get even better infrastructures and more frequent services!"
     }
 
     private var tripTitle: String {

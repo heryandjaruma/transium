@@ -9,7 +9,7 @@ import UIKit
 struct SummaryIntroView: View {
     let cards: [StatCardData]
     var locationLabel: String = "Sanur Street"
-    var calorieMessage: String = "This trip burned 250 calories. That's like doing 1,000 jumping jacks 🥵"
+    var calorieMessage: String = "If more people take public transportation, there’s higher chance we can get even better infrastructures and more frequent services!"
     var badgeImageUrl: String? = nil
 
     @State private var animatedIn: Bool = false
@@ -117,7 +117,7 @@ struct SummaryIntroView: View {
                                     .frame(width: 55, height: 55)
                                 
                                 Text(calorieMessage)
-                                    .font(TransiumFont.body(13, weight: .medium))
+                                    .font(TransiumFont.body(12, weight: .medium))
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
