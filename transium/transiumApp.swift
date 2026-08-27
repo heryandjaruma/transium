@@ -12,6 +12,7 @@ import SwiftData
 struct transiumApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var session = SessionController()
+    @State private var languageManager = AppLanguageManager.shared
 
     init() {
         if AppEnvironment.DEV_MODE {
@@ -23,6 +24,8 @@ struct transiumApp: App {
         WindowGroup {
             ContentView()
                 .environment(session)
+                .environment(languageManager)
+                .environment(\.locale, languageManager.currentLanguage.locale)
         }
         .modelContainer(for: transiumSchema.models)
     }

@@ -281,7 +281,7 @@ struct DetailPlaceScreen: View {
     private var titleSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
-                Text("\(currentArea.name) Quests")
+                Text("\(currentArea.name) " + "Quests".transiumLocalized)
                     .font(TransiumFont.display(28, weight: .bold))
                     .foregroundColor(.black)
                 
@@ -341,11 +341,11 @@ struct DetailPlaceScreen: View {
 
     private var areaTagline: String {
         if let desc = currentArea.description, !desc.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return desc
+            return desc.transiumLocalized
         }
-        if isBenoa { return "Where earlybirds relax 🌊" }
-        if isUbud { return "Rice fields, art walks & mountain air 🌿" }
-        return "Explore local quests & transit routes 🌴"
+        if isBenoa { return "Where earlybirds relax 🌊".transiumLocalized }
+        if isUbud { return "Rice fields, art walks & mountain air 🌿".transiumLocalized }
+        return "Explore local quests & transit routes 🌴".transiumLocalized
     }
     
     // MARK: - Data Loading
@@ -435,7 +435,7 @@ struct TransiumCategoryPaperBadge: View {
         HStack(spacing: 5) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .bold))
-            Text(category)
+            Text(category.transiumLocalized)
                 .font(TransiumFont.display(12, weight: .semibold))
                 .tracking(0.8)
                 .lineLimit(1)

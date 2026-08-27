@@ -35,7 +35,7 @@ struct GoTopBar: View {
             VStack(spacing: 12) {
                 TransiumIconButton(
                     icon: .system("xmark"),
-                    label: "END",
+                    label: "END".transiumLocalized,
                     accessibilityLabel: "End trip",
                     backgroundColor: TransiumColor.lightRed,
                     foregroundColor: .white,
@@ -98,43 +98,33 @@ private struct GoStepIcon: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            switch mode {
-            case .walking:
-                RoundedRectangle(cornerRadius: size * 0.35, style: .continuous)
-                    .fill(.white)
-                    .frame(width: size, height: size)
-                    .overlay {
-                        Image(systemName: mode.symbolName)
-                            .font(.system(size: size * 0.60, weight: .semibold))
-                            .foregroundStyle(TransiumColor.primaryBlue)
-                    }
+            RoundedRectangle(cornerRadius: size * 0.35, style: .continuous)
+                .fill(.white)
+                .frame(width: size, height: size)
 
-            case .bus:
-                Image("LineIcon")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: size, height: size)
-            }
+            Image(systemName: mode.symbolName)
+                .font(.system(size: size * 0.5, weight: .bold))
+                .foregroundStyle(TransiumColor.primaryBlue)
+                .frame(maxHeight: .infinity, alignment: .center)
+                .padding(.bottom, mode.badgeCode != nil ? 10 : 0)
 
-            if let badgeCode = mode.badgeCode {
-                Text(badgeCode)
-                    .font(TransiumFont.body(size * 0.20, weight: .bold))
+            if let badge = mode.badgeCode {
+                Text(badge)
+                    .font(TransiumFont.body(11, weight: .bold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, size * 0.1)
-                    .padding(.vertical, size * 0.04)
-                    .background(TransiumColor.lightRed)
-                    .clipShape(.rect(cornerRadius: size * 0.12))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: size * 0.12, style: .continuous)
-                            .strokeBorder(.white, lineWidth: 2)
-                    }
-                    .offset(x: 0.06, y: 15)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1.5)
+                    .background(TransiumColor.darkBlue)
+                    .clipShape(.capsule)
+                    .offset(y: 4)
             }
         }
     }
 }
 
 // MARK: - Go Step Card
+// Blue floating summary card for travel legs — walk or bus ride.
+
 struct GoStepCard: View {
     struct Metric {
         let value: String
@@ -144,23 +134,21 @@ struct GoStepCard: View {
             self.value = value
             self.unit = unit
         }
+
+        init(value: String, unit: String) {
+            self.value = value
+            self.unit = unit
+        }
     }
 
     let mode: GoTravelMode
     let verb: String
     let destination: String
     let metrics: [Metric]
-    /// Tiny line under the metrics row — e.g. "Est. arrival 9:52 PM" on a bus leg's live ride card.
     var caption: String? = nil
-    /// When set, replaces `verb`'s plain text with a bold count badge + "Stop(s) to" — a bus
-    /// leg's live stop countdown.
     var stopsRemaining: Int? = nil
-    /// When set, replaces the inline metrics row with a floating clock pill in the card's top
-    /// trailing corner (e.g. "15 min") — pairs with `stopsRemaining` on a bus leg's ride card,
-    /// where the countdown itself takes over the verb line's usual spot.
     var cornerBadge: String? = nil
 
-    /// Dipakai kalau cuma ada 1 metrik. Contoh: GoStepCard(..., metricValue: "5", metricUnit: "min")
     init(mode: GoTravelMode, verb: String, destination: String, metricValue: String, metricUnit: String, caption: String? = nil) {
         self.mode = mode
         self.verb = verb
@@ -169,8 +157,6 @@ struct GoStepCard: View {
         self.caption = caption
     }
 
-    /// Dipakai kalau ada lebih dari 1 metrik (misal durasi + jarak).
-    /// Contoh: GoStepCard(..., metrics: [.init("15", "min"), .init("1.2", "kilometer")])
     init(
         mode: GoTravelMode,
         verb: String,
@@ -191,13 +177,13 @@ struct GoStepCard: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            HStack(spacing: 20) {
+            HStack(spacing: 16) {
                 GoStepIcon(mode: mode)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     verbRow
 
-                    Text(destination)
+                    Text(destination.transiumLocalized)
                         .font(TransiumFont.body(24, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
@@ -208,7 +194,7 @@ struct GoStepCard: View {
                     }
 
                     if let caption {
-                        Text(caption)
+                        Text(caption.transiumLocalized)
                             .font(TransiumFont.body(11, weight: .medium))
                             .foregroundStyle(.white.opacity(0.7))
                     }
@@ -222,7 +208,7 @@ struct GoStepCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
                         .font(.system(size: 11, weight: .semibold))
-                    Text(cornerBadge)
+                    Text(cornerBadge.transiumLocalized)
                         .font(TransiumFont.body(12, weight: .semibold))
                 }
                 .foregroundStyle(.white)
@@ -250,13 +236,13 @@ struct GoStepCard: View {
                     .background(.white.opacity(0.22))
                     .clipShape(.capsule)
 
-                Text(stopsRemaining == 1 ? "Stop to" : "Stops to")
+                Text(stopsRemaining == 1 ? "Stop to".transiumLocalized : "Stops to".transiumLocalized)
                     .font(TransiumFont.body(17, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
                 
             }
         } else {
-            Text(verb)
+            Text(verb.transiumLocalized)
                 .font(TransiumFont.body(17, weight: .medium))
                 .foregroundStyle(.white.opacity(0.85))
         }
@@ -275,7 +261,7 @@ struct GoStepCard: View {
                     .font(TransiumFont.body(28, weight: .bold))
                     .foregroundStyle(.white)
 
-                Text(metric.unit)
+                Text(metric.unit.transiumLocalized)
                     .font(TransiumFont.body(15, weight: .medium))
                     .foregroundStyle(.white)
             }
@@ -319,7 +305,7 @@ struct GoMissionCard: View {
                     .font(TransiumFont.body(14, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
 
-                Text(instructions)
+                Text(instructions.transiumLocalized)
                     .font(TransiumFont.body(19, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(2)
@@ -330,7 +316,7 @@ struct GoMissionCard: View {
                         HStack(spacing: 5) {
                             Image(systemName: isCapture ? "camera.fill" : "checkmark.circle")
                                 .font(.system(size: 12, weight: .semibold))
-                            Text(isCapture ? "Take a Photo" : "I'm here")
+                            Text(isCapture ? "Take a Photo".transiumLocalized : "I'm here".transiumLocalized)
                                 .font(TransiumFont.body(13, weight: .semibold))
                         }
                         .foregroundStyle(TransiumColor.primaryYellow)
@@ -368,11 +354,11 @@ struct GoBusAppCard: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 VStack(alignment: .leading, spacing: 2){
-                    Text(promptText)
+                    Text(promptText.transiumLocalized)
                         .font(TransiumFont.body(16, weight: .medium))
                         .foregroundStyle(.white.opacity(0.85))
 
-                    Text(appName)
+                    Text(appName.transiumLocalized)
                         .font(TransiumFont.body(21, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
@@ -384,7 +370,7 @@ struct GoBusAppCard: View {
                         Image("logo_tmd")
                             .resizable()
                             .frame(width: 20, height: 20)
-                        Text(downloadLabel)
+                        Text(downloadLabel.transiumLocalized)
                             .font(TransiumFont.body(13, weight: .semibold))
                         Image(systemName: "app.badge")
                             .font(.system(size: 14, weight: .semibold))

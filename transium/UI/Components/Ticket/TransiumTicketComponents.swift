@@ -111,7 +111,7 @@ struct TransiumRecommendedSeal: View {
                     )
                 )
 
-            Text("RECOMMENDED")
+            Text(LocalizedStringKey("RECOMMENDED"))
                 .font(TransiumFont.body(10, weight: .bold))
                 .tracking(0.4)
                 .foregroundStyle(TransiumColor.ticketInk)
@@ -146,7 +146,7 @@ struct TransiumRecommendedSeal: View {
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Color(red: 1.0, green: 0.85, blue: 0.35))
 
-            Text("RECOMMENDED")
+            Text(LocalizedStringKey("RECOMMENDED"))
                 .font(TransiumFont.body(10, weight: .bold))
                 .tracking(0.4)
                 .foregroundStyle(.white)

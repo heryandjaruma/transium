@@ -9,8 +9,8 @@ struct SettingsScreen: View {
     var onBack: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(SessionController.self) private var session
+    @Environment(AppLanguageManager.self) private var languageManager: AppLanguageManager?
 
-    @State private var selectedLanguage: Language = .indonesia
     @State private var voiceVolume: Double = 0.6
     @State private var musicVolume: Double = 0.5
     @State private var isPermissionExpanded: Bool = false
@@ -21,16 +21,8 @@ struct SettingsScreen: View {
 
     @State private var showLogoutConfirmation: Bool = false
 
-    enum Language: String, CaseIterable {
-        case indonesia = "Bahasa Indonesia"
-        case english = "English"
-
-        var flag: String {
-            switch self {
-            case .indonesia: "🇮🇩"
-            case .english: "🇺🇸"
-            }
-        }
+    private var activeLanguage: AppLanguage {
+        languageManager?.currentLanguage ?? AppLanguageManager.shared.currentLanguage
     }
 
     var body: some View {
@@ -107,17 +99,19 @@ struct SettingsScreen: View {
             SettingsSectionLabel(icon: "character.bubble.fill", title: "Language")
 
             HStack(spacing: 4) {
-                ForEach(Language.allCases, id: \.self) { language in
-                    let isSelected = selectedLanguage == language
+                ForEach(AppLanguage.allCases) { language in
+                    let isSelected = activeLanguage == language
                     Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            selectedLanguage = language
+                        if let languageManager {
+                            languageManager.setLanguage(language)
+                        } else {
+                            AppLanguageManager.shared.setLanguage(language)
                         }
                     } label: {
                         HStack(spacing: 8) {
                             Text(language.flag)
                                 .font(.system(size: 16))
-                            Text(language.rawValue)
+                            Text(language.displayName)
                                 .font(TransiumFont.body(14, weight: isSelected ? .bold : .semibold))
                                 .foregroundColor(isSelected ? TransiumColor.primaryBlue : .white.opacity(0.85))
                                 .lineLimit(1)
@@ -333,4 +327,6 @@ private struct VolumeSlider: View {
 #Preview {
     SettingsScreen()
         .environment(SessionController())
+        .environment(AppLanguageManager.shared)
+        .environment(\.locale, AppLanguageManager.shared.currentLanguage.locale)
 }

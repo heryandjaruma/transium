@@ -296,7 +296,7 @@ struct StepTimelineView: View {
 
                 if let transferRouteRef {
                     HStack(spacing: 6) {
-                        Text("Transit to")
+                        Text("Transit to".transiumLocalized)
                             .font(TransiumFont.body(15, weight: .bold))
                             .foregroundColor(.black)
 
@@ -313,7 +313,9 @@ struct StepTimelineView: View {
                         .cornerRadius(6)
                     }
                 } else {
-                    Text(index == 0 ? "Walk to **\(segment.to?.name ?? "destination")**" : "Walk to **destination**")
+                    let destName = segment.to?.name ?? "destination".transiumLocalized
+                    let walkText = (index == 0 ? "Walk to".transiumLocalized + " **\(destName)**" : "Walk to".transiumLocalized + " **\("destination".transiumLocalized)**")
+                    Text(LocalizedStringKey(walkText))
                         .font(TransiumFont.body(15, weight: .bold))
                         .foregroundColor(.black)
                 }
@@ -321,7 +323,7 @@ struct StepTimelineView: View {
                 Spacer()
 
                 if let dur = segment.durationSeconds {
-                    Text("\(Int(round(dur / 60))) min")
+                    Text("\(Int(round(dur / 60))) \("min".transiumLocalized)")
                         .font(TransiumFont.body(14, weight: .bold))
                         .foregroundColor(.black)
                 }
@@ -369,7 +371,8 @@ struct StepTimelineView: View {
                     .background(TransiumColor.primaryBlue.opacity(0.1))
                     .clipShape(Capsule())
                 
-                Text("to **\(segment.to?.name ?? "destination")**")
+                let destName = segment.to?.name ?? "destination".transiumLocalized
+                Text(LocalizedStringKey("to".transiumLocalized + " **\(destName)**"))
                     .font(TransiumFont.body(14, weight: .bold))
                     .foregroundColor(.black)
                     .lineLimit(1)
@@ -377,7 +380,7 @@ struct StepTimelineView: View {
                 Spacer()
                 
                 if let dur = segment.durationSeconds {
-                    Text("\(Int(round(dur / 60))) min")
+                    Text("\(Int(round(dur / 60))) \("min".transiumLocalized)")
                         .font(TransiumFont.body(14, weight: .bold))
                         .foregroundColor(.black)
                 }
@@ -414,7 +417,7 @@ struct StepTimelineView: View {
                             }
                         }) {
                             HStack(spacing: 4) {
-                                Text("\(stopCount - 2) Stops")
+                                Text("\(stopCount - 2) \("Stops".transiumLocalized)")
                                     .font(TransiumFont.body(11, weight: .medium))
                                 Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                                     .font(.system(size: 9, weight: .bold))

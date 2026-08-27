@@ -27,7 +27,7 @@ struct SettingsSectionLabel: View {
             Image(systemName: icon)
                 .foregroundColor(.white)
                 .font(.system(size: 21))
-            Text(title)
+            Text(LocalizedStringKey(title))
                 .font(TransiumFont.body(17, weight: .semibold))
                 .foregroundColor(.white)
         }
@@ -52,12 +52,12 @@ struct PermissionRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(TransiumFont.body(15, weight: .semibold))
                     .foregroundColor(TransiumColor.darkBlue)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text(subtitle)
+                Text(LocalizedStringKey(subtitle))
                     .font(TransiumFont.body(12, weight: .medium))
                     .foregroundColor(TransiumColor.darkBlue.opacity(0.6))
                     .lineLimit(2)
@@ -319,12 +319,12 @@ struct QuestRow: View {
             .frame(width: 76, height: 76)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(quest.title)
+                Text(quest.title.transiumLocalized)
                     .font(TransiumFont.body(15, weight: .bold))
                     .foregroundColor(.black)
                     .lineLimit(1)
 
-                Text(quest.description)
+                Text(quest.description.transiumLocalized)
                     .font(TransiumFont.body(12, weight: .medium))
                     .foregroundColor(.gray)
                     .lineLimit(2)
@@ -337,7 +337,7 @@ struct QuestRow: View {
                 Button {
                     onStart?()
                 } label: {
-                    Text("Start Quest")
+                    Text(LocalizedStringKey("Start Quest"))
                         .font(TransiumFont.body(11, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
@@ -378,11 +378,11 @@ struct RecommendedQuestCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 TransiumRecommendedSeal(style: .cardPill)
  
-                Text(title)
+                Text(title.transiumLocalized)
                     .font(TransiumFont.body(20, weight: .bold))
                     .foregroundColor(.white)
  
-                Text(subtitle)
+                Text(subtitle.transiumLocalized)
                     .font(TransiumFont.body(13))
                     .foregroundColor(.white.opacity(0.9))
                     .fixedSize(horizontal: false, vertical: true)

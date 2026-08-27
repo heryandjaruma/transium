@@ -470,7 +470,7 @@ struct ProfileScreen: View {
                         .foregroundColor(.white)
                 }
 
-                Label("Explorer", systemImage: "star.fill")
+                Label(LocalizedStringKey("Explorer"), systemImage: "star.fill")
                     .font(TransiumFont.body(14, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 14)
@@ -503,7 +503,7 @@ struct ProfileScreen: View {
                         HStack(spacing: 6) {
                             Image(systemName: tab.icon)
                                 .font(.system(size: 17))
-                            Text(tab.rawValue)
+                            Text(LocalizedStringKey(tab.rawValue))
                                 .font(TransiumFont.body(17, weight: .medium))
                         }
                         .foregroundColor(selectedTab == tab ? TransiumColor.primaryBlue : .gray)
@@ -534,7 +534,7 @@ struct ProfileScreen: View {
         Button {
             presentEditAccount()
         } label: {
-            Text("Edit Account")
+            Text(LocalizedStringKey("Edit Account"))
                 .font(TransiumFont.body(16, weight: .semibold))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
@@ -549,7 +549,7 @@ struct ProfileScreen: View {
             Image(systemName: icon)
                 .foregroundColor(.gray)
                 .frame(width: 24)
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(TransiumFont.body(14))
                 .foregroundColor(.black)
             Spacer()
@@ -564,11 +564,11 @@ struct ProfileScreen: View {
     private var badgesTab: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Your Badges")
+                Text(LocalizedStringKey("Your Badges"))
                     .font(TransiumFont.body(17, weight: .bold))
                     .foregroundColor(.black)
                 Spacer()
-                Text("\(earnedBadges.count) Badges")
+                Text("\(earnedBadges.count) \("Badges".transiumLocalized)")
                     .font(TransiumFont.body(17, weight: .bold))
                     .foregroundColor(TransiumColor.primaryBlue)
             }
@@ -578,7 +578,7 @@ struct ProfileScreen: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
             } else if earnedBadges.isEmpty {
-                Text("No badges yet — complete a quest to earn your first one.")
+                Text(LocalizedStringKey("No badges yet — complete a quest to earn your first one."))
                     .font(TransiumFont.body(14))
                     .foregroundColor(.gray)
                     .frame(maxWidth: .infinity)

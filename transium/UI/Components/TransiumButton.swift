@@ -44,7 +44,7 @@ struct TransiumPrimaryButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(font)
                     .foregroundStyle(foregroundColor)
  
@@ -136,7 +136,7 @@ struct TransiumSecondaryButton: View {
                     iconView(icon)
                 }
 
-                Text(title)
+                Text(LocalizedStringKey(title))
                     .font(font)
                     .foregroundStyle(foregroundColor)
 

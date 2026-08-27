@@ -60,7 +60,7 @@ struct SummaryBox: View {
                 .frame(width: 45, height: 45)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(data.title)
+                Text(LocalizedStringKey(data.title))
                     .font(TransiumFont.body(12))
                     .foregroundStyle(.black)
                     .lineLimit(1)
