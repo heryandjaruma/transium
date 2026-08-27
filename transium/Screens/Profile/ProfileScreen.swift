@@ -23,6 +23,7 @@ struct ProfileScreen: View {
         }
     }
 
+    var onBack: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(SessionController.self) private var session
 
@@ -108,6 +109,16 @@ struct ProfileScreen: View {
                     }
                 }
             }
+
+            if isSettingsPresented {
+                SettingsScreen(onBack: {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isSettingsPresented = false
+                    }
+                })
+                .transition(.move(edge: .trailing))
+                .zIndex(200)
+            }
         }
         .navigationBarBackButtonHidden(true)
         .task {
@@ -121,9 +132,6 @@ struct ProfileScreen: View {
         }
         .sheet(isPresented: $isEditingAccount) {
             editAccountSheet
-        }
-        .sheet(isPresented: $isSettingsPresented) {
-            SettingsScreen()
         }
         .fullScreenCover(item: $viewingPhoto) { photo in
             PhotoViewer(
@@ -390,7 +398,11 @@ struct ProfileScreen: View {
 
                 HStack {
                     Button {
-                        dismiss()
+                        if let onBack {
+                            onBack()
+                        } else {
+                            dismiss()
+                        }
                     } label: {
                         Image(systemName: "arrow.left")
                             .foregroundColor(TransiumColor.primaryBlue)

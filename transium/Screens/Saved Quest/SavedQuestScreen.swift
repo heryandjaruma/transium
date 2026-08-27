@@ -205,14 +205,6 @@ private struct SavedQuestCard: View {
     var onRemove: (() -> Void)? = nil
 
     var body: some View {
-        let stampVariant: TransiumStampVariant = {
-            switch quest.theme {
-            case .blue: return .blue
-            case .red: return .warm
-            case .green: return .green
-            }
-        }()
-
         HStack(spacing: 14) {
             QuestBadgePostageStack(
                 badgeUrls: quest.badgeImageUrls,

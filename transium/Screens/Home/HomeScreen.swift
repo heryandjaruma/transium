@@ -39,6 +39,14 @@ struct HomeScreen: View {
                 detailOverlay
             }
 
+            if vm.isProfilePresented {
+                profileOverlay
+            }
+
+            if vm.isSettingsPresented {
+                settingsOverlay
+            }
+
             if vm.isStartingGoMode || vm.isFetchingJourney || vm.isResumingOngoingTrip {
                 LoadingScreen()
                     .transition(.opacity)
@@ -92,19 +100,17 @@ struct HomeScreen: View {
             })
         }
         .fullScreenCover(item: $vm.journeyCompletionResult) { result in
-            SummaryScreen(result: result, onDismiss: {
-                vm.journeyCompletionResult = nil
-                vm.endGoMode()
-            })
+            SummaryScreen(
+                result: result,
+                journey: vm.activeJourney,
+                onDismiss: {
+                    vm.journeyCompletionResult = nil
+                    vm.endGoMode()
+                }
+            )
         }
         .sheet(isPresented: $vm.isSearchPresented, onDismiss: vm.resetSheetState) {
             searchSheetContent
-        }
-        .sheet(isPresented: $vm.isProfilePresented) {
-            ProfileScreen()
-        }
-        .sheet(isPresented: $vm.isSettingsPresented) {
-            SettingsScreen()
         }
         .sheet(isPresented: $vm.isSavedQuestPresented) {
             SavedQuestScreen()
@@ -195,8 +201,16 @@ struct HomeScreen: View {
             HStack(spacing: 10) {
                 HomeFloatingMenu(
                     isExpanded: $vm.isMenuExpanded,
-                    onSettings: { vm.isSettingsPresented = true },
-                    onProfile: { vm.isProfilePresented = true },
+                    onSettings: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            vm.isSettingsPresented = true
+                        }
+                    },
+                    onProfile: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            vm.isProfilePresented = true
+                        }
+                    },
                     onSavedQuests: { vm.isSavedQuestPresented = true },
                     onCenterMap: { vm.centerMapOnUser() }
                 )
@@ -272,6 +286,30 @@ struct HomeScreen: View {
         )
         .transition(.move(edge: .trailing))
         .zIndex(100)
+    }
+
+    private var profileOverlay: some View {
+        ProfileScreen(
+            onBack: {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    vm.isProfilePresented = false
+                }
+            }
+        )
+        .transition(.move(edge: .trailing))
+        .zIndex(110)
+    }
+
+    private var settingsOverlay: some View {
+        SettingsScreen(
+            onBack: {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    vm.isSettingsPresented = false
+                }
+            }
+        )
+        .transition(.move(edge: .trailing))
+        .zIndex(120)
     }
 
     private var searchSheetContent: some View {

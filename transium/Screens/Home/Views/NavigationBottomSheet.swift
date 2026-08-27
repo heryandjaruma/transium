@@ -133,7 +133,7 @@ struct NavigationBottomSheet: View {
                         .padding(.horizontal, 20)
                         .padding(.bottom, 40)
                 }
-                .frame(maxHeight: min(UIScreen.main.bounds.height * 0.58, 480))
+                .frame(maxHeight: 460)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }

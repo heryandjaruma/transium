@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct SettingsScreen: View {
+    var onBack: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(SessionController.self) private var session
 
@@ -80,7 +81,11 @@ struct SettingsScreen: View {
 
             HStack {
                 Button {
-                    dismiss()
+                    if let onBack {
+                        onBack()
+                    } else {
+                        dismiss()
+                    }
                 } label: {
                     Image(systemName: "arrow.left")
                         .foregroundColor(TransiumColor.primaryBlue)
