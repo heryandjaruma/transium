@@ -76,13 +76,7 @@ struct SummaryScreen: View {
     }
 
     private var calorieMessage: String {
-        let calories: Int = {
-            if let summary { return max(1, Int(summary.calorie.rounded())) }
-            if let journey { return max(50, Int(Double(journey.summary.walkingDistanceMeters) * 0.05)) }
-            return 250
-        }()
-        
-        return "If more people take public transportation, there’s higher chance we can get even better infrastructures and more frequent services!"
+        "If more people take public transportation, there’s higher chance we can get even better infrastructures and more frequent services!"
     }
 
     private var tripTitle: String {
