@@ -46,10 +46,12 @@
 
 ```
 Screens/Summary/
-├── SummaryScreen.swift                  // Root coordinator (3-sec cross-fade)
+├── SummaryScreen.swift                  // Root coordinator (3-sec cross-fade, location resolvers)
 └── Views/
     ├── SummaryIntroView.swift           // 165pt rotated postage stamp wrap-up
-    ├── SummaryCelebrationView.swift     // 155pt rotated postage stamp with confetti & stat grid
+    ├── SummaryCelebrationView.swift     // 190pt postage stamp with coaxial BadgeShine, 230pt vector map & 4-stat grid
+    ├── SummaryMapView.swift             // MapLibre vector route snapshot & auto-framing container
+    ├── SummaryStoryCardView.swift       // 9:16 Instagram Story card renderer with MapLibre basemap
     └── SummaryReportCard.swift          // Reusable summary metrics component
 ```
 
@@ -59,14 +61,32 @@ Screens/Summary/
 - Shows total calories burned with motivational comparison text ("like doing 1,000 jumping jacks 🥵").
 
 ### 2. `SummaryCelebrationView`
-- Transitions in after 3 seconds via smooth cross-fade animation.
+- Transitions in after 2.8–3.0 seconds via smooth spring and opacity animation.
 - Visual elements:
-  - Background radial shine (`BadgeShine`).
-  - Colorful confetti particles (`Confetti-L`, `Confetti-R`).
-  - Rotated `155pt` `TransiumStampCard` badge.
-  - Floating outlined quest title with starburst splash (`OutlinedText` rotated `-5°`).
-  - White route and stats summary card (Distance, Travel Cost saved, Calories, Steps).
-  - "Share your experience" and "Go to the Next Trip!" actions.
+  - **Coaxial Sunburst Shine (`BadgeShine`)**: Sunburst rays nested in the exact same `ZStack` as the badge stamp on the same Y-axis center.
+  - **Confetti Pops**: Pop animations for `Confetti-L` and `Confetti-R`.
+  - **Hero Postage Stamp**: `190pt` `BadgeArtworkStamp` rotated `-7.5°`.
+  - **Floating Outlined Title**: Outlined quest title (`OutlinedText` rotated `-5°`) with starburst splash (`Splash`).
+  - **White Content Card**:
+    - Route header: Origin (red pin) ➔ Destination (green pin).
+    - **Dynamic Vector Map (`SummaryMapView`)**: `230pt` height, smooth entrance animation, full route polyline rendering with white road casing.
+    - **4-Stat Metrics Grid (`SummaryBox`)**: Distance (km), Cost Saved (Rp), Calories, and Total Steps.
+  - **Action Buttons**: "Share your experience" (Instagram Story export) and "Go to the Next Trip!".
+
+### 3. Vector Map Snapshotting (`SummaryMapView`)
+- Custom `UIViewRepresentable` wrapping `SummaryMapContainerView` (`MLNMapView`).
+- Pre-centers camera on route midpoint coordinate.
+- Automatically calculates coordinate bounding box with `12%` margin padding and `22pt` edge insets to prevent start/dest pin clipping.
+- Captures Metal framebuffer into `SummaryMapSnapshotCache.shared` for zero-delay offline rendering in story shares.
+
+### 4. Instagram Story Share (`SummaryStoryCardView` & `SummaryStoryShareManager`)
+- **Dimensions**: Formatted for 9:16 canvas ratio (`414 × 896 pt`).
+- **Brand Consistency**: Uses authentic Transium primary blue (`TransiumColor.primaryBlue`), coaxial `BadgeShine` sunburst rays, tilted postage stamp badge, outlined title, route summary pill, and MapLibre vector map snapshot.
+- **Sharing Pipeline**:
+  1. Pre-caches quest badge `UIImage` from `TransiumImageCache` or loads synchronously.
+  2. Grabs latest vector map snapshot from `SummaryMapSnapshotCache.shared`.
+  3. Renders `SummaryStoryCardView` via `ImageRenderer`.
+  4. Copies sticker image pasteboard data and deep-links to `instagram-stories://share` with fallback to `UIActivityViewController`.
 
 ---
 
@@ -74,5 +94,6 @@ Screens/Summary/
 
 Postage stamp cards across Transium use template rendering with authentic serrated edges:
 - **`TransiumStampVariant`**: Supports `.classic`, `.blue`, `.warm`, and `.green` frame colors and shadow depths.
-- **Tilt Angle**: Typically `-4°` or `-5°` to provide playful physical stamp character.
+- **Tilt Angle**: Typically `-4°`, `-5°`, or `-7.5°` to provide playful physical stamp character.
 - **Async Image Loading**: Built-in shimmer loading placeholders and asset image fallbacks.
+- **Coaxial Alignment**: Centered directly with background sunburst shines without hardcoded vertical offsets.

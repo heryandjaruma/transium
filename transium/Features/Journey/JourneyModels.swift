@@ -59,7 +59,17 @@ public nonisolated struct JourneyResult: Codable, Equatable, Sendable {
     /// The journey's true final destination name. Returns the arrival point name of the last travel leg
     /// that has a named location (`to?.name`), falling back to mission instructions or "Destination".
     public var destinationName: String {
-        if let lastLocationName = segments.reversed().compactMap({ $0.to?.name }).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+        // 1. Prioritize last bus stop in the transit route (e.g. "Sentral Parkir Monkey Forest")
+        if let busArrival = segments.reversed().first(where: { $0.type == "bus" })?.to?.name,
+           !busArrival.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return busArrival
+        }
+        // 2. Check last non-generic destination from journey segments
+        if let lastLocationName = segments.reversed().compactMap({ $0.to?.name }).first(where: {
+            let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            let lower = trimmed.lowercased()
+            return !trimmed.isEmpty && lower != "destination" && lower != "walk to destination" && lower != "current location"
+        }) {
             return lastLocationName
         }
         guard let lastSegment = segments.last else { return "Destination" }

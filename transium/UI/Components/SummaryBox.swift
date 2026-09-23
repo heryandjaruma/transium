@@ -8,38 +8,6 @@
 import SwiftUI
 import Observation
 
-//@Observable
-//class StatsViewModel {
-//    var cards: [StatCardData] = []
-//
-//    func load(for questID: String) async {
-//        let distance = await healthKitService.distance(for: questID)
-//        let cost = await walletService.cost(for: questID)
-//        let calories = await healthKitService.calories(for: questID)
-//        let steps = await pedometerService.steps(for: questID)
-//
-//        cards = [
-//            StatCardData(title: "Total Distance", value: "\(distance)", unit: "km", icon: "figure.walk"),
-//            StatCardData(title: "Cost Total", value: "\(cost)", unit: "Rp", icon: "banknote"),
-//            StatCardData(title: "Calorie Burn", value: "\(calories)", unit: nil, icon: "flame.fill"),
-//            StatCardData(title: "Total Steps", value: "\(steps)", unit: nil, icon: "shoeprints.fill"),
-//        ]
-//    }
-//}
-
-//extension StatsViewModel {
-//    static var sample: StatsViewModel {
-//        let dummy = StatsViewModel()
-//        dummy.cards = [
-//            StatCardData(title: "Total Distance", value: "17", unit: "km", icon: "figure.walk"),
-//            StatCardData(title: "Cost Total", value: "4.4K", unit: "Rp", icon: "banknote"),
-//            StatCardData(title: "Calorie Burn", value: "2500", unit: nil, icon: "flame.fill"),
-//            StatCardData(title: "Total Steps", value: "3600", unit: nil, icon: "shoeprints.fill"),
-//        ]
-//        return dummy
-//    }
-//}
-
 // MARK: - Shared data model
 struct StatCardData: Identifiable {
     let id = UUID()
@@ -54,11 +22,11 @@ struct SummaryBox: View {
     let data: StatCardData
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 9) {
             Image(data.icon)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 36, height: 36)
+                .frame(width: 38, height: 38)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(LocalizedStringKey(data.title))
@@ -89,10 +57,10 @@ struct SummaryBox: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
         .background(Color.white)
-        .frame(maxWidth: .infinity, minHeight: 68, maxHeight: 74)
         .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 }
@@ -103,7 +71,7 @@ struct StatsGridView: View {
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 12) {
+        LazyVGrid(columns: columns, spacing: 10) {
             ForEach(cards) { SummaryBox(data: $0) }
         }
         .padding(16)
@@ -112,7 +80,6 @@ struct StatsGridView: View {
 
 #Preview {
     ZStack {
-        
         Color.primaryBlue
             .ignoresSafeArea()
         
@@ -120,7 +87,7 @@ struct StatsGridView: View {
             title: "Total Distance",
             value: "17",
             unit: "km",
-            icon: "distance-icon",
+            icon: "distance-icon"
         ))
         .padding()
         .background(TransiumColor.primaryBlue)

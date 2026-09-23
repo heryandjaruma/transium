@@ -81,31 +81,68 @@ struct SummaryScreen: View {
         return false
     }
 
-    private var originName: String {
-        if let start = summary?.startPoint, !isStepActionText(start), start != "Start", start != "Current Location" {
-            return start
+    private func isGenericLocationName(_ text: String?) -> Bool {
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return true }
+        let lower = text.lowercased()
+        if lower == "destination" ||
+           lower == "walk to destination" ||
+           lower == "current location" ||
+           lower == "start" ||
+           lower == "origin" ||
+           lower == "finish" ||
+           lower == "culture" ||
+           lower == "explore" ||
+           lower == "nature" ||
+           lower == "food" ||
+           lower == "null" ||
+           lower == "undefined" {
+            return true
         }
-        if let firstFrom = journey?.segments.first?.from?.name, !isStepActionText(firstFrom) {
+        return isStepActionText(text)
+    }
+
+    private var originName: String {
+        // 1. First bus departure stop in the transit route (e.g. "Titi Banda")
+        if let firstBusStop = journey?.segments.first(where: { $0.type == "bus" })?.from?.name,
+           !isGenericLocationName(firstBusStop) {
+            return firstBusStop
+        }
+        // 2. First non-generic departure point from journey segments
+        if let firstFrom = journey?.segments.first?.from?.name, !isGenericLocationName(firstFrom) {
             return firstFrom
+        }
+        // 3. Start point from backend summary
+        if let start = summary?.startPoint, !isGenericLocationName(start) {
+            return start
         }
         return "Origin"
     }
 
     private var destinationName: String {
-        if let areaName, !areaName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isStepActionText(areaName) {
-            return areaName
+        // 1. Last bus arrival stop in the transit route (e.g. "Sentral Parkir Monkey Forest")
+        if let lastBusStop = journey?.segments.reversed().first(where: { $0.type == "bus" })?.to?.name,
+           !isGenericLocationName(lastBusStop) {
+            return lastBusStop
         }
-        if let journeyDest = journey?.destinationName, !isStepActionText(journeyDest) {
+        // 2. Journey destination / arrival stop if not generic
+        if let journeyDest = journey?.destinationName, !isGenericLocationName(journeyDest) {
             return journeyDest
         }
-        if let lastLocation = journey?.segments.reversed().compactMap(\.to?.name).first(where: { !isStepActionText($0) }) {
+        // 3. Last location in journey segments
+        if let lastLocation = journey?.segments.reversed().compactMap(\.to?.name).first(where: { !isGenericLocationName($0) }) {
             return lastLocation
         }
-        if let finish = summary?.finishPoint, !isStepActionText(finish) {
+        // 4. Finish point from backend summary
+        if let finish = summary?.finishPoint, !isGenericLocationName(finish) {
             return finish
         }
-        if let cat = result.journeyAttempt.questCategory, !isStepActionText(cat), cat != "Culture", cat != "Explore" {
-            return cat
+        // 5. Quest Name if meaningful
+        if let questName = result.journeyAttempt.questName, !isGenericLocationName(questName) {
+            return questName
+        }
+        // 6. Area Name as fallback
+        if let areaName, !isGenericLocationName(areaName) {
+            return areaName
         }
         return "Sanur Beach"
     }

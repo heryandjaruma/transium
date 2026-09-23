@@ -81,8 +81,23 @@ struct HomeNavigationTopBar: View {
 struct HomeNavigationActionSheet: View {
     let journey: JourneyResult
     var isStartingGoMode: Bool
+    @Binding var isCollapsed: Bool
     var onStartGo: () -> Void
     var onBack: () -> Void
+
+    init(
+        journey: JourneyResult,
+        isStartingGoMode: Bool,
+        isCollapsed: Binding<Bool> = .constant(false),
+        onStartGo: @escaping () -> Void,
+        onBack: @escaping () -> Void
+    ) {
+        self.journey = journey
+        self.isStartingGoMode = isStartingGoMode
+        self._isCollapsed = isCollapsed
+        self.onStartGo = onStartGo
+        self.onBack = onBack
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -107,7 +122,7 @@ struct HomeNavigationActionSheet: View {
                 .padding(.bottom, 16)
             }
             
-            NavigationBottomSheet(journey: journey, onBack: onBack)
+            NavigationBottomSheet(journey: journey, isCollapsed: $isCollapsed, onBack: onBack)
         }
         .ignoresSafeArea(edges: .bottom)
         .transition(.move(edge: .bottom))

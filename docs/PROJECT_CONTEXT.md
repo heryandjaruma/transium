@@ -62,12 +62,14 @@ transium/
 │   ├── Saved Quest/             # SavedQuestScreen bookmark catalog
 │   ├── Settings/                # SettingsScreen (Language, Audio volumes, Notification permissions)
 │   ├── States/                  # EmptyStateScreen placeholder states
-│   └── Summary/                 # SummaryScreen and Views/ (SummaryIntroView, SummaryCelebrationView)
-│       ├── SummaryScreen.swift                  # 3-second transition coordinator
+│   └── Summary/                 # SummaryScreen and Views/ (SummaryIntroView, SummaryCelebrationView, SummaryMapView, SummaryStoryCardView)
+│       ├── SummaryScreen.swift                  # 3-second transition coordinator & data resolver
 │       └── Views/
 │           ├── SummaryIntroView.swift           # Intro wrap-up view with 165pt postage stamp
-│           ├── SummaryCelebrationView.swift     # Celebration card with 155pt postage stamp & confetti
-│           └── SummaryReportCard.swift          # Reusable summary report card component
+│           ├── SummaryCelebrationView.swift     # Celebration card with coaxial BadgeShine, 190pt stamp, 230pt vector map & confetti
+│           ├── SummaryMapView.swift             # MapLibre vector route snapshot & auto-framing container
+│           ├── SummaryStoryCardView.swift       # 9:16 Instagram Story card renderer with MapLibre basemap
+│           └── SummaryReportCard.swift          # Reusable summary metrics component
 │
 ├── UI/                      # Design system tokens and reusable UI components
 │   ├── Components/              # TransiumButton, TransiumIconButton, TransiumStampCard, AppToast
@@ -84,6 +86,9 @@ transium/
 
 ### 1. Map, Road Snapping & Transit Routing Engine
 - **MapLibre Offline Foundation**: Powered by offline PMTiles vector layers (`bali_basemap.pmtiles` and `bali_transit.pmtiles`) via `TransiumMapStyleFactory`.
+- **Interactive Map Under Sheets**:
+  - Full-screen touch interceptors removed across `HomeScreen` and `GoComponentMode`, allowing user gestures (pan, pinch, zoom, rotate) to pass directly to `LocalBaliMapView` while sheets and drawers are open.
+  - Native `.presentationBackgroundInteraction(.enabled)` configured on search and pinning sheets.
 - **20m Road-Snapping (`RoadSnapper`)**:
   - Orthogonally projects user location and raw GTFS stop coordinates directly onto active route polylines and vector road tile layers (`roads`, `roads-casing`).
   - Snaps when within $\le 20\text{m}$; allows free movement when beyond $20\text{m}$.
@@ -96,23 +101,35 @@ transium/
   - Pre-resolves all transit segments concurrently in parallel using `withTaskGroup`.
   - Calculates exact street-following geometry through consecutive stop pairs along `segment.stops` to follow real inland bus avenue corridors (Jl. Imam Bonjol, Jl. Teuku Umar, Jl. Sudirman) rather than toll bypasses.
   - Caches resolved polyline coordinates in-memory for instant frame rendering with zero snapping.
-- **Route Line Aesthetics**:
+- **Route Line Aesthetics & Map Framing**:
   - Bus routes render with white outer casings (8pt) and official transit line colors (5pt) matching `K1B` through `K6B`.
   - Walking legs render with crisp emerald green dashed paths (4.5pt) and white casings.
-  - Custom interactive stop annotations differentiate boarding (flag), intermediate (circle), and alighting points.
+  - Dynamic route bounding box calculations with 12% margin expansion and 22pt padding insets to prevent route clipping in celebration views.
 
 ### 2. Postage Stamp Design System (`TransiumStampCard` & `QuestBadgePostageStack`)
 - Reusable postage stamp cards featuring serrated postage stamp borders, customizable tilt angles, drop shadows, and theme variants (`.classic`, `.blue`, `.warm`, `.green`).
+- **Coaxial Sunburst Centering**: `Image("BadgeShine")` is nested directly behind `BadgeArtworkStamp` / `TransiumStampCard` on the same Y-axis center to radiate light rays authentically from the postage stamp.
 - **Deterministic Multi-Badge Stacking**:
   - **1 Badge**: Size `72`, `tilt: 0°`, offset `(0, 0)`.
   - **2 Badges**: Scaled to `62`–`64`, scattered with back badge (`tilt: -8°`, offset `(-6, -4)`) and front badge (`tilt: +6°`, offset `(+5, +4)`).
   - **3 Badges**: Scaled down to `52`–`56`, scattered with bottom badge (`tilt: -12°`, offset `(-10, -6)`), middle badge (`tilt: +10°`, offset `(+8, -3)`), and top badge (`tilt: -2°`, offset `(0, +6)`).
 
-### 3. Swift 6 Concurrency & Strict Types
+### 3. Summary Celebration & Instagram Story Sharing
+- **Two-Step Celebration Flow**: Automatic 3-second animated intro (`SummaryIntroView`) transitioning into `SummaryCelebrationView` with smooth step-2 map entrance.
+- **Instagram Story Card Engine (`SummaryStoryCardView` & `SummaryStoryShareManager`)**:
+  - High-resolution 9:16 story card rendering matching Transium brand identity (`TransiumColor.primaryBlue`, `BadgeShine`, confetti, outlined title, 4-stat metrics grid).
+  - Uses live MapLibre vector basemap snapshots (`SummaryMapSnapshotCache`) and pre-cached badge assets (`TransiumImageCache`).
+  - Direct sharing via `instagram-stories://share` with fallback to standard `UIActivityViewController`.
+
+### 4. Custom Modal System & Live Activity Lifecycle
+- **Branded Conflict Dialog**: Custom overlay card replacing system alerts for active journey conflicts (`journeyConflictModal`) with Transium typography (`TransiumFont.display`), warning badge icon, and branded primary/destructive buttons.
+- **Immediate ActivityKit Dismissal**: `LiveActivityManager.shared.endAllActivities(dismissalPolicy: .immediate)` immediately terminates Dynamic Island and lock screen activities upon journey completion or cancellation.
+
+### 5. Swift 6 Concurrency & Strict Types
 - All API and domain DTOs are declared `public nonisolated struct` / `public nonisolated enum` to enable seamless data transfer across background actor boundaries (`RoadGeometryResolver`, background services) without `MainActor` isolation friction.
 - Modern iOS MapKit integration utilizing version-checked `MKMapItem(location:address:)` and backward-compatible fallback constructors.
 
-### 4. Authentication & Keychain Token Management
+### 6. Authentication & Keychain Token Management
 - Powered by Better Auth with Apple Sign-In exchange.
 - Session tokens stored securely in iOS Keychain via `SessionTokenStore`.
 - Automatic Bearer token header injection in `APIClient`.

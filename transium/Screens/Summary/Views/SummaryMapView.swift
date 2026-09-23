@@ -8,6 +8,26 @@ import MapKit
 import MapLibre
 import SwiftUI
 
+/// Shared cache storing the latest high-fidelity MapLibre vector map snapshot rendered in SummaryMapView.
+@MainActor
+final class SummaryMapSnapshotCache {
+    static let shared = SummaryMapSnapshotCache()
+    var latestSnapshot: UIImage?
+
+    private init() {}
+
+    func capture(from mapView: MLNMapView) {
+        guard mapView.bounds.width > 0 && mapView.bounds.height > 0 else { return }
+        let renderer = UIGraphicsImageRenderer(bounds: mapView.bounds)
+        let image = renderer.image { _ in
+            mapView.drawHierarchy(in: mapView.bounds, afterScreenUpdates: false)
+        }
+        if image.size.width > 0 && image.size.height > 0 {
+            latestSnapshot = image
+        }
+    }
+}
+
 /// Custom MLNMapView container that fires layout callbacks to ensure bounding box fits reliably once rendered.
 final class SummaryMapContainerView: MLNMapView {
     var onLayoutChange: (() -> Void)?
@@ -44,10 +64,21 @@ struct SummaryMapView: UIViewRepresentable {
         mapView.onLayoutChange = { [weak coordinator, weak mapView] in
             guard let coordinator, let mapView else { return }
             coordinator.applyCoordinateBounds(on: mapView)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                SummaryMapSnapshotCache.shared.capture(from: mapView)
+            }
         }
 
-        let defaultCenter = CLLocationCoordinate2D(latitude: -8.690, longitude: 115.220)
-        mapView.setCenter(defaultCenter, zoomLevel: 12, animated: false)
+        var initialCenter = CLLocationCoordinate2D(latitude: -8.690, longitude: 115.220)
+        if let journey {
+            initialCenter = CLLocationCoordinate2D(
+                latitude: (journey.origin.lat + journey.destination.lat) / 2.0,
+                longitude: (journey.origin.lng + journey.destination.lng) / 2.0
+            )
+        } else if let first = path.first {
+            initialCenter = CLLocationCoordinate2D(latitude: first.lat, longitude: first.lng)
+        }
+        mapView.setCenter(initialCenter, zoomLevel: 11.5, animated: false)
 
         do {
             mapView.styleURL = try TransiumMapStyleFactory.makeLocalBaliStyleURL()
@@ -277,8 +308,8 @@ struct SummaryMapView: UIViewRepresentable {
                 let latSpan = maxLat - minLat
                 let lngSpan = maxLng - minLng
 
-                let latMargin = max(0.001, latSpan * 0.06)
-                let lngMargin = max(0.001, lngSpan * 0.06)
+                let latMargin = max(0.002, latSpan * 0.12)
+                let lngMargin = max(0.002, lngSpan * 0.12)
 
                 let sw = CLLocationCoordinate2D(latitude: minLat - latMargin, longitude: minLng - lngMargin)
                 let ne = CLLocationCoordinate2D(latitude: maxLat + latMargin, longitude: maxLng + lngMargin)
@@ -289,7 +320,7 @@ struct SummaryMapView: UIViewRepresentable {
 
         func applyCoordinateBounds(on mapView: MLNMapView) {
             guard let bounds = currentBounds, mapView.bounds.width > 0, mapView.bounds.height > 0 else { return }
-            let insets = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+            let insets = UIEdgeInsets(top: 22, left: 18, bottom: 22, right: 18)
             mapView.setVisibleCoordinateBounds(
                 bounds,
                 edgePadding: insets,

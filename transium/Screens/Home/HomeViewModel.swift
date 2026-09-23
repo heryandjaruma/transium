@@ -285,6 +285,7 @@ final class HomeViewModel: ObservableObject {
                     if showOngoingTripCard {
                         withAnimation(.easeIn(duration: 0.22)) { showOngoingTripCard = false }
                     }
+                    LiveActivityManager.shared.endAllActivities(dismissalPolicy: .immediate)
                     return
                 }
 
@@ -325,7 +326,7 @@ final class HomeViewModel: ObservableObject {
                     activeJourney = resolvedJourney
                     activeQuestId = questId
                     activeQuestName = attempt.questName
-                    activeAreaName = attempt.questCategory
+                    activeAreaName = resolvedJourney.destinationName
                     goJourneyAttempt = attempt
                     goJourneySteps = ongoingJourneySteps
                     goGeofences = geofences
@@ -501,6 +502,7 @@ final class HomeViewModel: ObservableObject {
     func cancelConflictingAttemptAndRetry(_ conflict: JourneyStartConflictError) {
         journeyConflict = nil
         guard let attemptId = conflict.activeJourneyAttemptId else { return }
+        LiveActivityManager.shared.endAllActivities(dismissalPolicy: .immediate)
 
         Task {
             do {
@@ -511,6 +513,9 @@ final class HomeViewModel: ObservableObject {
                         goJourneySteps = []
                         goGeofences = []
                     }
+                    ongoingJourneyAttempt = nil
+                    ongoingJourneySteps = []
+                    showOngoingTripCard = false
                 }
                 startGoMode()
             } catch {
@@ -543,7 +548,7 @@ final class HomeViewModel: ObservableObject {
             goCurrentSegmentIndex = 0
         }
         goStartDebugResult = nil
-        LiveActivityManager.shared.endNavigationActivity(dismissalPolicy: .immediate)
+        LiveActivityManager.shared.endAllActivities(dismissalPolicy: .immediate)
 
         if cancelAttempt {
             cancelActiveJourneyAttempt()
@@ -553,7 +558,13 @@ final class HomeViewModel: ObservableObject {
     func cancelActiveJourneyAttempt() {
         guard let attempt = goJourneyAttempt, !isCancelingJourney else { return }
         isCancelingJourney = true
-        LiveActivityManager.shared.endNavigationActivity(dismissalPolicy: .immediate)
+        geofenceMonitor.stopMonitoring()
+        geofenceMonitor.onRegionEntered = nil
+        randomPhotoOpMonitor.stopMonitoring()
+        randomPhotoOpMonitor.onRegionEntered = nil
+        pendingPhotoStep = nil
+        isRandomPhotoOpPresented = false
+        LiveActivityManager.shared.endAllActivities(dismissalPolicy: .immediate)
 
         Task {
             do {
@@ -563,6 +574,9 @@ final class HomeViewModel: ObservableObject {
                     goJourneySteps = []
                     goGeofences = []
                     goPathBreadcrumb = []
+                    ongoingJourneyAttempt = nil
+                    ongoingJourneySteps = []
+                    showOngoingTripCard = false
                     hasSubmittedJourneyCompletion = false
                     isCancelingJourney = false
                     AppToastCenter.shared.showSuccess(
@@ -672,7 +686,15 @@ final class HomeViewModel: ObservableObject {
                 await MainActor.run {
                     goJourneyAttempt = result.journeyAttempt
                     geofenceMonitor.stopMonitoring()
-                    LiveActivityManager.shared.endNavigationActivity(dismissalPolicy: .default)
+                    geofenceMonitor.onRegionEntered = nil
+                    randomPhotoOpMonitor.stopMonitoring()
+                    randomPhotoOpMonitor.onRegionEntered = nil
+                    pendingPhotoStep = nil
+                    isRandomPhotoOpPresented = false
+                    ongoingJourneyAttempt = nil
+                    ongoingJourneySteps = []
+                    showOngoingTripCard = false
+                    LiveActivityManager.shared.endAllActivities(dismissalPolicy: .immediate)
                     journeyCompletionResult = result
                 }
             } catch {
@@ -714,7 +736,15 @@ final class HomeViewModel: ObservableObject {
                     await MainActor.run {
                         goJourneyAttempt = result.journeyAttempt
                         geofenceMonitor.stopMonitoring()
-                        LiveActivityManager.shared.endNavigationActivity(dismissalPolicy: .default)
+                        geofenceMonitor.onRegionEntered = nil
+                        randomPhotoOpMonitor.stopMonitoring()
+                        randomPhotoOpMonitor.onRegionEntered = nil
+                        pendingPhotoStep = nil
+                        isRandomPhotoOpPresented = false
+                        ongoingJourneyAttempt = nil
+                        ongoingJourneySteps = []
+                        showOngoingTripCard = false
+                        LiveActivityManager.shared.endAllActivities(dismissalPolicy: .immediate)
                         journeyCompletionResult = result
                     }
                 } catch {
@@ -793,7 +823,15 @@ final class HomeViewModel: ObservableObject {
         )
 
         geofenceMonitor.stopMonitoring()
-        LiveActivityManager.shared.endNavigationActivity(dismissalPolicy: .default)
+        geofenceMonitor.onRegionEntered = nil
+        randomPhotoOpMonitor.stopMonitoring()
+        randomPhotoOpMonitor.onRegionEntered = nil
+        pendingPhotoStep = nil
+        isRandomPhotoOpPresented = false
+        ongoingJourneyAttempt = nil
+        ongoingJourneySteps = []
+        showOngoingTripCard = false
+        LiveActivityManager.shared.endAllActivities(dismissalPolicy: .immediate)
         journeyCompletionResult = completeResult
     }
 

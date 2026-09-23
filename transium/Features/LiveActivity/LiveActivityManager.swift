@@ -49,6 +49,9 @@ public final class LiveActivityManager {
 
     /// Dynamically updates the current Live Activity with updated navigation telemetry.
     public func updateNavigationActivity(state: TransiumNavigationActivityAttributes.ContentState) {
+        if currentActivity == nil {
+            currentActivity = Activity<TransiumNavigationActivityAttributes>.activities.first(where: { $0.activityState == .active })
+        }
         guard let activity = currentActivity else { return }
 
         Task {
@@ -56,12 +59,18 @@ public final class LiveActivityManager {
         }
     }
 
-    /// Ends the current Live Activity when the trip completes or is canceled.
+    /// Ends all active Live Activities when the trip completes or is canceled.
     public func endNavigationActivity(dismissalPolicy: ActivityUIDismissalPolicy = .immediate) {
-        guard let activity = currentActivity else { return }
+        endAllActivities(dismissalPolicy: dismissalPolicy)
+    }
 
-        Task {
-            await activity.end(nil, dismissalPolicy: dismissalPolicy)
+    /// Ends all active Live Activities across the system immediately.
+    public func endAllActivities(dismissalPolicy: ActivityUIDismissalPolicy = .immediate) {
+        let allActivities = Activity<TransiumNavigationActivityAttributes>.activities
+        for activity in allActivities {
+            Task {
+                await activity.end(nil, dismissalPolicy: dismissalPolicy)
+            }
         }
         currentActivity = nil
     }

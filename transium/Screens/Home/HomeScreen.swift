@@ -10,6 +10,7 @@ import SwiftUI
 struct HomeScreen: View {
     @StateObject private var vm = HomeViewModel()
     @Environment(\.scenePhase) private var scenePhase
+    @State private var isNavigationSheetCollapsed: Bool = false
 
     init(previewLocation: CLLocation? = nil) {
         _vm = StateObject(wrappedValue: {
@@ -52,6 +53,10 @@ struct HomeScreen: View {
                     .transition(.opacity)
                     .zIndex(300)
             }
+
+            if vm.isJourneyConflictPresented, let conflict = vm.journeyConflict {
+                journeyConflictModal(conflict: conflict)
+            }
         }
         .task {
             await vm.onTask()
@@ -68,18 +73,12 @@ struct HomeScreen: View {
         .onChange(of: vm.goJourneySteps) { _, _ in
             vm.advanceGoSegmentIfNeeded()
         }
-        .preferredColorScheme(.light)
-        .alert("Journey Already in Progress", isPresented: $vm.isJourneyConflictPresented, presenting: vm.journeyConflict) { conflict in
-            if vm.canResumeLocally(conflict) {
-                Button("Resume Journey") { vm.resumeCachedGoMode() }
+        .onChange(of: vm.showNavigationSheet) { _, isShown in
+            if isShown {
+                isNavigationSheetCollapsed = false
             }
-            Button("Cancel That Journey & Start This One", role: .destructive) {
-                vm.cancelConflictingAttemptAndRetry(conflict)
-            }
-            Button("Not Now", role: .cancel) { vm.journeyConflict = nil }
-        } message: { conflict in
-            Text(conflict.message)
         }
+        .preferredColorScheme(.light)
         .alert("Go Requires Your Real Location", isPresented: $vm.isLocationOverrideBlockingGoPresented) {
             Button("Use My Current Location") {
                 vm.manualLocationOverride = nil
@@ -192,6 +191,7 @@ struct HomeScreen: View {
             HomeNavigationActionSheet(
                 journey: journey,
                 isStartingGoMode: vm.isStartingGoMode,
+                isCollapsed: $isNavigationSheetCollapsed,
                 onStartGo: { vm.startGoMode() },
                 onBack: { vm.exitToExploreMode() }
             )
@@ -337,10 +337,100 @@ struct HomeScreen: View {
         )
         .presentationDetents([.fraction(0.38), .large], selection: $vm.sheetDetent)
         .presentationDragIndicator(.hidden)
+        .presentationBackgroundInteraction(.enabled(upThrough: .fraction(0.38)))
         .interactiveDismissDisabled(false)
         .onChange(of: vm.sheetDetent) { _, newDetent in
             vm.sheetState = (newDetent == .large) ? .searching : .pinning
         }
+    }
+
+    @ViewBuilder
+    private func journeyConflictModal(conflict: JourneyStartConflictError) -> some View {
+        ZStack {
+            Color.black.opacity(0.42)
+                .ignoresSafeArea()
+                .transition(.opacity)
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        vm.isJourneyConflictPresented = false
+                        vm.journeyConflict = nil
+                    }
+                }
+
+            VStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(Color(red: 0.98, green: 0.40, blue: 0.20).opacity(0.12))
+                        .frame(width: 56, height: 56)
+
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 26, weight: .semibold))
+                        .foregroundColor(Color(red: 0.98, green: 0.40, blue: 0.20))
+                }
+                .padding(.top, 4)
+
+                VStack(spacing: 8) {
+                    Text("Journey in Progress")
+                        .font(TransiumFont.display(22, weight: .bold))
+                        .foregroundColor(.black)
+                        .multilineTextAlignment(.center)
+
+                    Text(conflict.message)
+                        .font(TransiumFont.body(14, weight: .regular))
+                        .foregroundColor(Color.black.opacity(0.70))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 6)
+                }
+
+                VStack(spacing: 10) {
+                    if vm.canResumeLocally(conflict) {
+                        TransiumSecondaryButton(
+                            title: "Resume Journey",
+                            backgroundColor: TransiumColor.primaryBlue,
+                            foregroundColor: .white,
+                            icon: "arrow.right",
+                            iconPosition: .trailing
+                        ) {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                vm.isJourneyConflictPresented = false
+                            }
+                            vm.resumeCachedGoMode()
+                        }
+                    }
+
+                    TransiumSecondaryButton(
+                        title: "Start Over",
+                        backgroundColor: TransiumColor.lightRed,
+                        foregroundColor: .white
+                    ) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            vm.isJourneyConflictPresented = false
+                        }
+                        vm.cancelConflictingAttemptAndRetry(conflict)
+                    }
+
+                    TransiumSecondaryButton(
+                        title: "Not Now",
+                        backgroundColor: Color(.systemGray6),
+                        foregroundColor: .black
+                    ) {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            vm.isJourneyConflictPresented = false
+                            vm.journeyConflict = nil
+                        }
+                    }
+                }
+                .padding(.top, 4)
+            }
+            .padding(22)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: Color.black.opacity(0.20), radius: 20, x: 0, y: 10)
+            .padding(.horizontal, 24)
+            .transition(.scale(scale: 0.92).combined(with: .opacity))
+        }
+        .transition(.opacity)
+        .zIndex(250)
     }
 }
 

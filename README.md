@@ -29,9 +29,10 @@
   - Live geofence-based mission check-in and photo keepsake capture at scenic Bali checkpoints.
   - Passive HealthKit integration calculating accurate steps and active calories burned during transit walks.
 
-- 🏆 **Postage Stamp Celebration & Summary**
-  - Automatic 3-second animated wrap-up transitioning into celebration summary cards.
-  - Rotated `-4°` postage stamp frames with authentic badge art, starburst effects, and confetti.
+- 🏆 **Postage Stamp Celebration & Story Share**
+  - Automatic 3-second animated wrap-up transitioning into celebration summary cards with smooth MapLibre vector route previews.
+  - Rotated postage stamp frames (`190pt`) with coaxial `BadgeShine` sunburst rays, starburst effects, and confetti pops.
+  - Authentic 9:16 Instagram Story share template (`SummaryStoryCardView`) powered by live MapLibre vector map snapshots (`SummaryMapSnapshotCache`) and pre-cached badge artwork.
   - Shareable trip summary cards featuring distance, cost savings, calories, and step metrics.
 
 - 🔒 **Apple Authentication & Profile Moments**
@@ -62,7 +63,7 @@ transium/
 │   ├── Common/                  # Shared nonisolated models (LatLng, MediaAsset, Kelurahan, APIErrorResponse)
 │   ├── Device/                  # APNs device token registration and push testing
 │   ├── Gallery/                 # Moments gallery models, pagination, download, and GalleryService
-│   ├── Journey/                 # Door-to-door transit overview, multi-leg segments, and step models
+│   ├── Journey/                 # Door-to-door transit overview, multi-leg segments, and SummaryStoryShareManager
 │   ├── Location/                # Geocoding, reverse-geocoding, and token resolvers
 │   ├── Map/                     # LocationStore, TransiumMapStyleFactory, RoadSnapper, RoadGeometryResolver (Actor)
 │   ├── Profile/                 # User profile models, SwiftData LocalProfile, and profile service
@@ -81,7 +82,7 @@ transium/
 │   ├── Saved Quest/             # SavedQuestScreen bookmark catalog
 │   ├── Settings/                # SettingsScreen (Language, Audio volumes, Notification permissions)
 │   ├── States/                  # EmptyStateScreen placeholder states
-│   └── Summary/                 # SummaryScreen and Views/ (SummaryIntroView, SummaryCelebrationView)
+│   └── Summary/                 # SummaryScreen and Views/ (SummaryIntroView, SummaryCelebrationView, SummaryMapView, SummaryStoryCardView)
 │
 ├── UI/                      # Design system tokens and reusable UI components
 │   ├── Components/              # TransiumButton, TransiumIconButton, TransiumStampCard, AppToast

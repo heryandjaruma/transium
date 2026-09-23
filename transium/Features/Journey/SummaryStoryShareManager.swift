@@ -3,6 +3,8 @@
 //  transium
 //
 
+import CoreLocation
+import MapKit
 import SwiftUI
 import UIKit
 
@@ -23,37 +25,82 @@ final class SummaryStoryShareManager {
         journey: JourneyResult?,
         path: [JourneyPathPoint]
     ) {
-        let storyView = SummaryStoryCardView(
-            cards: cards,
-            origin: origin,
-            destination: destination,
-            tripTitle: tripTitle,
-            calorieMessage: calorieMessage,
-            badgeImageUrl: badgeImageUrl,
-            journey: journey,
-            path: path
-        )
+        Task {
+            // 1. Preload badge image synchronously from memory cache or network
+            let preloadedBadge = await loadBadgeImage(rawUrl: badgeImageUrl)
 
-        guard let image = renderStoryImage(view: storyView) else {
-            AppToastCenter.shared.showError(title: "Share Failed", message: "Could not generate story image.")
-            return
-        }
+            // 2. Fetch the high-fidelity offline MapLibre PMTiles map snapshot
+            let preloadedMap = SummaryMapSnapshotCache.shared.latestSnapshot
 
-        let instagramURL = URL(string: "instagram-stories://share?source_application=si.transporta.transium-app")!
+            // 3. Build story card view with pre-rendered synchronous image assets
+            let storyView = SummaryStoryCardView(
+                cards: cards,
+                origin: origin,
+                destination: destination,
+                tripTitle: tripTitle,
+                calorieMessage: calorieMessage,
+                badgeImage: preloadedBadge,
+                mapImage: preloadedMap,
+                badgeImageUrl: badgeImageUrl,
+                journey: journey,
+                path: path
+            )
 
-        if UIApplication.shared.canOpenURL(instagramURL) {
-            shareToInstagramStories(image: image, fallbackURL: instagramURL)
-        } else {
-            presentShareSheet(with: image)
+            guard let image = renderStoryImage(view: storyView) else {
+                AppToastCenter.shared.showError(title: "Share Failed", message: "Could not generate story image.")
+                return
+            }
+
+            let instagramURL = URL(string: "instagram-stories://share?source_application=si.transporta.transium-app")!
+
+            if UIApplication.shared.canOpenURL(instagramURL) {
+                shareToInstagramStories(image: image, fallbackURL: instagramURL)
+            } else {
+                presentShareSheet(with: image)
+            }
         }
     }
 
-    /// Renders a SwiftUI view hierarchy into a high-resolution UIImage.
+    /// Preloads the badge image into a concrete UIImage so off-screen snapshotting captures it immediately.
+    private func loadBadgeImage(rawUrl: String?) async -> UIImage? {
+        guard let raw = rawUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            return nil
+        }
+
+        if let local = UIImage(named: raw) {
+            return local
+        }
+
+        guard let url = APIConfiguration.resolveURL(raw) else {
+            return nil
+        }
+
+        if let cached = TransiumImageCache.shared.image(for: url) {
+            return cached
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.cachePolicy = .returnCacheDataElseLoad
+            request.timeoutInterval = 8
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode == 200, let downloaded = UIImage(data: data) {
+                TransiumImageCache.shared.setImage(downloaded, for: url)
+                return downloaded
+            }
+        } catch {
+            // Return nil to use graceful fallback
+        }
+        return nil
+    }
+
+    /// Renders a SwiftUI view hierarchy into a high-resolution 9:16 UIImage.
     private func renderStoryImage<V: View>(view: V) -> UIImage? {
+        let targetSize = CGSize(width: 414, height: 896)
         let hostingController = UIHostingController(rootView: view)
-        let targetSize = CGSize(width: 390, height: 844)
         hostingController.view.bounds = CGRect(origin: .zero, size: targetSize)
         hostingController.view.backgroundColor = .clear
+        hostingController.view.layoutIfNeeded()
 
         let renderer = UIGraphicsImageRenderer(size: targetSize)
         return renderer.image { _ in
@@ -70,8 +117,8 @@ final class SummaryStoryShareManager {
 
         let pasteboardItems: [String: Any] = [
             "com.instagram.sharedSticker.backgroundImage": imageData,
-            "com.instagram.sharedSticker.backgroundTopColor": "#1E88E5",
-            "com.instagram.sharedSticker.backgroundBottomColor": "#0D47A1"
+            "com.instagram.sharedSticker.backgroundTopColor": "#246BFD",
+            "com.instagram.sharedSticker.backgroundBottomColor": "#0F4BC2"
         ]
 
         let pasteboardOptions = [UIPasteboard.OptionsKey.expirationDate: Date().addingTimeInterval(300)]
@@ -113,3 +160,4 @@ final class SummaryStoryShareManager {
         topController.present(activityVC, animated: true)
     }
 }
+

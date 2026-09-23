@@ -2,10 +2,16 @@ import SwiftUI
 
 struct NavigationBottomSheet: View {
     let journey: JourneyResult
-    let onBack: () -> Void
+    var onBack: () -> Void = {}
     
-    @State private var isCollapsed: Bool = false
+    @Binding var isCollapsed: Bool
     @GestureState private var dragOffset: CGFloat = 0
+    
+    init(journey: JourneyResult, isCollapsed: Binding<Bool> = .constant(false), onBack: @escaping () -> Void = {}) {
+        self.journey = journey
+        self._isCollapsed = isCollapsed
+        self.onBack = onBack
+    }
     
     var body: some View {
         VStack(spacing: 0) {
