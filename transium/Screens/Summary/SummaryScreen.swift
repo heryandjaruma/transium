@@ -10,6 +10,8 @@ import SwiftUI
 struct SummaryScreen: View {
     let result: JourneyCompleteResult
     var journey: JourneyResult? = nil
+    var areaName: String? = nil
+    var badgeImageUrl: String? = nil
     var onDismiss: () -> Void = {}
 
     @State private var showCelebration = false
@@ -67,12 +69,45 @@ struct SummaryScreen: View {
         ]
     }
 
+    private func isStepActionText(_ text: String?) -> Bool {
+        guard let text = text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return true }
+        let lower = text.lowercased()
+        if lower.contains("selfie") || lower.contains("picture") || lower.contains("photo") || lower.contains("take a") || lower.contains("capture") || lower.contains("checkin") || lower.contains("check in") || lower.contains("snap") || lower.contains("mission") || lower.contains("!") {
+            return true
+        }
+        if result.steps.contains(where: { $0.name.caseInsensitiveCompare(text) == .orderedSame || $0.description.caseInsensitiveCompare(text) == .orderedSame }) {
+            return true
+        }
+        return false
+    }
+
     private var originName: String {
-        summary?.startPoint ?? journey?.segments.first?.from?.name ?? "Current Location"
+        if let start = summary?.startPoint, !isStepActionText(start), start != "Start", start != "Current Location" {
+            return start
+        }
+        if let firstFrom = journey?.segments.first?.from?.name, !isStepActionText(firstFrom) {
+            return firstFrom
+        }
+        return "Origin"
     }
 
     private var destinationName: String {
-        summary?.finishPoint ?? journey?.segments.last?.to?.name ?? "Destination"
+        if let areaName, !areaName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isStepActionText(areaName) {
+            return areaName
+        }
+        if let journeyDest = journey?.destinationName, !isStepActionText(journeyDest) {
+            return journeyDest
+        }
+        if let lastLocation = journey?.segments.reversed().compactMap(\.to?.name).first(where: { !isStepActionText($0) }) {
+            return lastLocation
+        }
+        if let finish = summary?.finishPoint, !isStepActionText(finish) {
+            return finish
+        }
+        if let cat = result.journeyAttempt.questCategory, !isStepActionText(cat), cat != "Culture", cat != "Explore" {
+            return cat
+        }
+        return "Sanur Beach"
     }
 
     private var calorieMessage: String {
@@ -80,7 +115,34 @@ struct SummaryScreen: View {
     }
 
     private var tripTitle: String {
-        badge?.badgeName ?? result.journeyAttempt.questName ?? journey?.segments.last?.to?.name ?? "Quest Complete"
+        if let questName = result.journeyAttempt.questName, !questName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isStepActionText(questName) {
+            return questName
+        }
+        if let badgeQuestName = badge?.questName, !badgeQuestName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !isStepActionText(badgeQuestName) {
+            return badgeQuestName
+        }
+        if let journeyDest = journey?.destinationName, !isStepActionText(journeyDest) {
+            return journeyDest
+        }
+        return badge?.badgeName ?? "Quest Complete"
+    }
+
+    @State private var fetchedBadgeImageUrl: String? = nil
+
+    private var resolvedBadgeImageUrl: String? {
+        if let apiBadgeUrl = result.badgesAwarded.first?.badgeImageUrl, !apiBadgeUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return apiBadgeUrl
+        }
+        if let passedUrl = badgeImageUrl, !passedUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return passedUrl
+        }
+        if let badgeUrl = badge?.badgeImageUrl, !badgeUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return badgeUrl
+        }
+        if let fetchedUrl = fetchedBadgeImageUrl, !fetchedUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return fetchedUrl
+        }
+        return nil
     }
 
     var body: some View {
@@ -95,7 +157,7 @@ struct SummaryScreen: View {
                     origin: originName,
                     destination: destinationName,
                     tripTitle: tripTitle,
-                    badgeImageUrl: badge?.badgeImageUrl,
+                    badgeImageUrl: resolvedBadgeImageUrl,
                     journey: journey,
                     path: result.path,
                     onShare: {
@@ -105,7 +167,7 @@ struct SummaryScreen: View {
                             destination: destinationName,
                             tripTitle: tripTitle,
                             calorieMessage: calorieMessage,
-                            badgeImageUrl: badge?.badgeImageUrl,
+                            badgeImageUrl: resolvedBadgeImageUrl,
                             journey: journey,
                             path: result.path
                         )
@@ -121,7 +183,7 @@ struct SummaryScreen: View {
                     cards: cards,
                     locationLabel: destinationName,
                     calorieMessage: calorieMessage,
-                    badgeImageUrl: badge?.badgeImageUrl
+                    badgeImageUrl: resolvedBadgeImageUrl
                 )
                 .transition(.asymmetric(
                     insertion: .opacity,
@@ -134,6 +196,18 @@ struct SummaryScreen: View {
                 try? await Task.sleep(for: .seconds(2.8))
                 withAnimation(.spring(response: 0.55, dampingFraction: 0.85)) {
                     showCelebration = true
+                }
+            }
+        }
+        .task {
+            if resolvedBadgeImageUrl == nil {
+                if let questId = result.journeyAttempt.questId, !questId.isEmpty {
+                    if let badges = try? await QuestService.shared.listQuestBadges(id: questId),
+                       let firstUrl = badges.first?.badgeImageUrl, !firstUrl.isEmpty {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            fetchedBadgeImageUrl = firstUrl
+                        }
+                    }
                 }
             }
         }
@@ -152,51 +226,110 @@ struct SummaryScreen: View {
 // Backward-compatibility alias
 typealias JourneyCompletionSummaryScreen = SummaryScreen
 
-/// Renders the quest badge artwork cleanly inside a single postage stamp frame with playful tilt.
+/// In-memory cache to guarantee instant, zero-flicker loading across view transitions
+@MainActor
+final class TransiumImageCache {
+    static let shared = TransiumImageCache()
+    private let cache = NSCache<NSURL, UIImage>()
+
+    private init() {
+        cache.countLimit = 100
+        cache.totalCostLimit = 50 * 1024 * 1024
+    }
+
+    func image(for url: URL) -> UIImage? {
+        cache.object(forKey: url as NSURL)
+    }
+
+    func setImage(_ image: UIImage, for url: URL) {
+        cache.setObject(image, forKey: url as NSURL)
+    }
+}
+
+/// Renders the quest badge artwork cleanly inside a single postage stamp frame with playful tilt and zero-flicker caching.
 struct BadgeArtworkStamp: View {
     let badgeImageUrl: String?
     var size: CGFloat = 195
     var tilt: Angle = .degrees(-7.5)
 
+    @State private var loadedImage: UIImage? = nil
+    @State private var isLoading: Bool = false
+
     var body: some View {
-        Group {
-            if let badgeImageUrl, !badgeImageUrl.isEmpty, let url = Self.resolvedURL(badgeImageUrl) {
-                TransiumStampCard(size: size, tilt: .degrees(0), variant: .classic) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().scaledToFill()
-                        case .empty:
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(Color.white.opacity(0.12))
-                                .transiumShimmer(
-                                    baseColor: Color.white.opacity(0.1),
-                                    highlightColor: Color.white.opacity(0.3)
-                                )
-                        default:
-                            Image(systemName: "rosette")
-                                .resizable()
-                                .scaledToFit()
-                                .padding(18)
-                                .foregroundColor(.white.opacity(0.9))
-                        }
+        TransiumStampCard(size: size, tilt: .degrees(0), variant: .classic) {
+            Group {
+                if let loadedImage {
+                    Image(uiImage: loadedImage)
+                        .resizable()
+                        .scaledToFill()
+                } else if let localAsset = badgeImageUrl, !localAsset.isEmpty, let assetImg = UIImage(named: localAsset) {
+                    Image(uiImage: assetImg)
+                        .resizable()
+                        .scaledToFill()
+                } else if isLoading {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.white.opacity(0.18))
+                        .transiumShimmer(
+                            baseColor: Color.white.opacity(0.12),
+                            highlightColor: Color.white.opacity(0.38)
+                        )
+                } else {
+                    ZStack {
+                        Color(red: 0.95, green: 0.60, blue: 0.20).opacity(0.15)
+                        Image(systemName: "rosette")
+                            .resizable()
+                            .scaledToFit()
+                            .padding(28)
+                            .foregroundColor(TransiumColor.primaryBlue.opacity(0.85))
                     }
                 }
-            } else {
-                // Standalone badge artwork (SampleBadge is already a complete single postage stamp)
-                Image("SampleBadge")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: size, height: size * 0.96)
             }
         }
         .rotationEffect(tilt)
         .shadow(color: Color.black.opacity(0.22), radius: 12, x: 0, y: 8)
+        .task(id: badgeImageUrl) {
+            await loadImage()
+        }
     }
 
-    private static func resolvedURL(_ raw: String) -> URL? {
-        let fullString = raw.hasPrefix("http") ? raw : "\(APIConfiguration.origin.absoluteString)\(raw)"
-        return URL(string: fullString)
+    private func loadImage() async {
+        guard let raw = badgeImageUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+            loadedImage = nil
+            return
+        }
+
+        if let local = UIImage(named: raw) {
+            loadedImage = local
+            return
+        }
+
+        guard let url = APIConfiguration.resolveURL(raw) else {
+            loadedImage = nil
+            return
+        }
+
+        if let cached = TransiumImageCache.shared.image(for: url) {
+            loadedImage = cached
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        do {
+            var request = URLRequest(url: url)
+            request.cachePolicy = .returnCacheDataElseLoad
+            request.timeoutInterval = 10
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode == 200, let downloaded = UIImage(data: data) {
+                TransiumImageCache.shared.setImage(downloaded, for: url)
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    loadedImage = downloaded
+                }
+            }
+        } catch {
+            // Keep fallback
+        }
     }
 }
 
@@ -265,7 +398,7 @@ typealias BadgeArtworkImage = BadgeArtworkStamp
                 badgeName: "Sanoored",
                 badgeCategory: "Explorer",
                 badgeType: "Stamp",
-                badgeImageUrl: nil,
+                badgeImageUrl: "https://transium-api.heryandjaruma.workers.dev/media/system/badge/ae2cf1b2-e536-416b-9db7-d7e76c6f3443/0e1721d8-0858-462e-af84-f78d99a43d5a.png",
                 earnedAt: Date(),
                 questId: "quest-1",
                 questName: "Sanur Beach Sunrise Quest"

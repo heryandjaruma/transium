@@ -106,7 +106,7 @@ struct SummaryCelebrationView: View {
                         
                         // Dynamic Map Preview
                         SummaryMapView(journey: journey, path: path)
-                            .frame(height: 150)
+                            .frame(height: 180)
                             .frame(maxWidth: .infinity)
                             .clipShape(RoundedRectangle(cornerRadius: 18))
                             .padding(.horizontal, 16)
@@ -120,7 +120,7 @@ struct SummaryCelebrationView: View {
                             .animation(.easeOut(duration: 0.3).delay(0.40), value: animatedIn)
                         
                         // Staggered Stats Grid (2x2)
-                        LazyVGrid(columns: columns, spacing: 10) {
+                        LazyVGrid(columns: columns, spacing: 8) {
                             ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
                                 SummaryBox(data: card)
                                     .scaleEffect(animatedIn ? 1.0 : 0.86)
@@ -133,7 +133,7 @@ struct SummaryCelebrationView: View {
                                     )
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 12)
                         .padding(.bottom, 16)
                     }
                     .foregroundStyle(.black)

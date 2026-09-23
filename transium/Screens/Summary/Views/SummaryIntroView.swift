@@ -21,16 +21,23 @@ struct SummaryIntroView: View {
             Color.primaryBlue
                 .ignoresSafeArea()
             
-            VStack {
-                Spacer()
+            VStack(spacing: 0) {
+                Spacer(minLength: 8)
                 
                 ZStack {
                     // Background Ambient Rays & Stars
                     VStack {
                         ZStack {
-                            Image("ShortcutSementara")
-                                .resizable()
-                                .frame(width: 400, height: 500)
+                            Circle()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [Color.white.opacity(0.18), Color.white.opacity(0.0)],
+                                        center: .center,
+                                        startRadius: 40,
+                                        endRadius: 220
+                                    )
+                                )
+                                .frame(width: 420, height: 420)
                                 .opacity(animatedIn ? 1.0 : 0.0)
                                 .scaleEffect(animatedIn ? 1.0 : 0.85)
                                 .animation(.easeOut(duration: 0.6), value: animatedIn)
@@ -57,8 +64,6 @@ struct SummaryIntroView: View {
                     }
                 
                     VStack(spacing: 12) {
-                        Spacer()
-                        
                         // Hero Postage Stamp
                         BadgeArtworkStamp(
                             badgeImageUrl: badgeImageUrl,
@@ -92,7 +97,7 @@ struct SummaryIntroView: View {
                         .animation(.spring(response: 0.48, dampingFraction: 0.78).delay(0.18), value: animatedIn)
  
                         // Staggered Stats Grid (2x2)
-                        LazyVGrid(columns: columns, spacing: 10) {
+                        LazyVGrid(columns: columns, spacing: 8) {
                             ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
                                 SummaryBox(data: card)
                                     .scaleEffect(animatedIn ? 1.0 : 0.85)
@@ -130,8 +135,10 @@ struct SummaryIntroView: View {
                         .animation(.spring(response: 0.52, dampingFraction: 0.80).delay(0.56), value: animatedIn)
                     }
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 12)
                 }
+                
+                Spacer(minLength: 28)
             }
         }
         .onAppear {

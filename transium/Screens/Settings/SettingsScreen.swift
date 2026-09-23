@@ -98,7 +98,7 @@ struct SettingsScreen: View {
         SettingsCard {
             SettingsSectionLabel(icon: "character.bubble.fill", title: "Language")
 
-            HStack(spacing: 4) {
+            VStack(spacing: 8) {
                 ForEach(AppLanguage.allCases) { language in
                     let isSelected = activeLanguage == language
                     Button {
@@ -108,31 +108,50 @@ struct SettingsScreen: View {
                             AppLanguageManager.shared.setLanguage(language)
                         }
                     } label: {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 12) {
                             Text(language.flag)
-                                .font(.system(size: 16))
-                            Text(language.displayName)
-                                .font(TransiumFont.body(14, weight: isSelected ? .bold : .semibold))
-                                .foregroundColor(isSelected ? TransiumColor.primaryBlue : .white.opacity(0.85))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background {
+                                .font(.system(size: 20))
+                                .frame(width: 36, height: 36)
+                                .background(Color.white.opacity(0.12))
+                                .clipShape(Circle())
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(language.displayName)
+                                    .font(TransiumFont.body(15, weight: isSelected ? .bold : .medium))
+                                    .foregroundColor(.white)
+                                
+                                Text(language == .english ? "English (US)" : "Bahasa Indonesia (ID)")
+                                    .font(TransiumFont.body(12))
+                                    .foregroundColor(.white.opacity(0.65))
+                            }
+
+                            Spacer()
+
                             if isSelected {
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(Color.white)
-                                    .shadow(color: Color.black.opacity(0.12), radius: 6, y: 2)
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 20, weight: .bold))
+                            } else {
+                                Circle()
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1.5)
+                                    .frame(width: 20, height: 20)
                             }
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(isSelected ? Color.white.opacity(0.18) : Color.white.opacity(0.06))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(isSelected ? Color.white.opacity(0.35) : Color.clear, lineWidth: 1)
+                        )
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(4)
-            .background(Color.white.opacity(0.12))
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(.top, 2)
         }
     }
 

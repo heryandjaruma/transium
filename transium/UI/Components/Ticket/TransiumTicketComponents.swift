@@ -454,7 +454,7 @@ extension TransiumTicketCard where Stamp == TransiumStampCard<AnyView>, BodyCont
         distance: String,
         price: String,
         imageUrl: String?,
-        fallbackImageName: String = "kintamani",
+        fallbackImageName: String? = nil,
         variant: TransiumTicketVariant = .blue
     ) {
         let stampVariant: TransiumStampVariant = {
@@ -485,15 +485,29 @@ extension TransiumTicketCard where Stamp == TransiumStampCard<AnyView>, BodyCont
                                             highlightColor: Color.white.opacity(0.38)
                                         )
                                 default:
-                                    Image(fallbackImageName)
-                                        .resizable()
-                                        .scaledToFill()
+                                    if let fallback = fallbackImageName, UIImage(named: fallback) != nil {
+                                        Image(fallback)
+                                            .resizable()
+                                            .scaledToFill()
+                                    } else {
+                                        Image(systemName: "map.fill")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .padding(16)
+                                            .foregroundColor(.white.opacity(0.85))
+                                    }
                                 }
                             }
-                        } else {
-                            Image(fallbackImageName)
+                        } else if let fallback = fallbackImageName, UIImage(named: fallback) != nil {
+                            Image(fallback)
                                 .resizable()
                                 .scaledToFill()
+                        } else {
+                            Image(systemName: "map.fill")
+                                .resizable()
+                                .scaledToFit()
+                                .padding(16)
+                                .foregroundColor(.white.opacity(0.85))
                         }
                     }
                 )
@@ -743,7 +757,7 @@ struct TransiumTicketSkeletonCard: View {
                 subtitle: "A laid-back coastal escape. Where earlybirds relax.",
                 distance: "11",
                 price: "Rp. 4,4k",
-                imageName: TransiumAsset.Illustration.sanur_beach
+                imageName: TransiumAsset.Illustration.onboardingAdventure
             )
             .frame(width: 336)
 

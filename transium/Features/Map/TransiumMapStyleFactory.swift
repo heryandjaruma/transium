@@ -68,14 +68,14 @@ enum TransiumMapStyleFactory {
               "type": "vector",
               "url": "\(pmtilesStyleURL(for: basemapURL))",
               "minzoom": 0,
-              "maxzoom": 18,
+              "maxzoom": 16,
               "attribution": "Transium local map data"
             },
             "bali-transit": {
               "type": "vector",
               "url": "\(pmtilesStyleURL(for: transitURL))",
               "minzoom": 0,
-              "maxzoom": 18,
+              "maxzoom": 16,
               "attribution": "Transium local transit data"
             }
           },
@@ -116,7 +116,7 @@ enum TransiumMapStyleFactory {
               "source-layer": "streams",
               "paint": {
                 "line-color": "#A7D4EE",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.28, 13, 1.0],
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.28, 13, 1.0, 18, 3.5],
                 "line-opacity": 0.7
               }
             },
@@ -127,7 +127,7 @@ enum TransiumMapStyleFactory {
               "source-layer": "kelurahan",
               "paint": {
                 "line-color": "#FFFFFF",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.16, 13, 0.62],
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.16, 13, 0.62, 18, 1.5],
                 "line-opacity": 0.38
               }
             },
@@ -138,7 +138,7 @@ enum TransiumMapStyleFactory {
               "source-layer": "kecamatan",
               "paint": {
                 "line-color": "#D4D4D4",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.32, 13, 0.92],
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.32, 13, 0.92, 18, 2.0],
                 "line-opacity": 0.42
               }
             },
@@ -149,7 +149,7 @@ enum TransiumMapStyleFactory {
               "source-layer": "roads",
               "paint": {
                 "line-color": "#D6D6D6",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.95, 13, 4.2],
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.95, 13, 4.2, 16, 9.0, 18, 16.0, 20, 24.0],
                 "line-opacity": 0.72
               }
             },
@@ -160,7 +160,7 @@ enum TransiumMapStyleFactory {
               "source-layer": "roads",
               "paint": {
                 "line-color": "#FFFFFF",
-                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 13, 2.85],
+                "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 13, 2.85, 16, 6.5, 18, 12.0, 20, 18.0],
                 "line-opacity": 1.0
               }
             }

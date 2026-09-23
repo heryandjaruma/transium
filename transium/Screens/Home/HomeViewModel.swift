@@ -17,12 +17,16 @@ final class HomeViewModel: ObservableObject {
     let randomPhotoOpMonitor = JourneyGeofenceMonitor()
     let healthKitStepService = HealthKitStepService()
     let journeyService = JourneyService.shared
+    let questService = QuestService.shared
 
     var previewLocation: CLLocation?
 
     // MARK: - Journey & Navigation State
     @Published var activeJourney: JourneyResult? = nil
     @Published var activeQuestId: String? = nil
+    @Published var activeQuestName: String? = nil
+    @Published var activeAreaName: String? = nil
+    @Published var activeBadgeImageUrl: String? = nil
     @Published var isFetchingJourney: Bool = false
     @Published var showNavigationSheet: Bool = false
 
@@ -188,35 +192,58 @@ final class HomeViewModel: ObservableObject {
         Task {
             do {
                 let originCoordinate = resolvedCurrentLocation.coordinate
-                let targetQuestId: String? = {
-                    if let questId { return questId }
+                let (targetQuestId, targetQuestName, targetAreaName, initialBadgeUrl): (String?, String?, String?, String?) = {
+                    if let questId {
+                        for group in areaGroups {
+                            if let matched = group.quests.first(where: { $0.id == questId }) {
+                                return (questId, matched.name, group.area.name, matched.thumbnails.first?.url ?? group.area.photoUrl)
+                            }
+                        }
+                        return (questId, nil, selectedArea.name, selectedArea.photoUrl)
+                    }
                     let page = visibleTicketPage ?? 0
                     if areaGroups.indices.contains(page) {
-                        return areaGroups[page].quests.first?.id
+                        let group = areaGroups[page]
+                        let q = group.quests.first
+                        return (q?.id, q?.name, group.area.name, q?.thumbnails.first?.url ?? group.area.photoUrl)
                     }
-                    return areaGroups.first?.quests.first?.id
+                    if let firstGroup = areaGroups.first {
+                        let q = firstGroup.quests.first
+                        return (q?.id, q?.name, firstGroup.area.name, q?.thumbnails.first?.url ?? firstGroup.area.photoUrl)
+                    }
+                    return (nil, nil, selectedArea.name, selectedArea.photoUrl)
                 }()
                 
+                var resolvedBadgeUrl = initialBadgeUrl
+                if let targetQuestId {
+                    if let badges = try? await questService.listQuestBadges(id: targetQuestId), let firstBadge = badges.first, let url = firstBadge.badgeImageUrl, !url.isEmpty {
+                        resolvedBadgeUrl = url
+                    }
+                }
+
                 var response: JourneyResponse?
                 if let targetQuestId {
                     response = try? await journeyService.fetchRealJourney(questId: targetQuestId, origin: originCoordinate)
                 }
                 if response == nil {
-                    let destinationCoordinate = CLLocationCoordinate2D(latitude: -8.67368, longitude: 115.26337)
+                    let destinationCoordinate = CLLocationCoordinate2D(
+                        latitude: selectedArea.lat != 0 ? selectedArea.lat : -8.67368,
+                        longitude: selectedArea.lng != 0 ? selectedArea.lng : 115.26337
+                    )
                     response = try await journeyService.fetchJourneyOverview(origin: originCoordinate, destination: destinationCoordinate)
                 }
                 
-                guard let validResponse = response else {
-                    throw TransiumAPIError.serviceUnavailable("Unable to calculate route")
-                }
-                
-                let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(validResponse.best)
+                guard let journeyResponse = response else { return }
+                let resolvedJourney = await RoadGeometryResolver.shared.resolveJourneyGeometries(journeyResponse.best)
                 
                 await MainActor.run {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                         activeJourney = resolvedJourney
                         activeQuestId = targetQuestId
+                        activeQuestName = targetQuestName
+                        activeAreaName = targetAreaName ?? selectedArea.name
+                        activeBadgeImageUrl = resolvedBadgeUrl
                         showNavigationSheet = true
                         isFetchingJourney = false
                     }
@@ -256,7 +283,7 @@ final class HomeViewModel: ObservableObject {
                     ongoingJourneyAttempt = nil
                     ongoingJourneySteps = []
                     if showOngoingTripCard {
-                        withAnimation(.easeInOut(duration: 0.2)) { showOngoingTripCard = false }
+                        withAnimation(.easeIn(duration: 0.22)) { showOngoingTripCard = false }
                     }
                     return
                 }
@@ -264,7 +291,7 @@ final class HomeViewModel: ObservableObject {
                 ongoingJourneyAttempt = attempt
                 ongoingJourneySteps = current.steps
                 if !showOngoingTripCard {
-                    withAnimation(.spring(response: 0.55, dampingFraction: 0.78)) {
+                    withAnimation(.easeOut(duration: 0.35)) {
                         showOngoingTripCard = true
                     }
                 }
@@ -276,7 +303,7 @@ final class HomeViewModel: ObservableObject {
 
     func resumeOngoingTrip() {
         guard !isResumingOngoingTrip, let attempt = ongoingJourneyAttempt, let questId = attempt.questId else { return }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+        withAnimation(.easeOut(duration: 0.25)) {
             isResumingOngoingTrip = true
         }
         Task { await healthKitStepService.requestAuthorization() }
@@ -297,6 +324,8 @@ final class HomeViewModel: ObservableObject {
 
                     activeJourney = resolvedJourney
                     activeQuestId = questId
+                    activeQuestName = attempt.questName
+                    activeAreaName = attempt.questCategory
                     goJourneyAttempt = attempt
                     goJourneySteps = ongoingJourneySteps
                     goGeofences = geofences
@@ -306,8 +335,19 @@ final class HomeViewModel: ObservableObject {
                     goPathBreadcrumb = []
                     hasSubmittedJourneyCompletion = false
 
+                    if activeBadgeImageUrl == nil {
+                        Task {
+                            if let badges = try? await questService.listQuestBadges(id: questId),
+                               let firstUrl = badges.first?.badgeImageUrl, !firstUrl.isEmpty {
+                                await MainActor.run { [weak self] in
+                                    self?.activeBadgeImageUrl = firstUrl
+                                }
+                            }
+                        }
+                    }
+
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    withAnimation(.easeOut(duration: 0.35)) {
                         showGoMode = true
                         showNavigationSheet = false
                         isResumingOngoingTrip = false
@@ -315,7 +355,7 @@ final class HomeViewModel: ObservableObject {
                 }
             } catch {
                 await MainActor.run {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    withAnimation(.easeOut(duration: 0.25)) {
                         isResumingOngoingTrip = false
                     }
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -398,6 +438,16 @@ final class HomeViewModel: ObservableObject {
                             attemptId: result.journeyAttempt.id,
                             initialState: initialState
                         )
+                    }
+                    if activeBadgeImageUrl == nil {
+                        Task {
+                            if let badges = try? await questService.listQuestBadges(id: questId),
+                               let firstUrl = badges.first?.badgeImageUrl, !firstUrl.isEmpty {
+                                await MainActor.run { [weak self] in
+                                    self?.activeBadgeImageUrl = firstUrl
+                                }
+                            }
+                        }
                     }
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                         showGoMode = true
@@ -637,6 +687,114 @@ final class HomeViewModel: ObservableObject {
         }
 
         return true
+    }
+
+    /// Developer testing helper: immediately completes the current Go Mode journey and opens SummaryScreen,
+    /// attempting real backend completion first and falling back to a rich mock result if offline/sandbox.
+    func devFinishActiveJourney() {
+        let distanceMeters = activeJourney?.summary.distanceMeters ?? 1850
+        let startPoint = activeJourney?.segments.first?.from?.name ?? "Current Location"
+        let finishPoint = activeJourney?.destinationName ?? "Destination"
+        let pathInput = goPathBreadcrumb.isEmpty ? [
+            JourneyPathPointInput(lat: -8.737, lng: 115.175, recordedAt: Date())
+        ] : goPathBreadcrumb
+
+        if let attemptId = goJourneyAttempt?.id {
+            let request = CompleteJourneyRequest(
+                stepsTaken: Int((distanceMeters / 0.75).rounded()),
+                distanceMeters: distanceMeters,
+                calorie: max(45, distanceMeters * 0.05),
+                startPoint: startPoint,
+                finishPoint: finishPoint,
+                path: pathInput
+            )
+            Task {
+                do {
+                    let result = try await journeyService.completeJourney(attemptId: attemptId, request: request)
+                    await MainActor.run {
+                        goJourneyAttempt = result.journeyAttempt
+                        geofenceMonitor.stopMonitoring()
+                        LiveActivityManager.shared.endNavigationActivity(dismissalPolicy: .default)
+                        journeyCompletionResult = result
+                    }
+                } catch {
+                    await MainActor.run {
+                        let resultPath: [JourneyPathPoint] = pathInput.enumerated().map { index, point in
+                            JourneyPathPoint(id: UUID().uuidString, journeyAttemptId: attemptId, sequence: index + 1, lat: point.lat, lng: point.lng, recordedAt: point.recordedAt)
+                        }
+                        fallbackDevCompleteResult(startPoint: startPoint, finishPoint: finishPoint, distanceMeters: distanceMeters, path: resultPath)
+                    }
+                }
+            }
+        } else {
+            let resultPath: [JourneyPathPoint] = pathInput.enumerated().map { index, point in
+                JourneyPathPoint(id: UUID().uuidString, journeyAttemptId: "dev-attempt", sequence: index + 1, lat: point.lat, lng: point.lng, recordedAt: point.recordedAt)
+            }
+            fallbackDevCompleteResult(startPoint: startPoint, finishPoint: finishPoint, distanceMeters: distanceMeters, path: resultPath)
+        }
+    }
+
+    private func fallbackDevCompleteResult(startPoint: String, finishPoint: String, distanceMeters: Double, path: [JourneyPathPoint]) {
+        let questTitle = activeQuestName ?? (goJourneyAttempt?.questName ?? "PrimaTrip")
+        let endLocation = activeAreaName ?? (selectedArea.name.isEmpty ? (finishPoint != "Destination" && !finishPoint.lowercased().contains("monkey") ? finishPoint : "Denpasar Utara") : selectedArea.name)
+        let dummyAttempt = goJourneyAttempt ?? JourneyAttempt(
+            id: "dev-attempt-\(UUID().uuidString.prefix(6))",
+            userQuestId: "dev-user-quest",
+            questId: activeQuestId ?? "dev-quest",
+            questName: questTitle,
+            questCategory: endLocation,
+            currentStepSequence: 1,
+            status: "completed",
+            createdAt: Date().addingTimeInterval(-1200),
+            startedAt: Date().addingTimeInterval(-1200),
+            endedAt: Date()
+        )
+        let dummySummary = JourneySummary(
+            id: UUID().uuidString,
+            journeyAttemptId: dummyAttempt.id,
+            stepsTaken: max(450, Int((distanceMeters / 0.75).rounded())),
+            distanceMeters: distanceMeters,
+            calorie: max(65, distanceMeters * 0.05),
+            startPoint: startPoint != "Destination" && !startPoint.lowercased().contains("monkey") ? startPoint : "Current Location",
+            finishPoint: endLocation,
+            fuelCostSavedIdr: 15000,
+            rideHailingMotorcycleSavedIdr: 25000,
+            rideHailingCarSavedIdr: 55000
+        )
+        let badgeUrl = activeBadgeImageUrl ?? "https://transium-api.heryandjaruma.workers.dev/media/system/badge/ae2cf1b2-e536-416b-9db7-d7e76c6f3443/0e1721d8-0858-462e-af84-f78d99a43d5a.png"
+        let dummyBadge = EarnedBadge(
+            id: UUID().uuidString,
+            badgeId: "dev-badge-1",
+            badgeName: "\(questTitle) Badge",
+            badgeCategory: endLocation,
+            badgeType: "stamp",
+            badgeImageUrl: badgeUrl,
+            earnedAt: Date(),
+            questId: dummyAttempt.questId,
+            questName: questTitle
+        )
+        let dummyProfile = Profile(
+            id: "dev-profile",
+            userId: "dev-user",
+            firstName: "Explorer",
+            lastName: "Dev",
+            level: 3,
+            image: nil,
+            email: "dev@transium.app"
+        )
+        let completeResult = JourneyCompleteResult(
+            journeyAttempt: dummyAttempt,
+            steps: goJourneySteps,
+            summary: dummySummary,
+            path: path,
+            xpAwarded: 150,
+            badgesAwarded: [dummyBadge],
+            profile: dummyProfile
+        )
+
+        geofenceMonitor.stopMonitoring()
+        LiveActivityManager.shared.endNavigationActivity(dismissalPolicy: .default)
+        journeyCompletionResult = completeResult
     }
 
     func handlePhotoCaptured(image: UIImage, step: JourneyAttemptStep) async {

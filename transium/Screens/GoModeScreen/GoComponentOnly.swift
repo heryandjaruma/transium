@@ -19,6 +19,7 @@ struct GoTopBar: View {
     let onLocate: () -> Void
     let isMuted: Bool
     let onToggleMute: () -> Void
+    var onDevFinish: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .top) {
@@ -33,6 +34,21 @@ struct GoTopBar: View {
             Spacer()
 
             VStack(spacing: 12) {
+                #if DEBUG
+                if let onDevFinish {
+                    TransiumIconButton(
+                        icon: .system("flag.checkered"),
+                        label: "FINISH",
+                        accessibilityLabel: "Finish journey for testing",
+                        backgroundColor: Color(red: 0.12, green: 0.68, blue: 0.38),
+                        foregroundColor: .white,
+                        size: 54
+                    ) {
+                        onDevFinish()
+                    }
+                }
+                #endif
+
                 TransiumIconButton(
                     icon: .system("xmark"),
                     label: "END".transiumLocalized,
@@ -98,27 +114,40 @@ private struct GoStepIcon: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            RoundedRectangle(cornerRadius: size * 0.35, style: .continuous)
-                .fill(.white)
-                .frame(width: size, height: size)
+            switch mode {
+            case .walking:
+                RoundedRectangle(cornerRadius: size * 0.35, style: .continuous)
+                    .fill(.white)
+                    .frame(width: size, height: size)
+                    .overlay {
+                        Image(systemName: mode.symbolName)
+                            .font(.system(size: size * 0.60, weight: .semibold))
+                            .foregroundStyle(TransiumColor.primaryBlue)
+                    }
 
-            Image(systemName: mode.symbolName)
-                .font(.system(size: size * 0.5, weight: .bold))
-                .foregroundStyle(TransiumColor.primaryBlue)
-                .frame(maxHeight: .infinity, alignment: .center)
-                .padding(.bottom, mode.badgeCode != nil ? 10 : 0)
+            case .bus:
+                Image("LineIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+            }
 
-            if let badge = mode.badgeCode {
-                Text(badge)
-                    .font(TransiumFont.body(11, weight: .bold))
+            if let badgeCode = mode.badgeCode {
+                Text(badgeCode)
+                    .font(TransiumFont.body(size * 0.20, weight: .bold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 1.5)
-                    .background(TransiumColor.darkBlue)
-                    .clipShape(.capsule)
-                    .offset(y: 4)
+                    .padding(.horizontal, size * 0.1)
+                    .padding(.vertical, size * 0.04)
+                    .background(TransiumColor.lightRed)
+                    .clipShape(.rect(cornerRadius: size * 0.12))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: size * 0.12, style: .continuous)
+                            .strokeBorder(.white, lineWidth: 2)
+                    }
+                    .offset(x: 0.06, y: 15)
             }
         }
+        .frame(width: size, height: size)
     }
 }
 
@@ -299,6 +328,7 @@ struct GoMissionCard: View {
                     .font(.system(size: 65 * 0.5, weight: .semibold))
                     .foregroundStyle(TransiumColor.primaryYellow)
             }
+            .frame(width: 65, height: 65)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Mission")

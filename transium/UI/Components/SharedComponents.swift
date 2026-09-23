@@ -277,7 +277,7 @@ struct QuestBadgePostageStack: View {
                         .fill(Color.black.opacity(0.08))
                 }
             }
-        } else if !imageSource.isEmpty && imageSource != "Beach" && imageSource != "BusFee" && UIImage(named: imageSource) != nil {
+        } else if !imageSource.isEmpty && UIImage(named: imageSource) != nil {
             Image(imageSource)
                 .resizable()
                 .scaledToFill()
@@ -287,19 +287,21 @@ struct QuestBadgePostageStack: View {
     }
 
     private var fallbackImage: some View {
-        let name: String = {
-            if !fallbackImageName.isEmpty && fallbackImageName != "Beach" && fallbackImageName != "BusFee" && UIImage(named: fallbackImageName) != nil {
-                return fallbackImageName
+        Group {
+            if !fallbackImageName.isEmpty, UIImage(named: fallbackImageName) != nil {
+                Image(fallbackImageName)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(theme.accent.opacity(0.15))
+                    Image(systemName: "map.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(theme.accent)
+                }
             }
-            switch theme {
-            case .red: return "gwk"
-            case .green: return "kintamani"
-            case .blue: return "sanoored"
-            }
-        }()
-        return Image(name)
-            .resizable()
-            .scaledToFill()
+        }
     }
 }
 
@@ -367,7 +369,7 @@ struct RecommendedQuestCard: View {
     var title: String = "Early Bird Walk"
     var subtitle: String = "Visit Sanur before 8 AM and capture the sunrise."
     var imageUrl: String? = nil
-    var fallbackImageName: String = "sanoored"
+    var fallbackImageName: String = ""
     var points: Int = 10
     var onStart: (() -> Void)? = nil
 
@@ -424,31 +426,28 @@ struct RecommendedQuestCard: View {
                                         highlightColor: Color.white.opacity(0.45)
                                     )
                             case .failure:
-                                Image("sanoored")
+                                Image(systemName: "ticket.fill")
                                     .resizable()
-                                    .scaledToFill()
+                                    .scaledToFit()
+                                    .padding(18)
+                                    .foregroundColor(.white.opacity(0.85))
                             @unknown default:
                                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                                     .fill(Color.white.opacity(0.2))
                             }
                         }
-                    } else if !fallbackImageName.isEmpty && fallbackImageName != "Beach" && fallbackImageName != "BusFee" && UIImage(named: fallbackImageName) != nil {
+                    } else if !fallbackImageName.isEmpty && UIImage(named: fallbackImageName) != nil {
                         Image(fallbackImageName)
                             .resizable()
                             .scaledToFill()
                     } else {
-                        Image("sanoored")
+                        Image(systemName: "ticket.fill")
                             .resizable()
-                            .scaledToFill()
+                            .scaledToFit()
+                            .padding(18)
+                            .foregroundColor(.white.opacity(0.85))
                     }
                 }
-                .background(
-                    Image(TransiumAsset.Illustration.wow)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 130, height: 130)
-                        .allowsHitTesting(false)
-                )
                 .padding(.bottom, 12)
  
                 TransiumPrimaryButton(
@@ -550,14 +549,6 @@ struct RecommendedQuestCardSkeleton: View {
                             highlightColor: Color.white.opacity(0.4)
                         )
                 }
-                .background(
-                    Image(TransiumAsset.Illustration.wow)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 130, height: 130)
-                        .opacity(0.3)
-                        .allowsHitTesting(false)
-                )
                 .padding(.bottom, 12)
 
                 // "Start Quest" button skeleton
@@ -677,7 +668,7 @@ struct QuestRowSkeleton: View {
             QuestRow(
                 quest: DetailPlaceScreen.Quest(
                     id: "preview-sanoored",
-                    fallbackImageName: "sanoored",
+                    fallbackImageName: "",
                     title: "Sanoored",
                     description: "Enjoy the vibe along the shore of Sanur",
                     points: 10,
@@ -688,7 +679,7 @@ struct QuestRowSkeleton: View {
             QuestRow(
                 quest: DetailPlaceScreen.Quest(
                     id: "preview-gela-tour",
-                    fallbackImageName: "traveling",
+                    fallbackImageName: "",
                     title: "Gela-tour",
                     description: "Gelato + Sanur weather = perfect summer",
                     points: 10,
@@ -699,7 +690,7 @@ struct QuestRowSkeleton: View {
             QuestRow(
                 quest: DetailPlaceScreen.Quest(
                     id: "preview-little-stalls",
-                    fallbackImageName: "gwk",
+                    fallbackImageName: "",
                     title: "Little Stalls",
                     description: "Go local by enjoying snacks from small businesses",
                     points: 10,

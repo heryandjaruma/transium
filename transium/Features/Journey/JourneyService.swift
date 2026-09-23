@@ -67,8 +67,8 @@ public final class JourneyService: JourneyServiceProtocol, Sendable {
     }
 
     public func getOverview(origin: LatLng, destination: LatLng) async throws -> JourneyResponse {
-        let originStr = "\(origin.lat),\(origin.lng)"
-        let destStr = "\(destination.lat),\(destination.lng)"
+        let originStr = String(format: "%.5f,%.5f", origin.lat, origin.lng)
+        let destStr = String(format: "%.5f,%.5f", destination.lat, destination.lng)
 
         let queryItems = [
             URLQueryItem(name: "origin", value: originStr),
@@ -92,7 +92,7 @@ public final class JourneyService: JourneyServiceProtocol, Sendable {
     }
 
     public func getRealJourney(questId: String, origin: LatLng, journeyAttemptId: String? = nil) async throws -> JourneyResponse {
-        let originStr = "\(origin.lat),\(origin.lng)"
+        let originStr = String(format: "%.5f,%.5f", origin.lat, origin.lng)
         var queryItems = [
             URLQueryItem(name: "questId", value: questId),
             URLQueryItem(name: "origin", value: originStr)
@@ -160,12 +160,12 @@ public final class JourneyService: JourneyServiceProtocol, Sendable {
         )
         return JourneyCompleteResult(
             journeyAttempt: response.journeyAttempt,
-            steps: response.steps,
+            steps: response.steps ?? [],
             summary: response.summary,
-            path: response.path,
-            xpAwarded: response.xpAwarded,
-            badgesAwarded: response.badgesAwarded,
-            profile: response.profile
+            path: response.path ?? [],
+            xpAwarded: response.xpAwarded ?? 0,
+            badgesAwarded: response.badgesAwarded ?? [],
+            profile: response.profile ?? Profile(id: "", userId: "", firstName: "", lastName: nil, level: 1, image: nil, email: "")
         )
     }
 

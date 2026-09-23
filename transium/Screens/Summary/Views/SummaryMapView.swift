@@ -8,6 +8,18 @@ import MapKit
 import MapLibre
 import SwiftUI
 
+/// Custom MLNMapView container that fires layout callbacks to ensure bounding box fits reliably once rendered.
+final class SummaryMapContainerView: MLNMapView {
+    var onLayoutChange: (() -> Void)?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if bounds.width > 0 && bounds.height > 0 {
+            onLayoutChange?()
+        }
+    }
+}
+
 /// Renders a dynamic vector map snapshot of the user's completed journey route following real road geometry.
 struct SummaryMapView: UIViewRepresentable {
     let journey: JourneyResult?
@@ -17,8 +29,8 @@ struct SummaryMapView: UIViewRepresentable {
         Coordinator(journey: journey, path: path)
     }
 
-    func makeUIView(context: Context) -> MLNMapView {
-        let mapView = MLNMapView(frame: .zero)
+    func makeUIView(context: Context) -> SummaryMapContainerView {
+        let mapView = SummaryMapContainerView(frame: .zero)
         mapView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         mapView.compassView.isHidden = true
         mapView.logoView.isHidden = true
@@ -27,6 +39,12 @@ struct SummaryMapView: UIViewRepresentable {
         mapView.showsUserLocation = false
         mapView.showsUserHeadingIndicator = false
         mapView.delegate = context.coordinator
+
+        let coordinator = context.coordinator
+        mapView.onLayoutChange = { [weak coordinator, weak mapView] in
+            guard let coordinator, let mapView else { return }
+            coordinator.applyCoordinateBounds(on: mapView)
+        }
 
         let defaultCenter = CLLocationCoordinate2D(latitude: -8.690, longitude: 115.220)
         mapView.setCenter(defaultCenter, zoomLevel: 12, animated: false)
@@ -40,7 +58,7 @@ struct SummaryMapView: UIViewRepresentable {
         return mapView
     }
 
-    func updateUIView(_ mapView: MLNMapView, context: Context) {
+    func updateUIView(_ mapView: SummaryMapContainerView, context: Context) {
         context.coordinator.journey = journey
         context.coordinator.path = path
         context.coordinator.resolveAndRenderOverlays(on: mapView)
@@ -54,6 +72,7 @@ struct SummaryMapView: UIViewRepresentable {
 
         private var addedSourceIds: [String] = []
         private var isResolvingRoads = false
+        private var currentBounds: MLNCoordinateBounds?
 
         init(journey: JourneyResult?, path: [JourneyPathPoint]) {
             self.journey = journey
@@ -149,19 +168,19 @@ struct SummaryMapView: UIViewRepresentable {
 
                     let casingLayer = MLNLineStyleLayer(identifier: "\(sourceId)-casing", source: source)
                     casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white)
-                    casingLayer.lineWidth = NSExpression(forConstantValue: 5.5)
+                    casingLayer.lineWidth = NSExpression(forConstantValue: 5.2)
                     casingLayer.lineCap = NSExpression(forConstantValue: "round")
                     casingLayer.lineJoin = NSExpression(forConstantValue: "round")
                     style.addLayer(casingLayer)
 
                     let isBus = (segment.type == "bus")
                     let lineColor = isBus
-                        ? UIColor(red: 0.12, green: 0.53, blue: 0.90, alpha: 1.0)
+                        ? UIColor(red: 0.14, green: 0.42, blue: 0.96, alpha: 1.0)
                         : UIColor(red: 0.06, green: 0.72, blue: 0.51, alpha: 1.0)
 
                     let lineLayer = MLNLineStyleLayer(identifier: "\(sourceId)-line", source: source)
                     lineLayer.lineColor = NSExpression(forConstantValue: lineColor)
-                    lineLayer.lineWidth = NSExpression(forConstantValue: isBus ? 4.0 : 3.2)
+                    lineLayer.lineWidth = NSExpression(forConstantValue: isBus ? 3.6 : 3.0)
                     lineLayer.lineCap = NSExpression(forConstantValue: "round")
                     lineLayer.lineJoin = NSExpression(forConstantValue: "round")
                     style.addLayer(lineLayer)
@@ -186,14 +205,16 @@ struct SummaryMapView: UIViewRepresentable {
 
                     let casingLayer = MLNLineStyleLayer(identifier: "\(sourceId)-casing", source: source)
                     casingLayer.lineColor = NSExpression(forConstantValue: UIColor.white)
-                    casingLayer.lineWidth = NSExpression(forConstantValue: 5.5)
+                    casingLayer.lineWidth = NSExpression(forConstantValue: 5.2)
                     casingLayer.lineCap = NSExpression(forConstantValue: "round")
+                    casingLayer.lineJoin = NSExpression(forConstantValue: "round")
                     style.addLayer(casingLayer)
 
                     let lineLayer = MLNLineStyleLayer(identifier: "\(sourceId)-line", source: source)
-                    lineLayer.lineColor = NSExpression(forConstantValue: UIColor(red: 0.12, green: 0.53, blue: 0.90, alpha: 1.0))
-                    lineLayer.lineWidth = NSExpression(forConstantValue: 4.0)
+                    lineLayer.lineColor = NSExpression(forConstantValue: UIColor(red: 0.14, green: 0.42, blue: 0.96, alpha: 1.0))
+                    lineLayer.lineWidth = NSExpression(forConstantValue: 3.6)
                     lineLayer.lineCap = NSExpression(forConstantValue: "round")
+                    lineLayer.lineJoin = NSExpression(forConstantValue: "round")
                     style.addLayer(lineLayer)
                 }
             }
@@ -209,13 +230,13 @@ struct SummaryMapView: UIViewRepresentable {
                 style.addSource(startSource)
 
                 let casingLayer = MLNCircleStyleLayer(identifier: "\(startSourceId)-casing", source: startSource)
-                casingLayer.circleRadius = NSExpression(forConstantValue: 10.0)
+                casingLayer.circleRadius = NSExpression(forConstantValue: 6.0)
                 casingLayer.circleColor = NSExpression(forConstantValue: UIColor.white)
                 style.addLayer(casingLayer)
 
                 let innerLayer = MLNCircleStyleLayer(identifier: "\(startSourceId)-inner", source: startSource)
-                innerLayer.circleRadius = NSExpression(forConstantValue: 7.0)
-                innerLayer.circleColor = NSExpression(forConstantValue: UIColor(red: 0.95, green: 0.30, blue: 0.25, alpha: 1.0))
+                innerLayer.circleRadius = NSExpression(forConstantValue: 4.2)
+                innerLayer.circleColor = NSExpression(forConstantValue: UIColor(red: 0.98, green: 0.28, blue: 0.25, alpha: 1.0))
                 style.addLayer(innerLayer)
             }
 
@@ -229,17 +250,17 @@ struct SummaryMapView: UIViewRepresentable {
                 style.addSource(destSource)
 
                 let casingLayer = MLNCircleStyleLayer(identifier: "\(destSourceId)-casing", source: destSource)
-                casingLayer.circleRadius = NSExpression(forConstantValue: 10.0)
+                casingLayer.circleRadius = NSExpression(forConstantValue: 6.0)
                 casingLayer.circleColor = NSExpression(forConstantValue: UIColor.white)
                 style.addLayer(casingLayer)
 
                 let innerLayer = MLNCircleStyleLayer(identifier: "\(destSourceId)-inner", source: destSource)
-                innerLayer.circleRadius = NSExpression(forConstantValue: 7.0)
-                innerLayer.circleColor = NSExpression(forConstantValue: UIColor(red: 0.09, green: 0.69, blue: 0.36, alpha: 1.0))
+                innerLayer.circleRadius = NSExpression(forConstantValue: 4.2)
+                innerLayer.circleColor = NSExpression(forConstantValue: UIColor(red: 0.09, green: 0.75, blue: 0.40, alpha: 1.0))
                 style.addLayer(innerLayer)
             }
 
-            // Fit Bounds
+            // Fit Bounds - zoom closely to user journey
             if allCoordinates.count >= 2 {
                 var minLat = allCoordinates[0].latitude
                 var maxLat = allCoordinates[0].latitude
@@ -253,20 +274,28 @@ struct SummaryMapView: UIViewRepresentable {
                     maxLng = max(maxLng, c.longitude)
                 }
 
-                let latMargin = max(0.006, (maxLat - minLat) * 0.18)
-                let lngMargin = max(0.006, (maxLng - minLng) * 0.18)
+                let latSpan = maxLat - minLat
+                let lngSpan = maxLng - minLng
+
+                let latMargin = max(0.001, latSpan * 0.06)
+                let lngMargin = max(0.001, lngSpan * 0.06)
 
                 let sw = CLLocationCoordinate2D(latitude: minLat - latMargin, longitude: minLng - lngMargin)
                 let ne = CLLocationCoordinate2D(latitude: maxLat + latMargin, longitude: maxLng + lngMargin)
-                let bounds = MLNCoordinateBounds(sw: sw, ne: ne)
-
-                mapView.setVisibleCoordinateBounds(
-                    bounds,
-                    edgePadding: UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20),
-                    animated: false,
-                    completionHandler: nil
-                )
+                currentBounds = MLNCoordinateBounds(sw: sw, ne: ne)
+                applyCoordinateBounds(on: mapView)
             }
+        }
+
+        func applyCoordinateBounds(on mapView: MLNMapView) {
+            guard let bounds = currentBounds, mapView.bounds.width > 0, mapView.bounds.height > 0 else { return }
+            let insets = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+            mapView.setVisibleCoordinateBounds(
+                bounds,
+                edgePadding: insets,
+                animated: false,
+                completionHandler: nil
+            )
         }
 
         private func parseCoordinates(_ geometry: [[Double]]) -> [CLLocationCoordinate2D] {
@@ -289,3 +318,4 @@ struct SummaryMapView: UIViewRepresentable {
         }
     }
 }
+

@@ -159,7 +159,7 @@ struct SavedQuestScreen: View {
                         DetailPlaceScreen.Quest(
                             id: bookmark.questId,
                             imageUrl: thumbUrl,
-                            fallbackImageName: "sanoored",
+                            fallbackImageName: "",
                             title: questDetail.name,
                             description: questDetail.description,
                             points: questDetail.xp ?? 10,
@@ -171,7 +171,7 @@ struct SavedQuestScreen: View {
                         DetailPlaceScreen.Quest(
                             id: bookmark.questId,
                             imageUrl: nil,
-                            fallbackImageName: "sanoored",
+                            fallbackImageName: "",
                             title: bookmark.questName,
                             description: "\(bookmark.questCategory) Quest",
                             points: 10,

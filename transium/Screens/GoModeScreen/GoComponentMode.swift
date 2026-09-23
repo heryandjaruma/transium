@@ -46,6 +46,7 @@ struct GoComponentMode: View {
     var onEnd: () -> Void = {}
     var onLocate: () -> Void = {}
     var onToggleMute: () -> Void = {}
+    var onDevFinish: () -> Void = {}
     /// Manual "I'm here" fallback for a specific quest step (mission/photo-checkpoint), passed
     /// straight through to GoTripDetailsPanel — see its own doc comment for why this exists.
     var onManualAdvance: (String) -> Void = { _ in }
@@ -88,7 +89,8 @@ struct GoComponentMode: View {
                     onEnd: onEnd,
                     onLocate: onLocate,
                     isMuted: isMuted,
-                    onToggleMute: onToggleMute
+                    onToggleMute: onToggleMute,
+                    onDevFinish: onDevFinish
                 )
                 .padding(.top, 16)
 
@@ -107,6 +109,7 @@ struct GoComponentMode: View {
                 geofenceMonitor: geofenceMonitor,
                 goStartResult: goStartResult,
                 onManualAdvance: onManualAdvance,
+                onDevFinish: onDevFinish,
                 isExpanded: $isTripDetailsExpanded
             )
         }

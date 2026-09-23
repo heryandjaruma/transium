@@ -578,11 +578,7 @@ struct ProfileScreen: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
             } else if earnedBadges.isEmpty {
-                Text(LocalizedStringKey("No badges yet — complete a quest to earn your first one."))
-                    .font(TransiumFont.body(14))
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
+                badgesEmptyState
             } else {
                 LazyVGrid(
                     columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
@@ -619,9 +615,11 @@ struct ProfileScreen: View {
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
 
-                                Text(Self.badgeDateFormatter.string(from: badge.earnedAt))
-                                    .font(TransiumFont.body(11).weight(.medium))
-                                    .foregroundColor(.gray)
+                                if let date = badge.earnedAt {
+                                    Text(Self.badgeDateFormatter.string(from: date))
+                                        .font(TransiumFont.body(11).weight(.medium))
+                                        .foregroundColor(.gray)
+                                }
                             }
                         }
                     }
@@ -630,10 +628,40 @@ struct ProfileScreen: View {
         }
     }
 
+    private var badgesEmptyState: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.04))
+                    .frame(width: 76, height: 76)
+
+                Image(systemName: "rosette")
+                    .font(.system(size: 32, weight: .light))
+                    .foregroundColor(Color(.systemGray2))
+            }
+            .padding(.top, 24)
+
+            VStack(spacing: 4) {
+                Text(LocalizedStringKey("No Badges Yet"))
+                    .font(TransiumFont.body(16, weight: .semibold))
+                    .foregroundColor(.black)
+
+                Text(LocalizedStringKey("Complete bus quests across Bali to earn collectible badges."))
+                    .font(TransiumFont.body(13))
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+                    .padding(.horizontal, 32)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
+    }
+
     // MARK: - Gallery Tab
     private var galleryTab: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Your Adventure Moments")
+            Text(LocalizedStringKey("Your Adventure Moments"))
                 .font(TransiumFont.body(17, weight: .semibold))
                 .foregroundColor(.black)
 
@@ -642,11 +670,7 @@ struct ProfileScreen: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
             } else if galleryPhotos.isEmpty {
-                Text("No photos yet — they'll show up here once you snap some on a quest.")
-                    .font(TransiumFont.body(14))
-                    .foregroundColor(.gray)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
+                galleryEmptyState
             } else {
                 LazyVGrid(
                     columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())],
@@ -709,6 +733,36 @@ struct ProfileScreen: View {
                 }
             }
         }
+    }
+
+    private var galleryEmptyState: some View {
+        VStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.04))
+                    .frame(width: 76, height: 76)
+
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 28, weight: .regular))
+                    .foregroundColor(Color(.systemGray2))
+            }
+            .padding(.top, 24)
+
+            VStack(spacing: 4) {
+                Text(LocalizedStringKey("No Photos Yet"))
+                    .font(TransiumFont.body(16, weight: .semibold))
+                    .foregroundColor(.black)
+
+                Text(LocalizedStringKey("Snap photos during your quests and Go Mode journeys to save them here."))
+                    .font(TransiumFont.body(13))
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(2)
+                    .padding(.horizontal, 32)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 32)
     }
 
     // MARK: - Photo Download

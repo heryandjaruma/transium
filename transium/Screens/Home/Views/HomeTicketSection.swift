@@ -48,7 +48,6 @@ struct HomeTicketSection: View {
                                 distance: HomeLocationFormatter.distanceText(for: group, currentLocation: currentLocation),
                                 price: "Rp. 4,4k",
                                 imageUrl: group.area.photoUrl ?? group.area.thumbnails.first?.url ?? group.quests.first?.thumbnails.first?.url,
-                                fallbackImageName: isRecommended ? "kintamani" : "sanoored",
                                 variant: variant
                             )
                             .contentShape(Rectangle())

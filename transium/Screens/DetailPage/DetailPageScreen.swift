@@ -25,7 +25,7 @@ struct DetailPlaceScreen: View {
             id: String = UUID().uuidString,
             imageUrl: String? = nil,
             badgeImageUrls: [String] = [],
-            fallbackImageName: String = "sanoored",
+            fallbackImageName: String = "",
             title: String,
             description: String,
             points: Int = 10,
@@ -305,13 +305,13 @@ struct DetailPlaceScreen: View {
                         )
                     }
                 } else {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         TransiumCategoryPaperBadge(category: resolvedCategory)
                         
                         Image("BusFee")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 95, height: 30)
+                            .frame(width: 90, height: 28)
                     }
                 }
             }
@@ -383,19 +383,11 @@ struct DetailPlaceScreen: View {
                         return nil
                     }
                     
-                    let fallbackImg: String = {
-                        switch theme {
-                        case .red: return "gwk"
-                        case .green: return "kintamani"
-                        case .blue: return "sanoored"
-                        }
-                    }()
-                    
                     loaded.append(Quest(
                         id: q.id,
                         imageUrl: thumbUrl,
                         badgeImageUrls: Array(badgeUrls.prefix(3)),
-                        fallbackImageName: fallbackImg,
+                        fallbackImageName: "",
                         title: q.name,
                         description: "\(q.category) • \(q.description)",
                         points: q.xp ?? 10,
@@ -432,25 +424,27 @@ struct TransiumCategoryPaperBadge: View {
             }
         }()
         
-        HStack(spacing: 5) {
+        HStack(spacing: 3) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
             Text(category.transiumLocalized)
-                .font(TransiumFont.display(12, weight: .semibold))
-                .tracking(0.8)
+                .font(TransiumFont.display(11, weight: .semibold))
+                .tracking(0.2)
                 .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
         .foregroundColor(.white)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .frame(height: 30)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 4)
+        .frame(height: 28)
         .background(
             Image(TransiumAsset.Ticket.paperBadge)
-                .resizable(capInsets: EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10), resizingMode: .stretch)
+                .resizable(capInsets: EdgeInsets(top: 6, leading: 7, bottom: 6, trailing: 7), resizingMode: .stretch)
                 .renderingMode(.template)
                 .foregroundStyle(bg)
                 .shadow(color: .black.opacity(0.12), radius: 0, x: 0, y: 1.5)
         )
+        .rotationEffect(.degrees(1))
     }
 }
 

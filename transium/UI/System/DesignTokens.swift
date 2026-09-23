@@ -25,11 +25,6 @@ enum TransiumAsset {
         
         static let permissionOnboarding = "permission-onboarding"
         static let payment = "Payment"
-        static let sanurBeach = "sanur_beach"
-        static let sanur_beach = sanurBeach
-        static let ubudForest = "ubud_forest"
-        static let ubud_forest = ubudForest
-        static let wow = "Wow"
     }
     
     enum Logo {
@@ -39,13 +34,6 @@ enum TransiumAsset {
     enum Ticket {
         static let postageFrame = "postage-frame"
         static let paperBadge = "paper-badge"
-    }
-    
-    enum Profile{
-        static let sanur = "sanoored"
-        static let kintamani = "kintamani"
-        static let gwk = "gwk"
-        static let uluwatu = "uluwatu"
     }
 }
 

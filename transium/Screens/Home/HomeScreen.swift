@@ -103,6 +103,8 @@ struct HomeScreen: View {
             SummaryScreen(
                 result: result,
                 journey: vm.activeJourney,
+                areaName: vm.activeAreaName,
+                badgeImageUrl: vm.activeBadgeImageUrl,
                 onDismiss: {
                     vm.journeyCompletionResult = nil
                     vm.endGoMode()
@@ -159,6 +161,7 @@ struct HomeScreen: View {
             onBack: { vm.endGoMode() },
             onEnd: { vm.endGoMode(cancelAttempt: true) },
             onLocate: { vm.centerMapOnUser() },
+            onDevFinish: { vm.devFinishActiveJourney() },
             onManualAdvance: { stepId in
                 guard let attemptId = vm.goJourneyAttempt?.id else { return }
                 vm.handleGeofenceEntered(stepId: stepId, attemptId: attemptId, isManualConfirmation: true)

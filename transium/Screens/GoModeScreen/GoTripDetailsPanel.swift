@@ -31,6 +31,7 @@ struct GoTripDetailsPanel: View {
     /// fire (GPS drift, being outside the server's own ~150m tolerance, etc.), wired by the
     /// caller to the exact same handler a real geofence trigger uses.
     var onManualAdvance: (String) -> Void = { _ in }
+    var onDevFinish: (() -> Void)? = nil
     @Binding var isExpanded: Bool
 
     @GestureState private var dragOffset: CGFloat = 0
@@ -179,7 +180,22 @@ struct GoTripDetailsPanel: View {
                     Spacer(minLength: 12)
 
                     #if DEBUG
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
+                        if let onDevFinish {
+                            Button(action: onDevFinish) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "flag.checkered")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text("FINISH")
+                                        .font(TransiumFont.body(10, weight: .bold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3.5)
+                                .background(Color(red: 0.12, green: 0.68, blue: 0.38))
+                                .clipShape(Capsule())
+                            }
+                        }
                         Button(action: shareGoStartResultJSON) {
                             Image(systemName: "play.circle")
                                 .font(.system(size: 14, weight: .medium))

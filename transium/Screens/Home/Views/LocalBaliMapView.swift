@@ -75,7 +75,7 @@ struct LocalBaliMapView: UIViewRepresentable {
         mapView.logoView.isHidden = true
         mapView.attributionButton.isHidden = true
         mapView.minimumZoomLevel = 9.0
-        mapView.maximumZoomLevel = 16.5
+        mapView.maximumZoomLevel = 18.5
         mapView.delegate = context.coordinator
         mapView.showsUserLocation = false
         mapView.showsUserHeadingIndicator = false
@@ -85,7 +85,7 @@ struct LocalBaliMapView: UIViewRepresentable {
         let initialCoord = displayLocation?.coordinate ?? CLLocationCoordinate2D(latitude: -8.73704, longitude: 115.17570)
         mapView.setCenter(
             initialCoord,
-            zoomLevel: 15.5,
+            zoomLevel: 16.5,
             animated: false
         )
         
@@ -139,7 +139,7 @@ struct LocalBaliMapView: UIViewRepresentable {
             } ?? true
             if changed {
                 context.coordinator.lastPinFocusCoordinate = pinFocusCoordinate
-                mapView.setCenter(pinFocusCoordinate, zoomLevel: 16.5, animated: true)
+                mapView.setCenter(pinFocusCoordinate, zoomLevel: 17.5, animated: true)
             }
         }
 
@@ -155,20 +155,27 @@ struct LocalBaliMapView: UIViewRepresentable {
         let isExplicitFocusRequest = context.coordinator.lastCenterRequestID != centerRequestID
 
         let didExitGoMode = !isGoMode && context.coordinator.wasGoMode
-        if isGoMode, !context.coordinator.wasGoMode {
+        let didEnterGoMode = isGoMode && !context.coordinator.wasGoMode
+        if didEnterGoMode {
             context.coordinator.isFollowing = true
         }
         context.coordinator.wasGoMode = isGoMode
 
         if didExitGoMode {
             context.coordinator.isFollowing = false
+            let targetAltitude = Coordinator.altitude(forZoomLevel: 16.5)
             let targetCamera = MLNMapCamera(
                 lookingAtCenter: displayLocation.coordinate,
-                altitude: 1600,
+                altitude: targetAltitude,
                 pitch: 0,
                 heading: 0
             )
-            mapView.setCamera(targetCamera, animated: true)
+            mapView.setCamera(
+                targetCamera,
+                withDuration: 1.0,
+                animationTimingFunction: CAMediaTimingFunction(name: .easeInEaseOut),
+                completionHandler: nil
+            )
             return
         }
 
@@ -180,7 +187,12 @@ struct LocalBaliMapView: UIViewRepresentable {
                 context.coordinator.isFollowing = true
             }
             guard context.coordinator.isFollowing else { return }
-            context.coordinator.applyThirdPersonCamera(on: mapView, location: displayLocation, deviceHeading: markerHeading)
+            context.coordinator.applyThirdPersonCamera(
+                on: mapView,
+                location: displayLocation,
+                deviceHeading: markerHeading,
+                isInitialTransition: didEnterGoMode || isExplicitFocusRequest
+            )
             return
         }
 
@@ -195,7 +207,7 @@ struct LocalBaliMapView: UIViewRepresentable {
             context.coordinator.lastCenteredCoordinate = displayLocation.coordinate
             mapView.setCenter(
                 displayLocation.coordinate,
-                zoomLevel: 15.5,
+                zoomLevel: 16.5,
                 animated: true
             )
         }
@@ -219,22 +231,25 @@ struct LocalBaliMapView: UIViewRepresentable {
         var onPinCenterChanged: ((CLLocationCoordinate2D) -> Void)?
         var lastPinFocusCoordinate: CLLocationCoordinate2D?
 
+        func mapViewRegionIsChanging(_ mapView: MLNMapView) {
+            syncMarkerTilt(on: mapView, isLiveChanging: true)
+        }
+
         func mapView(_ mapView: MLNMapView, regionDidChangeAnimated animated: Bool) {
             if isPinningActive {
                 onPinCenterChanged?(mapView.centerCoordinate)
             }
-            syncMarkerTilt(on: mapView)
+            syncMarkerTilt(on: mapView, isLiveChanging: false)
         }
 
         /// Keeps the user-location marker's 3D lean matched to the map's own live camera
         /// pitch — flat/planar at a top-down pitch, progressively leaning into perspective as
         /// the camera tilts, whether from Go Mode's third-person camera or the user manually
-        /// pinching/dragging the pitch by hand. Fired on every camera change (this delegate
-        /// method runs continuously through an interactive gesture, not just once it settles),
-        /// so the marker tracks the tilt live instead of jumping between fixed states.
-        func syncMarkerTilt(on mapView: MLNMapView) {
-            guard let userView = mapView.view(for: userAnnotation) as? PreviewUserAnnotationView else { return }
-            userView.updateTilt(pitch: mapView.camera.pitch, animated: true)
+        /// pinching/dragging the pitch by hand. Fired on every camera change (via `mapViewRegionIsChanging`
+        /// on every render frame), so the marker tracks the tilt live instead of jumping between fixed states.
+        func syncMarkerTilt(on mapView: MLNMapView, isLiveChanging: Bool = false) {
+            guard let userView = (mapView.view(for: userAnnotation) as? PreviewUserAnnotationView) ?? activeUserAnnotationView else { return }
+            userView.updateTilt(pitch: mapView.camera.pitch, animated: !isLiveChanging)
         }
 
         // MARK: - Go Mode third-person camera
@@ -254,13 +269,18 @@ struct LocalBaliMapView: UIViewRepresentable {
         private var routePathCoordinates: [CLLocationCoordinate2D] = []
         private var didAttachFollowGestureObservers = false
 
-        // Matches `MLNMapView.maximumZoomLevel` (set in `makeUIView`) — anything higher would
-        // just get silently clamped there anyway.
-        private static let thirdPersonZoomLevel: Double = 16.5
+        // Default third-person camera zoom level in Go Mode (street-level detail)
+        private static let thirdPersonZoomLevel: Double = 16.8
         private static let thirdPersonPitch: CGFloat = 55
         /// How far ahead along the route to look when computing the camera's heading — short
         /// enough to hug tight turns, long enough not to jitter on GPS noise between updates.
         private static let headingLookaheadMeters: CLLocationDistance = 25
+
+        /// Standard MapLibre camera altitude calculation from Web Mercator zoom level
+        static func altitude(forZoomLevel zoom: Double) -> CLLocationDistance {
+            let baseAltitude: CLLocationDistance = 35_000_000
+            return baseAltitude / pow(2.0, zoom)
+        }
 
         /// Adds gesture recognizers purely to *observe* the start of a manual pan/pinch/rotate
         /// (never consuming the touch — `cancelsTouchesInView = false` plus always allowing
@@ -295,7 +315,12 @@ struct LocalBaliMapView: UIViewRepresentable {
         /// device's raw compass: steadier (compass jitters, especially standing still) and
         /// answers "which way does the route go from here" rather than "which way is the
         /// phone physically pointed."
-        func applyThirdPersonCamera(on mapView: MLNMapView, location: CLLocation, deviceHeading: CLLocationDirection) {
+        func applyThirdPersonCamera(
+            on mapView: MLNMapView,
+            location: CLLocation,
+            deviceHeading: CLLocationDirection,
+            isInitialTransition: Bool = false
+        ) {
             let heading: CLLocationDirection
             if let ahead = pointAhead(of: location, on: routePathCoordinates, lookahead: Self.headingLookaheadMeters) {
                 heading = bearing(from: location.coordinate, to: ahead)
@@ -303,15 +328,29 @@ struct LocalBaliMapView: UIViewRepresentable {
                 heading = deviceHeading
             }
 
-            if abs(mapView.zoomLevel - Self.thirdPersonZoomLevel) > 0.3 {
-                mapView.setZoomLevel(Self.thirdPersonZoomLevel, animated: false)
-            }
+            let targetAltitude = Self.altitude(forZoomLevel: Self.thirdPersonZoomLevel)
+            let camera = MLNMapCamera(
+                lookingAtCenter: location.coordinate,
+                altitude: targetAltitude,
+                pitch: Self.thirdPersonPitch,
+                heading: heading
+            )
 
-            let camera = mapView.camera
-            camera.centerCoordinate = location.coordinate
-            camera.heading = heading
-            camera.pitch = Self.thirdPersonPitch
-            mapView.setCamera(camera, withDuration: 0.6, animationTimingFunction: CAMediaTimingFunction(name: .linear), completionHandler: nil)
+            if isInitialTransition {
+                mapView.setCamera(
+                    camera,
+                    withDuration: 1.2,
+                    animationTimingFunction: CAMediaTimingFunction(name: .easeInEaseOut),
+                    completionHandler: nil
+                )
+            } else {
+                mapView.setCamera(
+                    camera,
+                    withDuration: 0.8,
+                    animationTimingFunction: CAMediaTimingFunction(name: .easeOut),
+                    completionHandler: nil
+                )
+            }
         }
 
         /// A point `lookahead` meters ahead of `location` along `path`: finds the nearest
@@ -671,7 +710,7 @@ struct LocalBaliMapView: UIViewRepresentable {
             // 4. Focus map camera on route start leg at readable street zoom level
             let startCenter = CLLocationCoordinate2D(latitude: activeJourney.origin.lat, longitude: activeJourney.origin.lng)
             DispatchQueue.main.async {
-                mapView.setCenter(startCenter, zoomLevel: 14.8, animated: true)
+                mapView.setCenter(startCenter, zoomLevel: 16.0, animated: true)
             }
         }
         
@@ -1083,11 +1122,11 @@ struct LocalBaliMapView: UIViewRepresentable {
         /// tilt continuously rather than jumping between two fixed looks.
         func updateTilt(pitch: CGFloat, animated: Bool = true) {
             let clampedPitch = max(0, min(pitch, Self.maxPitch))
-            guard abs(clampedPitch - currentPitch) > 0.5 else { return }
+            guard abs(clampedPitch - currentPitch) > 0.2 else { return }
             currentPitch = clampedPitch
 
-            let animations = {
-                let fraction = clampedPitch / Self.maxPitch
+            let fraction = clampedPitch / Self.maxPitch
+            let apply = {
                 if clampedPitch > 0.5 {
                     var transform = CATransform3DIdentity
                     transform.m34 = -1.0 / 450.0
@@ -1106,13 +1145,13 @@ struct LocalBaliMapView: UIViewRepresentable {
 
             if animated {
                 UIView.animate(
-                    withDuration: 0.35,
+                    withDuration: 0.25,
                     delay: 0,
                     options: [.beginFromCurrentState, .curveEaseOut, .allowUserInteraction],
-                    animations: animations
+                    animations: apply
                 )
             } else {
-                animations()
+                UIView.performWithoutAnimation(apply)
             }
         }
         

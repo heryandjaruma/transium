@@ -56,11 +56,12 @@ public nonisolated struct JourneyResult: Codable, Equatable, Sendable {
         self.steps = steps
     }
 
-    /// The journey's true final destination name. When the journey ends in a mission (the
-    /// common case for GET /journey/real quests with a badge action at the destination — its
-    /// segment has no `to`, only `instructions`), that instruction is the destination-facing
-    /// name; otherwise it's the last travel leg's arrival point.
+    /// The journey's true final destination name. Returns the arrival point name of the last travel leg
+    /// that has a named location (`to?.name`), falling back to mission instructions or "Destination".
     public var destinationName: String {
+        if let lastLocationName = segments.reversed().compactMap({ $0.to?.name }).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+            return lastLocationName
+        }
         guard let lastSegment = segments.last else { return "Destination" }
         if lastSegment.isMission {
             return lastSegment.instructions ?? "Destination"
@@ -634,23 +635,38 @@ public nonisolated struct JourneyPathPointInput: Encodable, Sendable, Equatable 
 /// caller just finished, skipping any they already have.
 public nonisolated struct EarnedBadge: Codable, Identifiable, Sendable, Equatable {
     public let id: String
-    public let badgeId: String
+    public let badgeId: String?
     public let badgeName: String
-    public let badgeCategory: String
-    public let badgeType: String
+    public let badgeCategory: String?
+    public let badgeType: String?
     public let badgeImageUrl: String?
-    public let earnedAt: Date
+    public let earnedAt: Date?
     public let questId: String?
     public let questName: String?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case badgeId
+        case badgeName
+        case badgeCategory
+        case badgeType
+        case badgeImageUrl
+        case imageUrl
+        case image
+        case icon
+        case earnedAt
+        case questId
+        case questName
+    }
+
     public init(
         id: String,
-        badgeId: String,
+        badgeId: String? = nil,
         badgeName: String,
-        badgeCategory: String,
-        badgeType: String,
+        badgeCategory: String? = nil,
+        badgeType: String? = nil,
         badgeImageUrl: String? = nil,
-        earnedAt: Date,
+        earnedAt: Date? = nil,
         questId: String? = nil,
         questName: String? = nil
     ) {
@@ -663,6 +679,38 @@ public nonisolated struct EarnedBadge: Codable, Identifiable, Sendable, Equatabl
         self.earnedAt = earnedAt
         self.questId = questId
         self.questName = questName
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        self.badgeId = try? container.decode(String.self, forKey: .badgeId)
+        self.badgeName = (try? container.decode(String.self, forKey: .badgeName)) ?? "Badge"
+        self.badgeCategory = try? container.decode(String.self, forKey: .badgeCategory)
+        self.badgeType = try? container.decode(String.self, forKey: .badgeType)
+
+        let directUrl = try? container.decode(String.self, forKey: .badgeImageUrl)
+        let altImageUrl = try? container.decode(String.self, forKey: .imageUrl)
+        let altImage = try? container.decode(String.self, forKey: .image)
+        let altIcon = try? container.decode(String.self, forKey: .icon)
+        self.badgeImageUrl = directUrl ?? altImageUrl ?? altImage ?? altIcon
+
+        self.earnedAt = try? container.decode(Date.self, forKey: .earnedAt)
+        self.questId = try? container.decode(String.self, forKey: .questId)
+        self.questName = try? container.decode(String.self, forKey: .questName)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(badgeId, forKey: .badgeId)
+        try container.encode(badgeName, forKey: .badgeName)
+        try container.encodeIfPresent(badgeCategory, forKey: .badgeCategory)
+        try container.encodeIfPresent(badgeType, forKey: .badgeType)
+        try container.encodeIfPresent(badgeImageUrl, forKey: .badgeImageUrl)
+        try container.encodeIfPresent(earnedAt, forKey: .earnedAt)
+        try container.encodeIfPresent(questId, forKey: .questId)
+        try container.encodeIfPresent(questName, forKey: .questName)
     }
 }
 
@@ -759,16 +807,12 @@ public nonisolated struct CompleteJourneyRequest: Encodable, Sendable {
 
 nonisolated struct CompleteJourneyResponse: Codable {
     let journeyAttempt: JourneyAttempt
-    let steps: [JourneyAttemptStep]
-    // Documented as required, but the idempotent-no-op path (attempt already "completed" —
-    // notably including when /advance's own auto-completion beat this call to it) returns
-    // `null` in practice, since no JourneySummary row was ever created. Kept optional so
-    // decoding doesn't hard-fail on that.
+    let steps: [JourneyAttemptStep]?
     let summary: JourneySummary?
-    let path: [JourneyPathPoint]
-    let xpAwarded: Int
-    let badgesAwarded: [EarnedBadge]
-    let profile: Profile
+    let path: [JourneyPathPoint]?
+    let xpAwarded: Int?
+    let badgesAwarded: [EarnedBadge]?
+    let profile: Profile?
 }
 
 /// Result of POST /private/journey/{id}/complete: the now-`"completed"` attempt, the awarded
